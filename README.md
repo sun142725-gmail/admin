@@ -31,6 +31,8 @@
 - 角色管理 `/roles`
 - 权限管理 `/permissions`
 - 六爻占卜 `/divination`
+- 日志中心 `/audit-center`
+- 个人中心 `/profile`
 
 ## 5. docker-compose / nginx
 - `docker-compose.yml` 包含 mysql、redis、backend、frontend、nginx
@@ -86,6 +88,9 @@ docker-compose up --build
 - system:permission:list / create / update / delete
 - system:resource:create / update / delete
 - system:audit:list
+- system:audit:center
+- system:profile:view / update / password / avatar
+- system:divination:use
 
 ## 项目说明
 - 统一响应结构：`{ code, message, data, timestamp }`
