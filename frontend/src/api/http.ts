@@ -3,6 +3,7 @@ import axios from 'axios';
 import { store } from '../store';
 import { clearTokens, setTokens } from '../store/authSlice';
 import { enqueueLogEvent } from '../utils/logBatcher';
+import { uuid } from '../utils/uuid';
 
 const CLIENT_SOURCE = 'web';
 const LOG_ENDPOINT = '/log-center/events';
@@ -28,7 +29,7 @@ http.interceptors.request.use((config) => {
   }
   config.headers = config.headers ?? {};
   config.headers['x-source'] = CLIENT_SOURCE;
-  config.headers['x-trace-id'] = crypto.randomUUID();
+  config.headers['x-trace-id'] = uuid();
   (config as any).metadata = { startTime: Date.now() };
   return config;
 });

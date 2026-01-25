@@ -1,5 +1,6 @@
 // 日志批量上报用于合并埋点与前端日志请求。
 import { postLogEvents, LogEvent } from '../api/logCenter';
+import { uuid } from './uuid';
 
 const SESSION_KEY = 'rbac_session_id';
 const SOURCE = 'web';
@@ -12,7 +13,7 @@ let timer: number | null = null;
 export const getSessionId = () => {
   let sessionId = sessionStorage.getItem(SESSION_KEY);
   if (!sessionId) {
-    sessionId = crypto.randomUUID();
+    sessionId = uuid();
     sessionStorage.setItem(SESSION_KEY, sessionId);
   }
   return sessionId;
