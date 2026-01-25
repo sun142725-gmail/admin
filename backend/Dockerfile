@@ -1,6 +1,7 @@
 # 后端镜像用于构建与运行 NestJS 服务。
 FROM docker.m.daocloud.io/library/node:20-alpine AS builder
 WORKDIR /app
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json* ./
 RUN npm install
 COPY . .
