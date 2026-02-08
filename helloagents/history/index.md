@@ -20,6 +20,7 @@
 | 202601251700 | dict_management | Feature | ✅Completed | 2026-01/202601251700_dict_management/ |
 | 202601251753 | form_messages | Fix | ✅Completed | 2026-01/202601251753_form_messages/ |
 | 202601251814 | log_source_dict | Fix | ✅Completed | 2026-01/202601251814_log_source_dict/ |
+| 202602072234 | notification_module | Feature | ✅Completed | 2026-02/202602072234_notification-module/ |
 
 ---
 
@@ -39,3 +40,7 @@
 - [202601251700_dict_management](2026-01/202601251700_dict_management/) - 字典管理与多语言枚举查询
 - [202601251753_form_messages](2026-01/202601251753_form_messages/) - 全站表单提示文案统一
 - [202601251814_log_source_dict](2026-01/202601251814_log_source_dict/) - 日志来源映射字典
+
+### 2026-02
+
+- [202602072234_notification-module](2026-02/202602072234_notification-module/) - 通知管理模块

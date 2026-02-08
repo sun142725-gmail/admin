@@ -4,13 +4,16 @@ import {
   Catch,
   ExceptionFilter,
   HttpException,
-  HttpStatus
+  HttpStatus,
+  Logger
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ensureTraceId } from '../utils/trace';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -35,6 +38,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
         } else if (payload.message) {
           message = payload.message;
         }
+      }
+      if (status >= 500) {
+        this.logger.error(
+          `[${traceId}] ${request.method} ${request.url} -> ${status} ${message}`,
+          exception.stack
+        );
+      }
+    } else {
+      const error = exception as Error;
+      const detail = error?.message ?? 'Unknown error';
+      this.logger.error(
+        `[${traceId}] ${request.method} ${request.url} -> 500 ${detail}`,
+        error?.stack
+      );
+      if (process.env.NODE_ENV !== 'production' && detail) {
+        message = detail;
       }
     }
 

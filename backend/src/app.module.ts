@@ -17,6 +17,8 @@ import { AuditCenterModule } from './modules/audit-center/audit-center.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { LogCenterModule } from './modules/log-center/log-center.module';
 import { DictModule } from './modules/dict/dict.module';
+import { NotificationModule } from './modules/notification/notification.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { User } from './common/entities/user.entity';
 import { Role } from './common/entities/role.entity';
 import { Permission } from './common/entities/permission.entity';
@@ -29,6 +31,9 @@ import { FrontendLog } from './common/entities/frontend-log.entity';
 import { ErrorLog } from './common/entities/error-log.entity';
 import { Dict } from './common/entities/dict.entity';
 import { DictItem } from './common/entities/dict-item.entity';
+import { NotificationTemplate } from './common/entities/notification-template.entity';
+import { NotificationPublish } from './common/entities/notification-publish.entity';
+import { NotificationMessage } from './common/entities/notification-message.entity';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -60,7 +65,10 @@ const isTest = process.env.NODE_ENV === 'test';
               FrontendLog,
               ErrorLog,
               Dict,
-              DictItem
+              DictItem,
+              NotificationTemplate,
+              NotificationPublish,
+              NotificationMessage
             ],
             synchronize: true
           }
@@ -83,7 +91,10 @@ const isTest = process.env.NODE_ENV === 'test';
               FrontendLog,
               ErrorLog,
               Dict,
-              DictItem
+              DictItem,
+              NotificationTemplate,
+              NotificationPublish,
+              NotificationMessage
             ],
             synchronize: process.env.DB_SYNC === 'true'
           }
@@ -100,7 +111,9 @@ const isTest = process.env.NODE_ENV === 'test';
     AuditCenterModule,
     ProfileModule,
     LogCenterModule,
-    DictModule
+    DictModule,
+    NotificationModule,
+    DashboardModule
   ],
   providers: [
     {

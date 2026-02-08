@@ -35,6 +35,7 @@
 | LogCenter | 打点/前端/错误日志中心 | ✅Stable | [log-center](modules/log-center.md) |
 | Profile | 个人中心 | ✅Stable | [profile](modules/profile.md) |
 | Dict | 字典管理 | ✅Stable | [dict](modules/dict.md) |
+| Notification | 通知管理（模板/发布记录） | 🚧In Development | [notification](modules/notification.md) |
 
 ---
 

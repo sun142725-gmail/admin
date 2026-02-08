@@ -11,6 +11,9 @@ import { AuditCenterPage } from '../pages/audit-center/AuditCenterPage';
 import { ProfilePage } from '../pages/profile/ProfilePage';
 import { HomePage } from '../pages/home/HomePage';
 import { DictPage } from '../pages/dict/DictPage';
+import { TemplatePage } from '../pages/notification/TemplatePage';
+import { PublishPage } from '../pages/notification/PublishPage';
+import { InboxPage } from '../pages/notification/InboxPage';
 import { RequireAuth } from './RequireAuth';
 
 export const router = createBrowserRouter([
@@ -31,6 +34,10 @@ export const router = createBrowserRouter([
       { path: '/audit-center', element: <Navigate to="/logs/audit" replace /> },
       { path: '/logs/:type', element: <AuditCenterPage /> },
       { path: '/dicts', element: <DictPage /> },
+      { path: '/notifications/templates', element: <TemplatePage /> },
+      { path: '/notifications/publish', element: <PublishPage /> },
+      { path: '/notifications/publishes', element: <Navigate to="/notifications/publish" replace /> },
+      { path: '/notifications/inbox', element: <InboxPage /> },
       { path: '/profile', element: <ProfilePage /> }
     ]
   }

@@ -39,3 +39,4 @@ sequenceDiagram
 | ADR-003 | 日志中心独立模块 | 2026-01-25 | ✅Adopted | audit-center, profile | [详情](../history/2026-01/202601251353_profile_audit_center/how.md#adr-003-日志中心独立模块) |
 | ADR-004 | 日志分表与批量上报 | 2026-01-25 | ✅Adopted | log-center, frontend | [详情](../history/2026-01/202601251534_log_center_enhance/how.md#adr-004-日志类型分表--统一查询层) |
 | ADR-005 | 字典分表与缓存 | 2026-01-25 | ✅Adopted | dict | [详情](../history/2026-01/202601251700_dict_management/how.md#adr-005-字典分表--redis-缓存) |
+| ADR-006 | 通道适配器可插拔方案 | 2026-02-07 | ✅Adopted | notification | [详情](../history/2026-02/202602072234_notification-module/how.md#adr-001-通道适配器可插拔方案) |

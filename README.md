@@ -22,6 +22,7 @@
 - Permissions：权限 CRUD
 - Resources：菜单树、资源 CRUD
 - Audit：审计日志查询
+- Notification：模板管理、通知发布、发送记录、站内信收件箱
 - 接口文档：`/api/docs`
 
 ## 4. 前端路由与页面
@@ -32,6 +33,9 @@
 - 权限管理 `/permissions`
 - 六爻占卜 `/divination`
 - 日志中心 `/audit-center`
+- 通知模板 `/notifications/templates`
+- 通知发布 `/notifications/publish`
+- 站内信 `/notifications/inbox`
 - 个人中心 `/profile`
 
 ## 5. docker-compose / nginx
@@ -91,8 +95,12 @@ docker-compose up --build
 - system:audit:center
 - system:profile:view / update / password / avatar
 - system:divination:use
+- system:notification:template:list / create / update / delete
+- system:notification:publish:list / create / retry
+- system:notification:inbox:list / read
 
 ## 项目说明
 - 统一响应结构：`{ code, message, data, timestamp }`
 - refreshToken 仅用于刷新（tokenVersion 策略）
 - 密码使用 bcrypt 加密
+- 飞书机器人地址通过环境变量 `FEISHU_BOT_WEBHOOK` 配置

@@ -35,9 +35,11 @@ export class SeedService implements OnModuleInit {
     }
     const userCount = await this.userRepo.count();
     if (userCount > 0) {
+      await this.ensureDashboardSetup();
       await this.ensureDivinationSetup();
       await this.ensureProfileAndAuditCenter();
       await this.ensureDictSetup();
+      await this.ensureNotificationSetup();
       return;
     }
 
@@ -46,6 +48,7 @@ export class SeedService implements OnModuleInit {
     await this.seedResources();
     await this.seedAdminUser(role);
     await this.ensureDictSetup();
+    await this.ensureNotificationSetup();
     this.logger.log('初始化数据已完成');
   }
 
@@ -71,6 +74,7 @@ export class SeedService implements OnModuleInit {
       { name: '资源新增', code: 'system:resource:create' },
       { name: '资源更新', code: 'system:resource:update' },
       { name: '资源删除', code: 'system:resource:delete' },
+      { name: '首页监控', code: 'system:dashboard:view' },
       { name: '审计日志', code: 'system:audit:list' },
       { name: '日志中心', code: 'system:audit:center' },
       { name: '字典列表', code: 'system:dict:list' },
@@ -81,7 +85,16 @@ export class SeedService implements OnModuleInit {
       { name: '个人中心更新', code: 'system:profile:update' },
       { name: '个人中心改密', code: 'system:profile:password' },
       { name: '个人中心头像', code: 'system:profile:avatar' },
-      { name: '占卜入口', code: 'system:divination:use' }
+      { name: '占卜入口', code: 'system:divination:use' },
+      { name: '通知模板列表', code: 'system:notification:template:list' },
+      { name: '新增通知模板', code: 'system:notification:template:create' },
+      { name: '编辑通知模板', code: 'system:notification:template:update' },
+      { name: '删除通知模板', code: 'system:notification:template:delete' },
+      { name: '通知发布列表', code: 'system:notification:publish:list' },
+      { name: '通知发布发送', code: 'system:notification:publish:create' },
+      { name: '通知发布重试', code: 'system:notification:publish:retry' },
+      { name: '站内信收件箱', code: 'system:notification:inbox:list' },
+      { name: '站内信已读', code: 'system:notification:inbox:read' }
     ];
     const entities = this.permissionRepo.create(items);
     return this.permissionRepo.save(entities);
@@ -128,11 +141,15 @@ export class SeedService implements OnModuleInit {
     );
 
     const children = [
+      { name: '系统首页', type: 'page', path: '/', parentId: system.id, permissionCode: 'system:dashboard:view' },
       { name: '用户管理', type: 'page', path: '/users', parentId: system.id, permissionCode: 'system:user:list' },
       { name: '角色管理', type: 'page', path: '/roles', parentId: system.id, permissionCode: 'system:role:list' },
       { name: '权限管理', type: 'page', path: '/permissions', parentId: system.id, permissionCode: 'system:permission:list' },
       { name: '六爻占卜', type: 'page', path: '/divination', parentId: tools.id, permissionCode: 'system:divination:use' },
       { name: '字典管理', type: 'page', path: '/dicts', parentId: config.id, permissionCode: 'system:dict:list' },
+      { name: '通知模板', type: 'page', path: '/notifications/templates', parentId: config.id, permissionCode: 'system:notification:template:list' },
+      { name: '通知发布', type: 'page', path: '/notifications/publish', parentId: config.id, permissionCode: 'system:notification:publish:list' },
+      { name: '站内信', type: 'page', path: '/notifications/inbox', parentId: config.id, permissionCode: 'system:notification:inbox:list' },
       { name: '审计日志', type: 'page', path: '/logs/audit', parentId: logs.id, permissionCode: 'system:audit:list' },
       { name: '打点日志', type: 'page', path: '/logs/track', parentId: logs.id, permissionCode: 'system:audit:center' },
       { name: '前端日志', type: 'page', path: '/logs/frontend', parentId: logs.id, permissionCode: 'system:audit:center' },
@@ -151,6 +168,7 @@ export class SeedService implements OnModuleInit {
 
   private async ensureProfileAndAuditCenter() {
     const permissions = [
+      { name: '首页监控', code: 'system:dashboard:view' },
       { name: '审计日志', code: 'system:audit:list' },
       { name: '日志中心', code: 'system:audit:center' },
       { name: '个人中心查看', code: 'system:profile:view' },
@@ -163,6 +181,12 @@ export class SeedService implements OnModuleInit {
       await this.ensureAdminRolePermission(permission);
     }
     await this.ensureLogPages();
+  }
+
+  private async ensureDashboardSetup() {
+    const permission = await this.ensurePermissionByCode('system:dashboard:view', '首页监控');
+    await this.ensureAdminRolePermission(permission);
+    await this.ensureDashboardResource();
   }
 
   private async ensureDictSetup() {
@@ -178,6 +202,25 @@ export class SeedService implements OnModuleInit {
     }
     await this.ensureDictResource();
     await this.ensureSourceTypeDict();
+  }
+
+  private async ensureNotificationSetup() {
+    const permissions = [
+      { name: '通知模板列表', code: 'system:notification:template:list' },
+      { name: '新增通知模板', code: 'system:notification:template:create' },
+      { name: '编辑通知模板', code: 'system:notification:template:update' },
+      { name: '删除通知模板', code: 'system:notification:template:delete' },
+      { name: '通知发布列表', code: 'system:notification:publish:list' },
+      { name: '通知发布发送', code: 'system:notification:publish:create' },
+      { name: '通知发布重试', code: 'system:notification:publish:retry' },
+      { name: '站内信收件箱', code: 'system:notification:inbox:list' },
+      { name: '站内信已读', code: 'system:notification:inbox:read' }
+    ];
+    for (const item of permissions) {
+      const permission = await this.ensurePermissionByCode(item.code, item.name);
+      await this.ensureAdminRolePermission(permission);
+    }
+    await this.ensureNotificationResources();
   }
 
   private async ensurePermission() {
@@ -236,6 +279,37 @@ export class SeedService implements OnModuleInit {
         path,
         parentId: system.id,
         permissionCode
+      })
+    );
+  }
+
+  private async ensureDashboardResource() {
+    const systemMenu = await this.ensureSystemMenu();
+    const exists = await this.resourceRepo.findOne({ where: { path: '/' } });
+    if (exists) {
+      if (
+        exists.parentId !== systemMenu.id ||
+        exists.permissionCode !== 'system:dashboard:view' ||
+        exists.name !== '系统首页'
+      ) {
+        await this.resourceRepo.update(
+          { id: exists.id },
+          {
+            name: '系统首页',
+            parentId: systemMenu.id,
+            permissionCode: 'system:dashboard:view'
+          }
+        );
+      }
+      return;
+    }
+    await this.resourceRepo.save(
+      this.resourceRepo.create({
+        name: '系统首页',
+        type: 'page',
+        path: '/',
+        parentId: systemMenu.id,
+        permissionCode: 'system:dashboard:view'
       })
     );
   }
@@ -307,6 +381,20 @@ export class SeedService implements OnModuleInit {
       );
     }
     return logMenu;
+  }
+
+  private async ensureSystemMenu() {
+    let systemMenu = await this.resourceRepo.findOne({ where: { name: '系统管理', type: 'menu' } });
+    if (!systemMenu) {
+      systemMenu = await this.resourceRepo.save(
+        this.resourceRepo.create({
+          name: '系统管理',
+          type: 'menu',
+          sortOrder: 1
+        })
+      );
+    }
+    return systemMenu;
   }
 
   private async ensureSystemConfigMenu() {
@@ -391,6 +479,53 @@ export class SeedService implements OnModuleInit {
           })
         );
       }
+    }
+  }
+
+  private async ensureNotificationResources() {
+    const configMenu = await this.ensureSystemConfigMenu();
+    const pages = [
+      {
+        name: '通知模板',
+        path: '/notifications/templates',
+        permissionCode: 'system:notification:template:list'
+      },
+      {
+        name: '通知发布',
+        path: '/notifications/publish',
+        permissionCode: 'system:notification:publish:list'
+      },
+      {
+        name: '站内信',
+        path: '/notifications/inbox',
+        permissionCode: 'system:notification:inbox:list'
+      }
+    ];
+
+    for (const page of pages) {
+      const exists = await this.resourceRepo.findOne({ where: { path: page.path } });
+      if (exists) {
+        if (
+          exists.parentId !== configMenu.id ||
+          exists.permissionCode !== page.permissionCode ||
+          exists.name !== page.name
+        ) {
+          await this.resourceRepo.update(
+            { id: exists.id },
+            { name: page.name, parentId: configMenu.id, permissionCode: page.permissionCode }
+          );
+        }
+        continue;
+      }
+      await this.resourceRepo.save(
+        this.resourceRepo.create({
+          name: page.name,
+          type: 'page',
+          path: page.path,
+          parentId: configMenu.id,
+          permissionCode: page.permissionCode
+        })
+      );
     }
   }
 
