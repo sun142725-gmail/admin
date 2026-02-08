@@ -3,7 +3,8 @@ FROM docker.m.daocloud.io/library/node:20-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json* ./
-RUN npm install
+# 构建阶段仅需编译 TypeScript，跳过依赖安装脚本可避免 sqlite3/node-gyp 网络编译失败。
+RUN npm install --ignore-scripts
 COPY . .
 RUN npm run build
 
