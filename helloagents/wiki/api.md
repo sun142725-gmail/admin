@@ -174,3 +174,23 @@
 
 #### DELETE /api/dict-items/:id
 **说明:** 删除字典项。
+
+### Notification
+
+#### GET /api/notifications/templates
+**说明:** 通知模板列表查询。
+
+#### POST /api/notifications/templates
+**说明:** 新增通知模板。
+
+#### PATCH /api/notifications/templates/:id
+**说明:** 更新通知模板。
+
+#### POST /api/notifications/publish
+**说明:** 发布通知。
+
+#### GET /api/notifications/publish
+**说明:** 通知发布记录列表。
+
+#### POST /api/notifications/publish/:id/retry
+**说明:** 手动重试发布记录。

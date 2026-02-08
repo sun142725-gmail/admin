@@ -1,5 +1,5 @@
 // 主布局提供菜单、头部与内容容器。
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Layout, Menu, Breadcrumb, Dropdown, Space, message } from 'antd';
 import {
   AppstoreOutlined,
@@ -7,6 +7,7 @@ import {
   ExperimentOutlined,
   FileSearchOutlined,
   FileTextOutlined,
+  HomeOutlined,
   SafetyOutlined,
   SettingOutlined,
   TeamOutlined,
@@ -33,6 +34,7 @@ interface MenuItem {
 const getMenuIcon = (item: MenuItem) => {
   if (item.path) {
     const pathIconMap: Record<string, React.ReactNode> = {
+      '/': <HomeOutlined />,
       '/users': <UserOutlined />,
       '/roles': <TeamOutlined />,
       '/permissions': <SafetyOutlined />,
@@ -42,11 +44,15 @@ const getMenuIcon = (item: MenuItem) => {
       '/logs/error': <FileSearchOutlined />,
       '/divination': <ExperimentOutlined />,
       '/dicts': <BookOutlined />,
+      '/notifications/templates': <BookOutlined />,
+      '/notifications/publish': <FileTextOutlined />,
+      '/notifications/inbox': <IdcardOutlined />,
       '/profile': <IdcardOutlined />
     };
     return pathIconMap[item.path];
   }
   const nameIconMap: Record<string, React.ReactNode> = {
+    系统首页: <HomeOutlined />,
     系统管理: <SettingOutlined />,
     系统配置: <SettingOutlined />,
     日志管理: <FileSearchOutlined />,
@@ -82,6 +88,9 @@ const PAGE_CODE_MAP: Record<string, string> = {
   '/logs/error': 'log_error',
   '/divination': 'tool_divination',
   '/dicts': 'config_dict',
+  '/notifications/templates': 'notification_template',
+  '/notifications/publish': 'notification_publish',
+  '/notifications/inbox': 'notification_inbox',
   '/profile': 'profile'
 };
 
@@ -93,11 +102,53 @@ export const MainLayout: React.FC = () => {
   const permissions = profile?.permissions ?? [];
   const [collapsed, setCollapsed] = useState(true);
   const [menuTree, setMenuTree] = useState<MenuItem[]>([]);
+  const enterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearHoverTimers = () => {
+    if (enterTimerRef.current) {
+      clearTimeout(enterTimerRef.current);
+      enterTimerRef.current = null;
+    }
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+  };
+
+  const handleSiderMouseEnter = () => {
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+    if (!collapsed) {
+      return;
+    }
+    enterTimerRef.current = setTimeout(() => {
+      setCollapsed(false);
+      enterTimerRef.current = null;
+    }, 140);
+  };
+
+  const handleSiderMouseLeave = () => {
+    if (enterTimerRef.current) {
+      clearTimeout(enterTimerRef.current);
+      enterTimerRef.current = null;
+    }
+    leaveTimerRef.current = setTimeout(() => {
+      setCollapsed(true);
+      leaveTimerRef.current = null;
+    }, 240);
+  };
 
   useEffect(() => {
     fetchProfile().then((data) => dispatch(setProfile(data)));
     fetchMenuTree().then((data) => setMenuTree(data));
   }, [dispatch]);
+
+  useEffect(() => {
+    return () => clearHoverTimers();
+  }, []);
 
   useEffect(() => {
     const pageCode = PAGE_CODE_MAP[location.pathname];
@@ -169,8 +220,8 @@ export const MainLayout: React.FC = () => {
         collapsedWidth={72}
         collapsed={collapsed}
         theme="light"
-        onMouseEnter={() => setCollapsed(false)}
-        onMouseLeave={() => setCollapsed(true)}
+        onMouseEnter={handleSiderMouseEnter}
+        onMouseLeave={handleSiderMouseLeave}
       >
         <div style={{ padding: 16, fontWeight: 600 }}>
           <Link

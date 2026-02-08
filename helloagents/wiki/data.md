@@ -195,6 +195,51 @@
 | created_at | datetime |  | 创建时间 |
 | updated_at | datetime |  | 更新时间 |
 
+### notification_templates
+**说明:** 通知模板
+
+| 字段 | 类型 | 约束 | 描述 |
+|------|------|------|------|
+| id | bigint | PK | 模板主键 |
+| name | varchar | Not Null | 模板名称 |
+| channel_types | json | Not Null | 通道类型 |
+| content | text | Not Null | 模板内容 |
+| variables | json |  | 变量定义 |
+| status | tinyint | Not Null | 0=停用,1=启用 |
+| created_at | datetime |  | 创建时间 |
+| updated_at | datetime |  | 更新时间 |
+
+### notification_publishes
+**说明:** 通知发布记录
+
+| 字段 | 类型 | 约束 | 描述 |
+|------|------|------|------|
+| id | bigint | PK | 发布主键 |
+| template_id | bigint | Not Null | 模板ID |
+| channel_type | varchar | Not Null | 通道类型 |
+| payload | json |  | 发送参数 |
+| status | varchar | Not Null | 发送状态 |
+| fail_reason | text |  | 失败原因 |
+| retry_count | int | Not Null | 重试次数 |
+| idempotency_key | varchar |  | 幂等标识 |
+| created_at | datetime |  | 创建时间 |
+| updated_at | datetime |  | 更新时间 |
+
+### notification_messages
+**说明:** 站内信消息
+
+| 字段 | 类型 | 约束 | 描述 |
+|------|------|------|------|
+| id | bigint | PK | 消息主键 |
+| publish_id | bigint | Not Null | 发布记录ID |
+| user_id | bigint | Not Null | 用户ID |
+| title | varchar | Not Null | 标题 |
+| content | text | Not Null | 内容 |
+| status | varchar | Not Null | unread/read |
+| read_at | datetime |  | 阅读时间 |
+| created_at | datetime |  | 创建时间 |
+| updated_at | datetime |  | 更新时间 |
+
 ---
 
 ## 关系
