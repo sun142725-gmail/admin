@@ -21,6 +21,7 @@
 | 202601251753 | form_messages | Fix | ✅Completed | 2026-01/202601251753_form_messages/ |
 | 202601251814 | log_source_dict | Fix | ✅Completed | 2026-01/202601251814_log_source_dict/ |
 | 202602072234 | notification_module | Feature | ✅Completed | 2026-02/202602072234_notification-module/ |
+| 202602092206 | docker_mirror_fix | Fix | ✅Completed | 2026-02/202602092206_docker_mirror_fix/ |
 
 ---
 
@@ -44,3 +45,4 @@
 ### 2026-02
 
 - [202602072234_notification-module](2026-02/202602072234_notification-module/) - 通知管理模块
+- [202602092206_docker_mirror_fix](2026-02/202602092206_docker_mirror_fix/) - Docker 构建镜像源与运行阶段依赖修复

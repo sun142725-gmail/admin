@@ -9,6 +9,9 @@
 - **文档:** Swagger
 - **部署:** Docker Compose + Nginx
 - **镜像源:** docker.m.daocloud.io/library
+- **Alpine apk 源:** mirrors.aliyun.com/alpine（沿用当前 Alpine 版本路径）
+- **npm registry:** https://registry.npmmirror.com
+- **构建依赖:** 后端运行阶段需 python3/make/g++ 以支持 sqlite3 编译
 
 ---
 
