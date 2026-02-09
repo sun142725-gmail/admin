@@ -80,6 +80,32 @@ docker-compose up --build
 - Nginx：http://localhost
 - Swagger：http://localhost:3000/api/docs
 
+## 服务器更新代码后重启
+```bash
+cd /你的项目目录
+git pull
+docker-compose up -d --build backend frontend nginx
+docker-compose logs --tail=200 backend
+```
+
+按模块重启：
+
+- 仅前端变更：
+```bash
+docker-compose up -d --build frontend nginx
+```
+
+- 仅后端变更：
+```bash
+docker-compose up -d --build backend
+```
+
+若旧版 `docker-compose` 出现 `ContainerConfig` 相关报错，可执行兜底重建：
+```bash
+docker-compose rm -f frontend backend nginx
+docker-compose up -d --build backend frontend nginx
+```
+
 ---
 
 ## 默认账号密码
