@@ -1,6 +1,6 @@
 // 主布局提供菜单、头部与内容容器。
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Layout, Menu, Breadcrumb, Dropdown, Space, message } from 'antd';
+import { Layout, Menu, Breadcrumb, Dropdown, Space, message, Avatar } from 'antd';
 import {
   AppstoreOutlined,
   BookOutlined,
@@ -102,8 +102,10 @@ export const MainLayout: React.FC = () => {
   const permissions = profile?.permissions ?? [];
   const [collapsed, setCollapsed] = useState(true);
   const [menuTree, setMenuTree] = useState<MenuItem[]>([]);
+  const [openKeys, setOpenKeys] = useState<string[]>([]);
   const enterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const expandMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearHoverTimers = () => {
     if (enterTimerRef.current) {
@@ -113,6 +115,10 @@ export const MainLayout: React.FC = () => {
     if (leaveTimerRef.current) {
       clearTimeout(leaveTimerRef.current);
       leaveTimerRef.current = null;
+    }
+    if (expandMenuTimerRef.current) {
+      clearTimeout(expandMenuTimerRef.current);
+      expandMenuTimerRef.current = null;
     }
   };
 
@@ -127,7 +133,7 @@ export const MainLayout: React.FC = () => {
     enterTimerRef.current = setTimeout(() => {
       setCollapsed(false);
       enterTimerRef.current = null;
-    }, 140);
+    }, 180);
   };
 
   const handleSiderMouseLeave = () => {
@@ -138,7 +144,7 @@ export const MainLayout: React.FC = () => {
     leaveTimerRef.current = setTimeout(() => {
       setCollapsed(true);
       leaveTimerRef.current = null;
-    }, 240);
+    }, 560);
   };
 
   useEffect(() => {
@@ -168,6 +174,50 @@ export const MainLayout: React.FC = () => {
 
   const items = useMemo(() => buildMenuItems(menuTree, permissions), [menuTree, permissions]);
 
+  const activeParentKeys = useMemo(() => {
+    const findParents = (nodes: MenuItem[], targetPath: string, parents: string[] = []): string[] => {
+      for (const node of nodes) {
+        const nodeKey = node.path ?? String(node.id);
+        if (node.path === targetPath) {
+          return parents;
+        }
+        if (node.children?.length) {
+          const matchedParents = findParents(node.children, targetPath, [...parents, nodeKey]);
+          if (matchedParents.length) {
+            return matchedParents;
+          }
+        }
+      }
+      return [];
+    };
+
+    return findParents(menuTree, location.pathname);
+  }, [location.pathname, menuTree]);
+
+  useEffect(() => {
+    if (expandMenuTimerRef.current) {
+      clearTimeout(expandMenuTimerRef.current);
+      expandMenuTimerRef.current = null;
+    }
+
+    if (collapsed) {
+      setOpenKeys([]);
+      return;
+    }
+
+    expandMenuTimerRef.current = setTimeout(() => {
+      setOpenKeys(activeParentKeys);
+      expandMenuTimerRef.current = null;
+    }, 360);
+
+    return () => {
+      if (expandMenuTimerRef.current) {
+        clearTimeout(expandMenuTimerRef.current);
+        expandMenuTimerRef.current = null;
+      }
+    };
+  }, [activeParentKeys, collapsed]);
+
   const breadcrumbMap = useMemo(() => {
     const map = new Map<string, string[]>();
     const walk = (nodes: MenuItem[], parents: string[]) => {
@@ -188,6 +238,9 @@ export const MainLayout: React.FC = () => {
   const breadcrumbItems = useMemo(() => {
     if (location.pathname === '/') {
       return [{ title: '首页' }];
+    }
+    if (/^\/roles\/\d+\/permissions$/.test(location.pathname)) {
+      return [{ title: '系统管理' }, { title: '角色管理' }, { title: '功能权限' }];
     }
     const custom = {
       '/profile': ['个人中心']
@@ -213,8 +266,10 @@ export const MainLayout: React.FC = () => {
     navigate('/profile');
   };
 
+  const baseSiderWidth = 72;
+
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout className={`app-shell ${collapsed ? 'is-collapsed' : 'is-expanded'}`}>
       <Sider
         width={220}
         collapsedWidth={72}
@@ -222,22 +277,48 @@ export const MainLayout: React.FC = () => {
         theme="light"
         onMouseEnter={handleSiderMouseEnter}
         onMouseLeave={handleSiderMouseLeave}
+        className="app-sider"
       >
-        <div style={{ padding: 16, fontWeight: 600 }}>
+        <div className={`app-brand ${collapsed ? 'is-collapsed' : ''}`}>
           <Link
             to="/"
-            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+            className="app-brand-link"
           >
-            <AppstoreOutlined />
-            {!collapsed && <span>RBAC 管理后台</span>}
+            <span className="app-brand-mark">
+              <AppstoreOutlined />
+            </span>
+            <span className="app-brand-text">RBAC 管理后台</span>
           </Link>
         </div>
-        <Menu mode="inline" items={items} selectedKeys={[location.pathname]} />
+        <Menu
+          mode="inline"
+          items={items}
+          selectedKeys={[location.pathname]}
+          openKeys={openKeys}
+          onOpenChange={(keys) => {
+            if (!collapsed) {
+              setOpenKeys(keys as string[]);
+            }
+          }}
+          className="app-menu"
+        />
       </Sider>
-      <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px' }}>
-          <Space style={{ float: 'right' }}>
-            <span>{profile?.nickname ?? profile?.username}</span>
+      <Layout
+        className={`app-main ${collapsed ? 'is-collapsed' : 'is-expanded'}`}
+        style={{ marginLeft: baseSiderWidth }}
+      >
+        <Header
+          className="app-header"
+          style={{ left: baseSiderWidth, width: `calc(100vw - ${baseSiderWidth}px)` }}
+        >
+          <div className="app-header-left">
+            <div className="app-header-title-row">
+              <div className="app-header-title">企业 RBAC 管理台</div>
+            </div>
+            <div className="app-header-subtitle">权限、日志、通知与系统配置统一管理</div>
+          </div>
+          <Space className="app-header-actions" size={16}>
+            <span className="app-header-identity">{profile?.nickname ?? profile?.username}</span>
             <Dropdown
               menu={{
                 items: [
@@ -254,16 +335,18 @@ export const MainLayout: React.FC = () => {
                 ]
               }}
             >
-              <a onClick={(e) => e.preventDefault()}>
-                <UserOutlined />
+              <a onClick={(e) => e.preventDefault()} className="app-avatar-trigger">
+                <Avatar size={36} icon={<UserOutlined />} />
               </a>
             </Dropdown>
           </Space>
         </Header>
-        <Content style={{ margin: '16px 24px' }}>
-          <Breadcrumb items={breadcrumbItems} style={{ marginBottom: 16 }} />
-          <div style={{ background: '#fff', padding: 24, minHeight: 360 }}>
+        <Content className="app-content">
+          <div className="app-content-inner">
+            <Breadcrumb items={breadcrumbItems} className="app-breadcrumb" />
+            <div className="app-page-panel">
             <Outlet />
+            </div>
           </div>
         </Content>
       </Layout>

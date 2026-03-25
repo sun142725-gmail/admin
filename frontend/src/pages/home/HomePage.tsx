@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Col,
+  Divider,
   Progress,
   Row,
   Space,
@@ -116,19 +117,19 @@ export const HomePage: React.FC = () => {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} md={8}>
-          <Card>
+          <Card bordered={false}>
             <Statistic title="CPU 使用率" value={data?.cpu.usagePercent ?? 0} suffix="%" precision={2} />
             <Progress style={{ marginTop: 12 }} percent={data?.cpu.usagePercent ?? 0} showInfo={false} />
           </Card>
         </Col>
         <Col xs={24} md={8}>
-          <Card>
+          <Card bordered={false}>
             <Statistic title="内存使用率" value={data?.memory.usagePercent ?? 0} suffix="%" precision={2} />
             <Progress style={{ marginTop: 12 }} percent={data?.memory.usagePercent ?? 0} showInfo={false} />
           </Card>
         </Col>
         <Col xs={24} md={8}>
-          <Card>
+          <Card bordered={false}>
             <Statistic title="磁盘使用率" value={data?.disk?.usagePercent ?? 0} suffix="%" precision={2} />
             <Progress style={{ marginTop: 12 }} percent={data?.disk?.usagePercent ?? 0} showInfo={false} />
           </Card>
@@ -137,7 +138,11 @@ export const HomePage: React.FC = () => {
 
       <Row gutter={[16, 16]} style={{ marginTop: 4 }}>
         <Col xs={24} md={12}>
-          <Card title="服务器信息">
+          <Card
+            title="服务器信息"
+            extra={<Tag color="processing">{data?.hostname ?? '未连接'}</Tag>}
+            bordered={false}
+          >
             <p>主机名: {data?.hostname ?? '-'}</p>
             <p>系统: {data?.platform ?? '-'}</p>
             <p>系统运行时长: {uptimeText}</p>
@@ -146,7 +151,11 @@ export const HomePage: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} md={12}>
-          <Card title="Node 进程信息">
+          <Card
+            title="Node 进程信息"
+            extra={<Tag color="blue">PID {data?.nodeProcess.pid ?? '-'}</Tag>}
+            bordered={false}
+          >
             <p>PID: {data?.nodeProcess.pid ?? '-'}</p>
             <p>进程运行时长: {nodeUptimeText}</p>
             <p>RSS: {formatBytes(data?.nodeProcess.rssBytes ?? 0)}</p>
@@ -156,7 +165,13 @@ export const HomePage: React.FC = () => {
         </Col>
       </Row>
 
-      <Card title="进程占用 TOP（按 CPU）" style={{ marginTop: 16 }}>
+      <Card
+        title="进程占用 TOP（按 CPU）"
+        style={{ marginTop: 16 }}
+        bordered={false}
+        extra={<span style={{ color: '#6b7280' }}>用于快速定位异常进程占用</span>}
+      >
+        <Divider style={{ marginTop: 0 }} />
         <Table
           rowKey="pid"
           loading={loading}

@@ -1,6 +1,6 @@
 // 日志中心页面提供审计日志与前端日志查询。
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, DatePicker, Form, Input, Modal, Space } from 'antd';
+import { Button, DatePicker, Form, Input, Modal, Space } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -242,70 +242,75 @@ export const AuditCenterPage: React.FC = () => {
   }, [activeTab]);
 
   return (
-    <Card>
-      <Form
-        layout="inline"
-        form={form}
-        style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 16 }}
-      >
-        <Form.Item label="用户ID" name="userId">
-          <Input placeholder="用户ID" />
-        </Form.Item>
-        {activeTab === 'audit' && (
-          <Form.Item label="模块" name="module">
-            <Input placeholder="模块" />
+    <div className="app-page-flat">
+      <div className="page-filter-card">
+        <Form
+          layout="inline"
+          form={form}
+          style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}
+        >
+          <Form.Item label="用户ID" name="userId">
+            <Input placeholder="用户ID" />
           </Form.Item>
-        )}
-        {activeTab === 'track' && (
-          <Form.Item label="页面码" name="pageCode">
-            <Input placeholder="页面码" />
+          {activeTab === 'audit' && (
+            <Form.Item label="模块" name="module">
+              <Input placeholder="模块" />
+            </Form.Item>
+          )}
+          {activeTab === 'track' && (
+            <Form.Item label="页面码" name="pageCode">
+              <Input placeholder="页面码" />
+            </Form.Item>
+          )}
+          {activeTab !== 'audit' && (
+            <Form.Item label="TraceId" name="traceId">
+              <Input placeholder="TraceId" />
+            </Form.Item>
+          )}
+          {activeTab !== 'audit' && (
+            <Form.Item label="SessionId" name="sessionId">
+              <Input placeholder="SessionId" />
+            </Form.Item>
+          )}
+          {(activeTab === 'frontend' || activeTab === 'error') && (
+            <Form.Item label="关键字" name="keyword">
+              <Input placeholder="关键字" />
+            </Form.Item>
+          )}
+          <Form.Item label="时间范围" name="range">
+            <DatePicker.RangePicker showTime />
           </Form.Item>
-        )}
-        {activeTab !== 'audit' && (
-          <Form.Item label="TraceId" name="traceId">
-            <Input placeholder="TraceId" />
+          <Form.Item style={{ width: '100%', marginBottom: 0, textAlign: 'center' }}>
+            <Space>
+              <Button type="primary" onClick={onSearch}>
+                查询
+              </Button>
+              <Button onClick={onReset}>重置</Button>
+            </Space>
           </Form.Item>
-        )}
-        {activeTab !== 'audit' && (
-          <Form.Item label="SessionId" name="sessionId">
-            <Input placeholder="SessionId" />
-          </Form.Item>
-        )}
-        {(activeTab === 'frontend' || activeTab === 'error') && (
-          <Form.Item label="关键字" name="keyword">
-            <Input placeholder="关键字" />
-          </Form.Item>
-        )}
-        <Form.Item label="时间范围" name="range">
-          <DatePicker.RangePicker showTime />
-        </Form.Item>
-        <Form.Item style={{ width: '100%', marginBottom: 0, textAlign: 'center' }}>
-          <Space>
-            <Button type="primary" onClick={onSearch}>
-              查询
-            </Button>
-            <Button onClick={onReset}>重置</Button>
-          </Space>
-        </Form.Item>
-      </Form>
+        </Form>
+      </div>
 
-      <AppTable
-        rowKey="id"
-        columns={columns}
-        dataSource={data}
-        loading={loading}
-        pagination={{
-          current: page,
-          pageSize,
-          total,
-          onChange: (p, ps) => {
-            setPage(p);
-            setPageSize(ps);
-          }
-        }}
-      />
+      <div className="page-table-card">
+        <AppTable
+          rowKey="id"
+          columns={columns}
+          dataSource={data}
+          loading={loading}
+          pagination={{
+            current: page,
+            pageSize,
+            total,
+            onChange: (p, ps) => {
+              setPage(p);
+              setPageSize(ps);
+            }
+          }}
+        />
+      </div>
 
       <Modal
+        className="app-form-modal"
         title="日志详情"
         open={!!detail}
         onCancel={() => setDetail(null)}
@@ -347,6 +352,6 @@ export const AuditCenterPage: React.FC = () => {
           </div>
         )}
       </Modal>
-    </Card>
+    </div>
   );
 };

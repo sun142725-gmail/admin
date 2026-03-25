@@ -41,6 +41,7 @@
 
 ## 3. 快速链接
 - [技术规范](../project.md)
+- [前端视觉规范](frontend-visual.md)
 - [架构设计](arch.md)
 - [API 文档](api.md)
 - [数据模型](data.md)
