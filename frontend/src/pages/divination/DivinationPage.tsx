@@ -75,7 +75,7 @@ export const DivinationPage: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: 24 }}>
+    <div className="app-page-flat">
       <Card>
         <Title level={2}>易占 — 六爻占卜</Title>
         <Paragraph>输入主题后开始占卜，动画结束后展示解卦结果。</Paragraph>

@@ -15,5 +15,12 @@ export const AppTable = <T extends object>(props: TableProps<T>) => {
           ...props.pagination
         };
 
-  return <Table {...props} pagination={pagination} />;
+  return (
+    <Table
+      size={props.size ?? 'middle'}
+      scroll={props.scroll ?? { x: 'max-content' }}
+      {...props}
+      pagination={pagination}
+    />
+  );
 };

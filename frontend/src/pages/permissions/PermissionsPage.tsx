@@ -83,16 +83,30 @@ export const PermissionsPage: React.FC = () => {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16 }}>
-        <Permission code="system:permission:create" mode="disable">
-          <Button type="primary" onClick={onCreate}>
-            新增权限
-          </Button>
-        </Permission>
-      </Space>
-      <AppTable rowKey="id" columns={columns} dataSource={data} />
+      <div className="page-toolbar">
+        <div>
+          <div className="page-toolbar-title">权限管理</div>
+          <div className="page-toolbar-subtitle">统一维护权限名称、权限码与描述，供角色与菜单引用。</div>
+        </div>
+        <div className="page-actions">
+          <Permission code="system:permission:create" mode="disable">
+            <Button type="primary" onClick={onCreate}>
+              新增权限
+            </Button>
+          </Permission>
+        </div>
+      </div>
+      <div className="page-table-card">
+        <AppTable rowKey="id" columns={columns} dataSource={data} />
+      </div>
 
-      <Modal title={editItem ? '编辑权限' : '新增权限'} open={open} onOk={onSubmit} onCancel={() => setOpen(false)}>
+      <Modal
+        className="app-form-modal"
+        title={editItem ? '编辑权限' : '新增权限'}
+        open={open}
+        onOk={onSubmit}
+        onCancel={() => setOpen(false)}
+      >
         <Form layout="vertical" form={form}>
           <Form.Item label="权限名称" name="name" rules={[{ required: true, message: '请填写权限名称' }]}>
             <Input />

@@ -166,16 +166,30 @@ export const UsersPage: React.FC = () => {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16 }}>
-        <Permission code="system:user:create" mode="disable">
-          <Button type="primary" onClick={onCreate}>
-            新增用户
-          </Button>
-        </Permission>
-      </Space>
-      <AppTable rowKey="id" columns={columns} dataSource={data} loading={loading} />
+      <div className="page-toolbar">
+        <div>
+          <div className="page-toolbar-title">用户管理</div>
+          <div className="page-toolbar-subtitle">维护后台用户资料、状态与角色绑定关系。</div>
+        </div>
+        <div className="page-actions">
+          <Permission code="system:user:create" mode="disable">
+            <Button type="primary" onClick={onCreate}>
+              新增用户
+            </Button>
+          </Permission>
+        </div>
+      </div>
+      <div className="page-table-card">
+        <AppTable rowKey="id" columns={columns} dataSource={data} loading={loading} />
+      </div>
 
-      <Modal title={editItem ? '编辑用户' : '新增用户'} open={open} onOk={onSubmit} onCancel={() => setOpen(false)}>
+      <Modal
+        className="app-form-modal"
+        title={editItem ? '编辑用户' : '新增用户'}
+        open={open}
+        onOk={onSubmit}
+        onCancel={() => setOpen(false)}
+      >
         <Form layout="vertical" form={form}>
           <Form.Item label="用户名" name="username" rules={[{ required: true, message: '请填写用户名' }]}>
             <Input disabled={!!editItem} />
@@ -194,7 +208,13 @@ export const UsersPage: React.FC = () => {
         </Form>
       </Modal>
 
-      <Modal title="分配角色" open={roleModalOpen} onOk={submitRoles} onCancel={() => setRoleModalOpen(false)}>
+      <Modal
+        className="app-form-modal"
+        title="分配角色"
+        open={roleModalOpen}
+        onOk={submitRoles}
+        onCancel={() => setRoleModalOpen(false)}
+      >
         <Form layout="vertical" form={roleForm}>
           <Form.Item label="角色" name="roleIds" rules={[{ required: true, message: '请选择角色' }]}>
             <Select mode="multiple" options={roles.map((role) => ({ value: role.id, label: role.name }))} />

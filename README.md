@@ -80,6 +80,25 @@ docker-compose up --build
 - Nginx：http://localhost
 - Swagger：http://localhost:3000/api/docs
 
+## 旧版 docker-compose 说明（1.29.x）
+如遇 `ContainerConfig` 报错，优先按以下流程重建：
+```bash
+docker-compose rm -f frontend backend nginx
+docker-compose up -d --build backend frontend nginx
+```
+
+前端/后端单独重建也建议先 `rm` 再 `up`：
+- 前端：
+```bash
+docker-compose rm -f frontend nginx
+docker-compose up -d --build frontend nginx
+```
+- 后端：
+```bash
+docker-compose rm -f backend
+docker-compose up -d --build backend
+```
+
 ## 服务器更新代码后重启
 ```bash
 cd /你的项目目录
@@ -104,6 +123,13 @@ docker-compose up -d --build backend
 ```bash
 docker-compose rm -f frontend backend nginx
 docker-compose up -d --build backend frontend nginx
+```
+
+若前端重建仍报错，可按以下顺序处理（你已验证可用）：
+```bash
+docker-compose down
+docker-compose rm -f frontend nginx
+docker-compose up -d --build frontend nginx
 ```
 
 ---

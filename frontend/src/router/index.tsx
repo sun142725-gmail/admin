@@ -5,6 +5,7 @@ import { MainLayout } from '../layouts/MainLayout';
 import { LoginPage } from '../pages/login/LoginPage';
 import { UsersPage } from '../pages/users/UsersPage';
 import { RolesPage } from '../pages/roles/RolesPage';
+import { RolePermissionsPage } from '../pages/roles/RolePermissionsPage';
 import { PermissionsPage } from '../pages/permissions/PermissionsPage';
 import { DivinationPage } from '../pages/divination/DivinationPage';
 import { AuditCenterPage } from '../pages/audit-center/AuditCenterPage';
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: '/users', element: <UsersPage /> },
       { path: '/roles', element: <RolesPage /> },
+      { path: '/roles/:id/permissions', element: <RolePermissionsPage /> },
       { path: '/permissions', element: <PermissionsPage /> },
       { path: '/divination', element: <DivinationPage /> },
       { path: '/audit-center', element: <Navigate to="/logs/audit" replace /> },

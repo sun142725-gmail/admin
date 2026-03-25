@@ -262,44 +262,62 @@ export const DictPage: React.FC = () => {
   );
 
   return (
-    <Card title="字典管理">
-      <Form layout="inline" form={queryForm} style={{ marginBottom: 16 }}>
-        <Form.Item label="关键词" name="keyword">
-          <Input placeholder="编码/名称" />
-        </Form.Item>
-        <Space>
-          <Button type="primary" onClick={onSearch}>
-            查询
-          </Button>
-          <Button onClick={onReset}>重置</Button>
-        </Space>
-      </Form>
+    <div>
+      <div className="page-toolbar">
+        <div>
+          <div className="page-toolbar-title">字典管理</div>
+          <div className="page-toolbar-subtitle">维护枚举字典、多语言标签与扩展属性，供前后端统一复用。</div>
+        </div>
+        <div className="page-actions">
+          <Permission code="system:dict:create" mode="disable">
+            <Button type="primary" onClick={onCreate}>
+              新增字典
+            </Button>
+          </Permission>
+        </div>
+      </div>
 
-      <Space style={{ marginBottom: 16 }}>
-        <Permission code="system:dict:create" mode="disable">
-          <Button type="primary" onClick={onCreate}>
-            新增字典
-          </Button>
-        </Permission>
-      </Space>
+      <div className="page-filter-card">
+        <Form layout="inline" form={queryForm}>
+          <Form.Item label="关键词" name="keyword">
+            <Input placeholder="编码/名称" />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" onClick={onSearch}>
+                查询
+              </Button>
+              <Button onClick={onReset}>重置</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </div>
 
-      <AppTable
-        rowKey="id"
-        columns={columns}
-        dataSource={data}
-        loading={loading}
-        pagination={{
-          current: page,
-          pageSize,
-          total,
-          onChange: (p, ps) => {
-            setPage(p);
-            setPageSize(ps);
-          }
-        }}
-      />
+      <div className="page-table-card">
+        <AppTable
+          rowKey="id"
+          columns={columns}
+          dataSource={data}
+          loading={loading}
+          pagination={{
+            current: page,
+            pageSize,
+            total,
+            onChange: (p, ps) => {
+              setPage(p);
+              setPageSize(ps);
+            }
+          }}
+        />
+      </div>
 
-      <Modal title={editItem ? '编辑字典' : '新增字典'} open={open} onOk={onSubmit} onCancel={() => setOpen(false)}>
+      <Modal
+        className="app-form-modal"
+        title={editItem ? '编辑字典' : '新增字典'}
+        open={open}
+        onOk={onSubmit}
+        onCancel={() => setOpen(false)}
+      >
         <Form layout="vertical" form={form}>
           {!editItem && (
             <Form.Item
@@ -327,6 +345,7 @@ export const DictPage: React.FC = () => {
       </Modal>
 
       <Drawer
+        className="app-form-drawer"
         title={currentDict ? `字典详情 - ${currentDict.name}` : '字典详情'}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -343,6 +362,7 @@ export const DictPage: React.FC = () => {
       </Drawer>
 
       <Modal
+        className="app-form-modal"
         title={currentDictItem ? '编辑字典项' : '新增字典项'}
         open={itemModalOpen}
         onOk={submitItem}
@@ -372,6 +392,6 @@ export const DictPage: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </Card>
+    </div>
   );
 };
