@@ -10,6 +10,7 @@ import {
   publishNotification,
   retryNotificationPublish
 } from '../../api/notification';
+import { batchDicts } from '../../api/dict';
 import { listUsers } from '../../api/users';
 
 interface TemplateItem {
@@ -65,6 +66,13 @@ const STATUS_OPTIONS = [
   { label: '失败', value: 'failed' }
 ];
 
+const DEFAULT_CHANNEL_OPTIONS = [
+  { label: '短信', value: 'sms' },
+  { label: '邮箱', value: 'email' },
+  { label: '站内信', value: 'inbox' },
+  { label: '飞书', value: 'feishu' }
+];
+
 export const PublishPage: React.FC = () => {
   const [data, setData] = useState<PublishItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -80,6 +88,8 @@ export const PublishPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
+  const [channelLabelMap, setChannelLabelMap] = useState<Record<string, string>>({});
+  const [channelItems, setChannelItems] = useState<Array<{ value: string; label: string }>>([]);
 
   const channelType = Form.useWatch('channelType', publishForm);
   const templateId = Form.useWatch('templateId', publishForm);
@@ -118,6 +128,23 @@ export const PublishPage: React.FC = () => {
     fetchData({}, 1, pageSize);
   }, []);
 
+  useEffect(() => {
+    batchDicts({ codes: 'MESSAGE_CHANNEL' })
+      .then((data) => {
+        const list = (data?.MESSAGE_CHANNEL ?? []) as Array<{ value: string; label: string }>;
+        const map: Record<string, string> = {};
+        list.forEach((item) => {
+          map[item.value] = item.label;
+        });
+        setChannelLabelMap(map);
+        setChannelItems(list);
+      })
+      .catch(() => {
+        setChannelLabelMap({});
+        setChannelItems([]);
+      });
+  }, []);
+
   const selectedTemplate = useMemo(
     () => templates.find((item) => item.id === templateId),
     [templates, templateId]
@@ -128,15 +155,15 @@ export const PublishPage: React.FC = () => {
   );
 
   const channelOptions = useMemo(() => {
-    const allOptions = [
-      { label: '站内信', value: 'inbox' },
-      { label: '飞书', value: 'feishu' }
-    ];
+    const allOptions = (channelItems.length ? channelItems : DEFAULT_CHANNEL_OPTIONS).map((item) => ({
+      ...item,
+      label: channelLabelMap[item.value] ?? item.label
+    }));
     if (!selectedTemplate?.channelTypes?.length) {
       return allOptions;
     }
     return allOptions.filter((item) => selectedTemplate.channelTypes.includes(item.value));
-  }, [selectedTemplate]);
+  }, [selectedTemplate, channelItems, channelLabelMap]);
 
   useEffect(() => {
     const selectedChannel = publishForm.getFieldValue('channelType');
@@ -268,7 +295,7 @@ export const PublishPage: React.FC = () => {
     {
       title: '通道',
       dataIndex: 'channelType',
-      render: (value: string) => (value === 'inbox' ? '站内信' : '飞书')
+      render: (value: string) => channelLabelMap[value] ?? value
     },
     {
       title: '状态',
@@ -311,10 +338,10 @@ export const PublishPage: React.FC = () => {
             allowClear
             style={{ width: 140 }}
             placeholder="全部通道"
-            options={[
-              { label: '站内信', value: 'inbox' },
-              { label: '飞书', value: 'feishu' }
-            ]}
+            options={(channelItems.length ? channelItems : DEFAULT_CHANNEL_OPTIONS).map((item) => ({
+              ...item,
+              label: channelLabelMap[item.value] ?? item.label
+            }))}
           />
         </Form.Item>
         <Form.Item name="status" label="状态">
@@ -446,7 +473,7 @@ export const PublishPage: React.FC = () => {
             <Descriptions size="small" bordered column={2}>
               <Descriptions.Item label="发布ID">{detail.id}</Descriptions.Item>
               <Descriptions.Item label="模板">{detail.template?.name ?? '-'}</Descriptions.Item>
-              <Descriptions.Item label="通道">{detail.channelType === 'inbox' ? '站内信' : '飞书'}</Descriptions.Item>
+              <Descriptions.Item label="通道">{channelLabelMap[detail.channelType] ?? detail.channelType}</Descriptions.Item>
               <Descriptions.Item label="状态">{renderStatusTag(detail.status)}</Descriptions.Item>
               <Descriptions.Item label="标题" span={2}>
                 {detail.payload?.title ?? detail.template?.name ?? '-'}

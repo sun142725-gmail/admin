@@ -1,5 +1,5 @@
 // 通知模块类型定义与常量。
-export const NOTIFICATION_CHANNEL_TYPES = ['inbox', 'feishu'] as const;
+export const NOTIFICATION_CHANNEL_TYPES = ['inbox', 'feishu', 'sms', 'email'] as const;
 export type NotificationChannelType = (typeof NOTIFICATION_CHANNEL_TYPES)[number];
 
 export const NOTIFICATION_VARIABLE_SOURCES = ['user', 'event', 'system', 'custom'] as const;

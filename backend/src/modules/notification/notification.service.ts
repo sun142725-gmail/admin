@@ -1,6 +1,7 @@
 // 通知服务负责模板管理、发送调度与发布记录。
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
 import { In, Repository } from 'typeorm';
 import { NotificationTemplate } from '../../common/entities/notification-template.entity';
 import { NotificationPublish } from '../../common/entities/notification-publish.entity';
@@ -63,7 +64,10 @@ export class NotificationService {
 
   async createTemplate(payload: CreateTemplateDto) {
     const variables = this.normalizeTemplateVariables(payload.variables);
+    const code = payload.code?.trim() || await this.generateUniqueTemplateCode(payload.name);
+    await this.ensureTemplateCodeAvailable(code);
     const template = this.templateRepo.create({
+      code,
       name: payload.name,
       channelTypes: payload.channelTypes,
       content: payload.content,
@@ -81,6 +85,24 @@ export class NotificationService {
     const variables = payload.variables
       ? this.normalizeTemplateVariables(payload.variables)
       : template.variables;
+    if (payload.code && payload.code !== template.code) {
+      await this.ensureTemplateCodeAvailable(payload.code, template.id);
+    }
+    Object.assign(template, payload, { variables });
+    return this.templateRepo.save(template);
+  }
+
+  async updateTemplateByCode(code: string, payload: UpdateTemplateDto) {
+    const template = await this.templateRepo.findOne({ where: { code } });
+    if (!template) {
+      throw new NotFoundException('模板不存在');
+    }
+    const variables = payload.variables
+      ? this.normalizeTemplateVariables(payload.variables)
+      : template.variables;
+    if (payload.code && payload.code !== template.code) {
+      await this.ensureTemplateCodeAvailable(payload.code, template.id);
+    }
     Object.assign(template, payload, { variables });
     return this.templateRepo.save(template);
   }
@@ -98,6 +120,19 @@ export class NotificationService {
     return true;
   }
 
+  async removeTemplateByCode(code: string) {
+    const template = await this.templateRepo.findOne({ where: { code } });
+    if (!template) {
+      throw new NotFoundException('模板不存在');
+    }
+    const usedCount = await this.publishRepo.count({ where: { templateId: template.id } });
+    if (usedCount > 0) {
+      throw new BadRequestException('模板已被发布记录引用，不能删除');
+    }
+    await this.templateRepo.delete({ code });
+    return true;
+  }
+
   async publish(payload: PublishNotificationDto) {
     if (payload.idempotencyKey) {
       const existing = await this.publishRepo.findOne({
@@ -107,7 +142,11 @@ export class NotificationService {
         return existing;
       }
     }
-    const template = await this.templateRepo.findOne({ where: { id: payload.templateId } });
+    const template = payload.templateCode
+      ? await this.templateRepo.findOne({ where: { code: payload.templateCode } })
+      : payload.templateId
+        ? await this.templateRepo.findOne({ where: { id: payload.templateId } })
+        : null;
     if (!template) {
       throw new NotFoundException('模板不存在');
     }
@@ -375,6 +414,31 @@ export class NotificationService {
       }
     }
     return Array.from(mergedMap.values());
+  }
+
+  private generateTemplateCode(name: string) {
+    const normalized = name
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 16);
+    return `TPL_${normalized || 'MSG'}_${randomUUID().slice(0, 8).toUpperCase()}`;
+  }
+
+  private async generateUniqueTemplateCode(name: string) {
+    let code = this.generateTemplateCode(name);
+    while (await this.templateRepo.exists({ where: { code } })) {
+      code = this.generateTemplateCode(name);
+    }
+    return code;
+  }
+
+  private async ensureTemplateCodeAvailable(code: string, exceptId?: number) {
+    const exists = await this.templateRepo.findOne({ where: { code } });
+    if (exists && exists.id !== exceptId) {
+      throw new BadRequestException('模板编码已存在');
+    }
   }
 
   private normalizeVariables(variables?: Record<string, unknown>) {

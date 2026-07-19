@@ -10,6 +10,7 @@ import {
   listNotificationTemplates,
   updateNotificationTemplate
 } from '../../api/notification';
+import { batchDicts } from '../../api/dict';
 import { registerVariableTagBlot, serializeTemplateContent, toEditorVariableHtml } from './quillVariableTag';
 
 interface TemplateVariable {
@@ -21,6 +22,7 @@ interface TemplateVariable {
 
 interface TemplateItem {
   id: number;
+  code?: string;
   name: string;
   channelTypes: string[];
   content: string;
@@ -41,11 +43,20 @@ const SOURCE_COLOR_MAP: Record<string, { color: string; bgColor: string }> = {
   custom: { color: '#d46b08', bgColor: '#fff7e6' }
 };
 
+const DEFAULT_CHANNEL_OPTIONS = [
+  { label: '短信', value: 'sms' },
+  { label: '邮箱', value: 'email' },
+  { label: '站内信', value: 'inbox' },
+  { label: '飞书', value: 'feishu' }
+];
+
 export const TemplatePage: React.FC = () => {
   const [data, setData] = useState<TemplateItem[]>([]);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<TemplateItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [channelLabelMap, setChannelLabelMap] = useState<Record<string, string>>({});
+  const [channelItems, setChannelItems] = useState<Array<{ value: string; label: string }>>([]);
   const [form] = Form.useForm();
   const quillRef = useRef<ReactQuill | null>(null);
   const editorInitRef = useRef(false);
@@ -61,10 +72,27 @@ export const TemplatePage: React.FC = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    batchDicts({ codes: 'MESSAGE_CHANNEL' })
+      .then((data) => {
+        const list = (data?.MESSAGE_CHANNEL ?? []) as Array<{ value: string; label: string }>;
+        const map: Record<string, string> = {};
+        list.forEach((item) => {
+          map[item.value] = item.label;
+        });
+        setChannelLabelMap(map);
+        setChannelItems(list);
+      })
+      .catch(() => {
+        setChannelLabelMap({});
+        setChannelItems([]);
+      });
+  }, []);
+
   const onCreate = () => {
     setEditItem(null);
     form.resetFields();
-    form.setFieldsValue({ channelTypes: ['inbox'], status: true, customVariables: [], content: '' });
+    form.setFieldsValue({ code: '', channelTypes: ['inbox'], status: true, customVariables: [], content: '' });
     setOpen(true);
   };
 
@@ -74,6 +102,7 @@ export const TemplatePage: React.FC = () => {
       (variable) => !BUILTIN_VARIABLES.find((builtin) => builtin.key === variable.key)
     );
     form.setFieldsValue({
+      code: item.code,
       name: item.name,
       channelTypes: item.channelTypes,
       content: item.content,
@@ -82,6 +111,8 @@ export const TemplatePage: React.FC = () => {
     });
     setOpen(true);
   };
+
+  const resolveTemplateKey = (item: TemplateItem) => item.code ?? String(item.id);
 
   const variableList = useMemo(
     () => [...BUILTIN_VARIABLES, ...customVariables.map((item: TemplateVariable) => ({ ...item, source: 'custom' }))],
@@ -152,6 +183,7 @@ export const TemplatePage: React.FC = () => {
       }
       setSaving(true);
       const payload = {
+        code: values.code?.trim(),
         name: values.name,
         channelTypes: values.channelTypes,
         content: serializeTemplateContent(values.content),
@@ -159,7 +191,7 @@ export const TemplatePage: React.FC = () => {
         variables: [...BUILTIN_VARIABLES, ...userVariables]
       };
       if (editItem) {
-        await updateNotificationTemplate(editItem.id, payload);
+        await updateNotificationTemplate(resolveTemplateKey(editItem), payload);
         message.success('模板更新成功');
       } else {
         await createNotificationTemplate(payload);
@@ -182,7 +214,7 @@ export const TemplatePage: React.FC = () => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await deleteNotificationTemplate(item.id);
+          await deleteNotificationTemplate(resolveTemplateKey(item));
           message.success('模板删除成功');
           fetchData();
         } catch (error) {
@@ -211,7 +243,19 @@ export const TemplatePage: React.FC = () => {
     });
   }, [contentValue, variableList]);
 
+  const channelOptions = useMemo(
+    () => {
+      const base = channelItems.length ? channelItems : DEFAULT_CHANNEL_OPTIONS;
+      return base.map((item) => ({
+        ...item,
+        label: channelLabelMap[item.value] ?? item.label
+      }));
+    },
+    [channelItems, channelLabelMap]
+  );
+
   const columns = [
+    { title: '模板编码', dataIndex: 'code' },
     { title: '模板名称', dataIndex: 'name' },
     {
       title: '通道',
@@ -219,7 +263,7 @@ export const TemplatePage: React.FC = () => {
       render: (items: string[]) => (
         <Space>
           {items?.map((item) => (
-            <Tag key={item}>{item === 'inbox' ? '站内信' : '飞书'}</Tag>
+            <Tag key={item}>{channelLabelMap[item] ?? item}</Tag>
           ))}
         </Space>
       )
@@ -281,125 +325,144 @@ export const TemplatePage: React.FC = () => {
         }
       >
         <Form layout="vertical" form={form}>
-          <Form.Item label="模板名称" name="name" rules={[{ required: true, message: '请填写模板名称' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item label="通道类型" name="channelTypes" rules={[{ required: true, message: '请选择通道类型' }]}>
-            <Select
-              mode="multiple"
-              options={[
-                { label: '站内信', value: 'inbox' },
-                { label: '飞书', value: 'feishu' }
-              ]}
-            />
-          </Form.Item>
-          <Form.Item label="模板状态" name="status" valuePropName="checked">
-            <Switch checkedChildren="启用" unCheckedChildren="停用" />
-          </Form.Item>
+          <div style={{ display: 'grid', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>基础设置</div>
+              <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                <Form.Item
+                  label="模板编码"
+                  name="code"
+                  rules={[
+                    {
+                      pattern: /^[A-Z][A-Z0-9_]{2,63}$/,
+                      message: '仅支持大写字母、数字、下划线，且需以字母开头'
+                    }
+                  ]}
+                >
+                  <Input placeholder="如 LOGIN_CODE_EMAIL" />
+                </Form.Item>
+                <Form.Item label="模板名称" name="name" rules={[{ required: true, message: '请填写模板名称' }]}>
+                  <Input />
+                </Form.Item>
+                <Form.Item label="通道类型" name="channelTypes" rules={[{ required: true, message: '请选择通道类型' }]}>
+                  <Select mode="multiple" options={channelOptions} />
+                </Form.Item>
+                <Form.Item label="模板状态" name="status" valuePropName="checked">
+                  <Switch checkedChildren="启用" unCheckedChildren="停用" />
+                </Form.Item>
+              </Space>
+            </div>
 
-          <Form.Item label="变量标签（点击插入）">
-            <Space wrap>
-              {variableList.map((item) => {
-                const style = SOURCE_COLOR_MAP[item.source] ?? SOURCE_COLOR_MAP.custom;
-                return (
-                  <Tag
-                    key={`${item.source}-${item.key}-${item.label}`}
-                    color={item.required ? 'red' : 'default'}
-                    style={{ cursor: 'pointer', backgroundColor: style.bgColor, color: style.color }}
-                    onClick={() => insertVariable(item.key)}
-                  >
-                    {item.label}({item.key})
-                  </Tag>
-                );
-              })}
-            </Space>
-          </Form.Item>
-
-          <Form.Item label="模板内容" name="content" rules={[{ required: true, message: '请填写模板内容' }]}>
-            <ReactQuill
-              ref={quillRef}
-              theme="snow"
-              value={contentValue}
-              onChange={(value) => form.setFieldValue('content', value)}
-              formats={[
-                'header',
-                'bold',
-                'italic',
-                'underline',
-                'strike',
-                'color',
-                'background',
-                'list',
-                'bullet',
-                'link',
-                'blockquote',
-                'code-block',
-                'variableTag'
-              ]}
-              modules={{
-                toolbar: [
-                  [{ header: [1, 2, 3, false] }],
-                  ['bold', 'italic', 'underline', 'strike'],
-                  [{ color: [] }, { background: [] }],
-                  [{ list: 'ordered' }, { list: 'bullet' }],
-                  ['link', 'blockquote', 'code-block'],
-                  ['clean']
-                ]
-              }}
-            />
-          </Form.Item>
-
-          <Form.Item label="变量预览">
-            <div
-              style={{
-                border: '1px solid #f0f0f0',
-                borderRadius: 6,
-                padding: 12,
-                minHeight: 56
-              }}
-              dangerouslySetInnerHTML={{ __html: highlightedPreview }}
-            />
-          </Form.Item>
-
-          <Form.List name="customVariables">
-            {(fields, { add, remove }) => (
-              <div>
-                <Space style={{ marginBottom: 8 }}>
-                  <span>自定义变量</span>
-                  <Button size="small" onClick={() => add()}>
-                    新增变量
-                  </Button>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>变量设置</div>
+              <Form.Item label="变量标签（点击插入）">
+                <Space wrap>
+                  {variableList.map((item) => {
+                    const style = SOURCE_COLOR_MAP[item.source] ?? SOURCE_COLOR_MAP.custom;
+                    return (
+                      <Tag
+                        key={`${item.source}-${item.key}-${item.label}`}
+                        color={item.required ? 'red' : 'default'}
+                        style={{ cursor: 'pointer', backgroundColor: style.bgColor, color: style.color }}
+                        onClick={() => insertVariable(item.key)}
+                      >
+                        {item.label}({item.key})
+                      </Tag>
+                    );
+                  })}
                 </Space>
-                {fields.map(({ key, name, ...restField }) => (
-                  <Space key={key} align="baseline" style={{ display: 'flex', marginBottom: 8 }}>
-                    <Form.Item
-                      {...restField}
-                      name={[name, 'key']}
-                      rules={[
-                        { required: true, message: '请输入变量 key' },
-                        { pattern: /^[a-zA-Z][a-zA-Z0-9_]*$/, message: '仅允许字母/数字/下划线' }
-                      ]}
-                    >
-                      <Input placeholder="key" />
-                    </Form.Item>
-                    <Form.Item
-                      {...restField}
-                      name={[name, 'label']}
-                      rules={[{ required: true, message: '请输入变量名称' }]}
-                    >
-                      <Input placeholder="名称" />
-                    </Form.Item>
-                    <Form.Item {...restField} name={[name, 'required']} valuePropName="checked">
-                      <Switch checkedChildren="必填" unCheckedChildren="可选" />
-                    </Form.Item>
-                    <Button danger size="small" onClick={() => remove(name)}>
-                      删除
-                    </Button>
-                  </Space>
-                ))}
-              </div>
-            )}
-          </Form.List>
+              </Form.Item>
+
+              <Form.List name="customVariables">
+                {(fields, { add, remove }) => (
+                  <div>
+                    <Space style={{ marginBottom: 8 }}>
+                      <span>自定义变量</span>
+                      <Button size="small" onClick={() => add()}>
+                        新增变量
+                      </Button>
+                    </Space>
+                    {fields.map(({ key, name, ...restField }) => (
+                      <Space key={key} align="baseline" style={{ display: 'flex', marginBottom: 8 }}>
+                        <Form.Item
+                          {...restField}
+                          name={[name, 'key']}
+                          rules={[
+                            { required: true, message: '请输入变量 key' },
+                            { pattern: /^[a-zA-Z][a-zA-Z0-9_]*$/, message: '仅允许字母/数字/下划线' }
+                          ]}
+                        >
+                          <Input placeholder="key" />
+                        </Form.Item>
+                        <Form.Item
+                          {...restField}
+                          name={[name, 'label']}
+                          rules={[{ required: true, message: '请输入变量名称' }]}
+                        >
+                          <Input placeholder="名称" />
+                        </Form.Item>
+                        <Form.Item {...restField} name={[name, 'required']} valuePropName="checked">
+                          <Switch checkedChildren="必填" unCheckedChildren="可选" />
+                        </Form.Item>
+                        <Button danger size="small" onClick={() => remove(name)}>
+                          删除
+                        </Button>
+                      </Space>
+                    ))}
+                  </div>
+                )}
+              </Form.List>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>模板内容</div>
+              <Form.Item name="content" rules={[{ required: true, message: '请填写模板内容' }]}>
+                <ReactQuill
+                  ref={quillRef}
+                  theme="snow"
+                  value={contentValue}
+                  onChange={(value) => form.setFieldValue('content', value)}
+                  formats={[
+                    'header',
+                    'bold',
+                    'italic',
+                    'underline',
+                    'strike',
+                    'color',
+                    'background',
+                    'list',
+                    'bullet',
+                    'link',
+                    'blockquote',
+                    'code-block',
+                    'variableTag'
+                  ]}
+                  modules={{
+                    toolbar: [
+                      [{ header: [1, 2, 3, false] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      [{ color: [] }, { background: [] }],
+                      [{ list: 'ordered' }, { list: 'bullet' }],
+                      ['link', 'blockquote', 'code-block'],
+                      ['clean']
+                    ]
+                  }}
+                />
+              </Form.Item>
+
+              <Form.Item label="变量预览">
+                <div
+                  style={{
+                    border: '1px solid #f0f0f0',
+                    borderRadius: 6,
+                    padding: 12,
+                    minHeight: 56
+                  }}
+                  dangerouslySetInnerHTML={{ __html: highlightedPreview }}
+                />
+              </Form.Item>
+            </div>
+          </div>
         </Form>
       </Drawer>
     </div>

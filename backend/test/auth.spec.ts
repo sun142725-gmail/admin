@@ -83,6 +83,21 @@ describe('Auth (e2e)', () => {
     expect(identifier?.user).toBeDefined();
   });
 
+  it('should login existing sms user without duplicate registration', async () => {
+    const beforeCount = await identifierRepo.count({
+      where: { identifierType: 'sms', identifierValue: '13800138000' }
+    });
+    const sendResponse = await verificationCodeService.sendCode('login', 'sms', '13800138000');
+
+    const loginResponse = await authService.codeLogin('sms', '13800138000', sendResponse.code!);
+
+    const afterCount = await identifierRepo.count({
+      where: { identifierType: 'sms', identifierValue: '13800138000' }
+    });
+    expect(loginResponse.accessToken).toBeDefined();
+    expect(afterCount).toBe(beforeCount);
+  });
+
   it('should reset password by sms code', async () => {
     const identifier = await identifierRepo.findOne({
       where: { identifierType: 'sms', identifierValue: '13800138000' },

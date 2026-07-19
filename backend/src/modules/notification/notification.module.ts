@@ -10,6 +10,8 @@ import { NotificationService } from './notification.service';
 import { NotificationTriggerService } from './notification-trigger.service';
 import { InboxNotificationProvider } from './providers/inbox-notification.provider';
 import { FeishuNotificationProvider } from './providers/feishu-notification.provider';
+import { SmsNotificationProvider } from './providers/sms-notification.provider';
+import { EmailNotificationProvider } from './providers/email-notification.provider';
 import { NotificationProviderRegistry } from './providers/notification-provider.registry';
 
 @Module({
@@ -20,6 +22,8 @@ import { NotificationProviderRegistry } from './providers/notification-provider.
     NotificationTriggerService,
     InboxNotificationProvider,
     FeishuNotificationProvider,
+    SmsNotificationProvider,
+    EmailNotificationProvider,
     NotificationProviderRegistry
   ],
   exports: [NotificationService, NotificationTriggerService]

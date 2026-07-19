@@ -1,7 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { getProfile, updateProfile } from '@/services/profile'
-import { uploadFile } from '@/services/files'
+import { getAuthProfile } from '@/services/auth'
 
 export const useProfileStore = defineStore('has-web-profile', () => {
   const profile = ref(null)
@@ -10,7 +9,7 @@ export const useProfileStore = defineStore('has-web-profile', () => {
   async function loadProfile() {
     loading.value = true
     try {
-      const response = await getProfile()
+      const response = await getAuthProfile()
       profile.value = response.data ?? response
       return profile.value
     } finally {
@@ -19,16 +18,15 @@ export const useProfileStore = defineStore('has-web-profile', () => {
   }
 
   async function saveProfile(payload) {
-    const response = await updateProfile(payload)
-    profile.value = response.data ?? response
+    profile.value = {
+      ...(profile.value || {}),
+      ...payload
+    }
     return profile.value
   }
 
   async function uploadAvatar(file) {
-    const response = await uploadFile(file, 'avatar')
-    const data = response.data ?? response
-    await saveProfile({ avatarUrl: data.url })
-    return data.url
+    return profile.value?.avatarUrl || ''
   }
 
   return {

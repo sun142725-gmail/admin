@@ -5,12 +5,13 @@ import { User } from '../../common/entities/user.entity';
 import { Role } from '../../common/entities/role.entity';
 import { Permission } from '../../common/entities/permission.entity';
 import { Resource } from '../../common/entities/resource.entity';
+import { NotificationTemplate } from '../../common/entities/notification-template.entity';
 import { Dict } from '../../common/entities/dict.entity';
 import { DictItem } from '../../common/entities/dict-item.entity';
 import { SeedService } from './seed.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Role, Permission, Resource, Dict, DictItem])],
+  imports: [TypeOrmModule.forFeature([User, Role, Permission, Resource, NotificationTemplate, Dict, DictItem])],
   providers: [SeedService]
 })
 export class SeedModule {}

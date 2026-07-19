@@ -248,12 +248,23 @@
 | created_at | datetime |  | 创建时间 |
 | updated_at | datetime |  | 更新时间 |
 
+### MESSAGE_CHANNEL
+**说明:** 消息通道字典，供通知模板与发布页使用
+
+| value | label | 说明 |
+|------|------|------|
+| sms | 短信 | 手机号验证码、短信通知 |
+| email | 邮箱 | 邮件验证码、邮件通知 |
+| inbox | 站内信 | 系统内消息 |
+| feishu | 飞书 | 飞书机器人消息 |
+
 ### notification_templates
 **说明:** 通知模板
 
 | 字段 | 类型 | 约束 | 描述 |
 |------|------|------|------|
 | id | bigint | PK | 模板主键 |
+| code | varchar | Unique | 模板业务编码 |
 | name | varchar | Not Null | 模板名称 |
 | channel_types | json | Not Null | 通道类型 |
 | content | text | Not Null | 模板内容 |

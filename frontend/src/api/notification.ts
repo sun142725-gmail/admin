@@ -19,10 +19,10 @@ export const listNotificationTemplates = (params?: {
 export const createNotificationTemplate = (payload: any) =>
   http.post('/notifications/templates', payload);
 
-export const updateNotificationTemplate = (id: number, payload: any) =>
+export const updateNotificationTemplate = (id: number | string, payload: any) =>
   http.patch(`/notifications/templates/${id}`, payload);
 
-export const deleteNotificationTemplate = (id: number) =>
+export const deleteNotificationTemplate = (id: number | string) =>
   http.delete(`/notifications/templates/${id}`);
 
 export const listNotificationPublishes = (params?: {

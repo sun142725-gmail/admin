@@ -6,7 +6,7 @@
 ## Module Overview
 - **Responsibility:** 管理通知模板、发布记录、通道适配与站内信落库
 - **Status:** ✅Active
-- **Last Updated:** 2026-02-07
+- **Last Updated:** 2026-07-19
 
 ## Specifications
 
@@ -21,12 +21,14 @@
 
 ### Requirement: 通知发送与通道管理
 **Module:** notification
-支持选择通道发送通知，首期提供站内信与飞书通道。
+支持选择通道发送通知，当前覆盖站内信、飞书、短信与邮箱通道。
 
 #### Scenario: 多通道发布
 选择模板与通道发布通知，系统生成发布记录并追踪状态。
 - 站内信立即入库
 - 飞书通过通道适配器发送
+- 短信通过短信适配器发送，默认支持控制台模式
+- 邮箱通过 SMTP 适配器发送，支持 `process.env` 配置
 - 支持业务模块直接注入 `NotificationTriggerService` 触发发送
 
 ### Requirement: 发布记录与状态追踪
@@ -45,12 +47,12 @@
 ### [POST] /api/notifications/templates
 **Description:** 新增通知模板
 **Input:** { name, channelTypes[], content, variables[], status? }
-**Output:** { id }
+**Output:** { id, code }
 
 ### [PATCH] /api/notifications/templates/:id
 **Description:** 更新通知模板
 **Input:** { name?, channelTypes?, content?, variables?, status? }
-**Output:** { id }
+**Output:** { id, code }
 
 ### [DELETE] /api/notifications/templates/:id
 **Description:** 删除模板（仅未被发布记录引用时可删除）
@@ -133,6 +135,8 @@
 - resources
 - users
 - FEISHU_BOT_WEBHOOK (env)
+- SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_USER / SMTP_PASS / SMTP_FROM (env)
+- SMS_PROVIDER_MODE (env)
 
 ## Change History
 - [202602072234_notification-module](../../history/2026-02/202602072234_notification-module/) - 通知管理模块

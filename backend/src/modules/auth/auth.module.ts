@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { AuditModule } from '../audit/audit.module';
+import { NotificationModule } from '../notification/notification.module';
 import { VerificationCodeService } from './verification-code.service';
 
 @Module({
@@ -20,7 +21,8 @@ import { VerificationCodeService } from './verification-code.service';
       secret: process.env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m' }
     }),
-    AuditModule
+    AuditModule,
+    NotificationModule
   ],
   providers: [AuthService, JwtStrategy, VerificationCodeService],
   controllers: [AuthController],

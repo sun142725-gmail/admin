@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../../common/entities/user.entity';
 import { UserIdentifier } from '../../common/entities/user-identifier.entity';
@@ -108,8 +108,13 @@ export class AuthService {
       where: { identifierType: channel, identifierValue: normalized },
       relations: ['user']
     });
-    if (existingIdentifier?.user) {
-      return existingIdentifier.user;
+    const existingUser = existingIdentifier?.user
+      ? existingIdentifier.user
+      : existingIdentifier?.userId
+        ? await this.userRepo.findOne({ where: { id: existingIdentifier.userId } })
+        : null;
+    if (existingUser) {
+      return existingUser;
     }
     const username = await this.ensureUniqueUsername(this.buildUsername(channel, target));
     const passwordHash = await bcrypt.hash(`${Date.now()}_${Math.random()}`, 10);
@@ -135,6 +140,17 @@ export class AuthService {
     return user;
   }
 
+  private async findUserByIdentifier(channel: string, target: string) {
+    const identifier = await this.identifierRepo.findOne({
+      where: { identifierType: channel, identifierValue: this.normalizeTarget(channel, target) },
+      relations: ['user']
+    });
+    if (!identifier) {
+      return null;
+    }
+    return identifier.user ?? this.userRepo.findOne({ where: { id: identifier.userId } });
+  }
+
   async sendCode(scene: string, channel: string, target: string, ip?: string) {
     const normalized = this.normalizeTarget(channel, target);
     return this.verificationCodeService.sendCode(scene, channel, normalized, ip);
@@ -143,7 +159,17 @@ export class AuthService {
   async codeLogin(channel: string, target: string, code: string, ip?: string) {
     const normalized = this.normalizeTarget(channel, target);
     await this.verificationCodeService.verifyCode('login', channel, normalized, code);
-    const user = await this.createOrBindIdentifier(channel, normalized, channel);
+    let user: User;
+    try {
+      user = await this.createOrBindIdentifier(channel, normalized, channel);
+    } catch (error) {
+      const duplicated = error instanceof QueryFailedError && /Duplicate entry/i.test(String(error.message));
+      const existingUser = duplicated ? await this.findUserByIdentifier(channel, normalized) : null;
+      if (!existingUser) {
+        throw error;
+      }
+      user = existingUser;
+    }
     user.lastLoginAt = new Date();
     await this.userRepo.save(user);
     await this.auditService.log('login', 'auth', `用户 ${user.username} 验证码登录`, user.id, ip);

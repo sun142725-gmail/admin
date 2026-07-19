@@ -1,13 +1,18 @@
 // 发布通知 DTO 用于校验发送请求。
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, Min, ValidateIf } from 'class-validator';
 import { NOTIFICATION_CHANNEL_TYPES } from '../notification.types';
 
 export class PublishNotificationDto {
+  @ValidateIf((payload) => !payload.templateCode)
   @IsInt()
   @Type(() => Number)
   @Min(1)
-  templateId!: number;
+  templateId?: number;
+
+  @ValidateIf((payload) => !payload.templateId)
+  @IsString()
+  templateCode?: string;
 
   @IsIn(NOTIFICATION_CHANNEL_TYPES)
   channelType!: string;

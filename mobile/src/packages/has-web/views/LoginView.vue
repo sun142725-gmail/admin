@@ -1,18 +1,19 @@
 <template>
-  <div class="has-page flex flex-col">
-    <div class="px-20 pt-44 pb-24 bg-primary-500 text-white">
-      <div class="text-2xl font-bold">HAS Web</div>
-      <div class="text-sm opacity-90 mt-8">验证码登录，首次使用自动注册</div>
-    </div>
+  <div class="has-screen">
+    <div class="has-content pt-32 has-bottom-safe">
+      <div class="has-card-stack">
+        <div class="has-section">
+          <div class="has-page-title">HAS Web</div>
+          <div class="has-page-subtitle">验证码登录，首次使用自动注册</div>
+        </div>
 
-    <div class="flex-1 px-16 pt-20">
-      <div class="has-section">
+        <div class="has-section">
         <van-tabs v-model:active="activeTab" shrink>
           <van-tab title="手机号" name="sms" />
           <van-tab title="邮箱" name="email" />
         </van-tabs>
 
-        <div class="mt-20">
+        <div class="mt-20 has-field-stack">
           <input
             v-model.trim="form.target"
             class="has-input"
@@ -21,25 +22,29 @@
             :placeholder="activeTab === 'sms' ? '请输入手机号' : '请输入邮箱'"
           />
 
-          <div class="flex gap-10 mt-12">
+          <div class="flex gap-10">
             <input v-model.trim="form.code" class="has-input flex-1" maxlength="6" placeholder="请输入验证码" />
-            <van-button class="w-[112px]" round plain type="primary" :disabled="countdown > 0" @click="onSendCode">
+            <van-button class="w-[112px] !h-[44px]" round plain type="primary" :disabled="countdown > 0" @click="onSendCode">
               {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
             </van-button>
           </div>
 
-          <base-button class="mt-20 w-full" type="primary" block :loading="authStore.loading" @click="onLogin">
+          <base-button class="w-full !min-h-[44px]" type="primary" block :loading="authStore.loading" @click="onLogin">
             登录 / 注册
           </base-button>
 
-          <button class="w-full mt-16 text-sm text-primary-500" @click="$router.push('/reset-password')">
+          <button class="w-full text-sm text-primary-500 active:text-primary-700 transition-colors" @click="$router.push('/reset-password')">
             忘记密码？
           </button>
         </div>
       </div>
 
-      <div class="px-8 mt-18 text-xs text-gray-400 leading-relaxed">
-        登录即表示你同意使用统一账号体系。C 端账号与管理端共用用户主表，但权限和入口相互隔离。
+        <div class="has-section">
+          <div class="text-sm font-semibold text-gray-700">账号说明</div>
+          <div class="text-xs text-gray-400 leading-relaxed mt-8">
+            登录即表示你同意使用统一账号体系。C 端账号与管理端共用用户主表，但权限和入口相互隔离。
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -65,6 +70,14 @@ const form = reactive({
 function validateTarget() {
   if (!form.target) {
     showToast(activeTab.value === 'sms' ? '请输入手机号' : '请输入邮箱')
+    return false
+  }
+  if (activeTab.value === 'sms' && !/^1\d{10}$/.test(form.target)) {
+    showToast('请输入正确的手机号')
+    return false
+  }
+  if (activeTab.value === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.target)) {
+    showToast('请输入正确的邮箱')
     return false
   }
   return true

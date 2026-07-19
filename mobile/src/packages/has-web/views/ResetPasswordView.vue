@@ -1,15 +1,21 @@
 <template>
-  <div class="has-page">
+  <div class="has-screen">
     <van-nav-bar title="重置密码" left-arrow fixed placeholder @click-left="$router.back()" />
 
-    <div class="p-16">
-      <div class="has-section">
+    <div class="has-content pt-16 has-bottom-safe">
+      <div class="has-card-stack">
+        <div class="has-section">
+          <div class="has-page-title">重置密码</div>
+          <div class="has-page-subtitle">通过手机号或邮箱验证码重置登录密码</div>
+        </div>
+
+        <div class="has-section">
         <van-tabs v-model:active="activeTab" shrink>
           <van-tab title="手机号" name="sms" />
           <van-tab title="邮箱" name="email" />
         </van-tabs>
 
-        <div class="mt-20 space-y-12">
+        <div class="mt-20 has-field-stack">
           <input
             v-model.trim="form.target"
             class="has-input"
@@ -19,16 +25,17 @@
           />
           <div class="flex gap-10">
             <input v-model.trim="form.code" class="has-input flex-1" maxlength="6" placeholder="请输入验证码" />
-            <van-button class="w-[112px]" round plain type="primary" :disabled="countdown > 0" @click="onSendCode">
+            <van-button class="w-[112px] !h-[44px]" round plain type="primary" :disabled="countdown > 0" @click="onSendCode">
               {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
             </van-button>
           </div>
           <input v-model.trim="form.newPassword" class="has-input" type="password" placeholder="请输入新密码" />
         </div>
 
-        <base-button class="mt-20 w-full" type="primary" block :loading="loading" @click="onReset">
+        <base-button class="mt-20 w-full !min-h-[44px]" type="primary" block :loading="loading" @click="onReset">
           确认重置
         </base-button>
+        </div>
       </div>
     </div>
   </div>
@@ -58,18 +65,31 @@ function startCountdown() {
   }, 1000)
 }
 
-async function onSendCode() {
+function validateTarget() {
   if (!form.target) {
     showToast(activeTab.value === 'sms' ? '请输入手机号' : '请输入邮箱')
-    return
+    return false
   }
+  if (activeTab.value === 'sms' && !/^1\d{10}$/.test(form.target)) {
+    showToast('请输入正确的手机号')
+    return false
+  }
+  if (activeTab.value === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.target)) {
+    showToast('请输入正确的邮箱')
+    return false
+  }
+  return true
+}
+
+async function onSendCode() {
+  if (!validateTarget()) return
   await sendCode({ channel: activeTab.value, scene: 'reset_password', target: form.target })
   showToast('验证码已发送')
   startCountdown()
 }
 
 async function onReset() {
-  if (!form.target || !form.code || !form.newPassword) {
+  if (!validateTarget() || !form.code || !form.newPassword) {
     showToast('请完整填写信息')
     return
   }

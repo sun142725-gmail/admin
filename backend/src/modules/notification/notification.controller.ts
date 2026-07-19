@@ -36,13 +36,19 @@ export class NotificationController {
   @Patch('templates/:id')
   @Permissions('system:notification:template:update')
   async updateTemplate(@Param('id') id: string, @Body() payload: UpdateTemplateDto) {
-    return this.notificationService.updateTemplate(Number(id), payload);
+    if (/^[0-9]+$/.test(id)) {
+      return this.notificationService.updateTemplate(Number(id), payload);
+    }
+    return this.notificationService.updateTemplateByCode(id, payload);
   }
 
   @Delete('templates/:id')
   @Permissions('system:notification:template:delete')
   async removeTemplate(@Param('id') id: string) {
-    return this.notificationService.removeTemplate(Number(id));
+    if (/^[0-9]+$/.test(id)) {
+      return this.notificationService.removeTemplate(Number(id));
+    }
+    return this.notificationService.removeTemplateByCode(id);
   }
 
   @Post('publish')
@@ -62,7 +68,6 @@ export class NotificationController {
   async publishDetail(@Param('id') id: string) {
     return this.notificationService.getPublishDetail(Number(id));
   }
-
 
   @Post('publish/:id/retry')
   @Permissions('system:notification:publish:retry')

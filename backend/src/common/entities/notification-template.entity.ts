@@ -10,6 +10,9 @@ interface NotificationVariableDefinition {
 
 @Entity('notification_templates')
 export class NotificationTemplate extends BaseEntity {
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  code?: string;
+
   @Column()
   name!: string;
 

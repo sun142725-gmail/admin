@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://frp8.aaszxc.asia:37400'
+      '/api': 'http://localhost:3000'
     }
   }
 });

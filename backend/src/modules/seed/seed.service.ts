@@ -7,6 +7,7 @@ import { User } from '../../common/entities/user.entity';
 import { Role } from '../../common/entities/role.entity';
 import { Permission } from '../../common/entities/permission.entity';
 import { Resource } from '../../common/entities/resource.entity';
+import { NotificationTemplate } from '../../common/entities/notification-template.entity';
 import { Dict } from '../../common/entities/dict.entity';
 import { DictItem } from '../../common/entities/dict-item.entity';
 
@@ -23,6 +24,8 @@ export class SeedService implements OnModuleInit {
     private readonly permissionRepo: Repository<Permission>,
     @InjectRepository(Resource)
     private readonly resourceRepo: Repository<Resource>,
+    @InjectRepository(NotificationTemplate)
+    private readonly templateRepo: Repository<NotificationTemplate>,
     @InjectRepository(Dict)
     private readonly dictRepo: Repository<Dict>,
     @InjectRepository(DictItem)
@@ -40,6 +43,8 @@ export class SeedService implements OnModuleInit {
       await this.ensureProfileAndAuditCenter();
       await this.ensureDictSetup();
       await this.ensureNotificationSetup();
+      await this.ensureNotificationTemplateCodes();
+      await this.ensureMessageChannelSetup();
       return;
     }
 
@@ -49,6 +54,8 @@ export class SeedService implements OnModuleInit {
     await this.seedAdminUser(role);
     await this.ensureDictSetup();
     await this.ensureNotificationSetup();
+    await this.ensureNotificationTemplateCodes();
+    await this.ensureMessageChannelSetup();
     this.logger.log('初始化数据已完成');
   }
 
@@ -221,6 +228,56 @@ export class SeedService implements OnModuleInit {
       await this.ensureAdminRolePermission(permission);
     }
     await this.ensureNotificationResources();
+  }
+
+  private async ensureMessageChannelSetup() {
+    let dict = await this.dictRepo.findOne({ where: { code: 'MESSAGE_CHANNEL' } });
+    if (!dict) {
+      dict = await this.dictRepo.save(
+        this.dictRepo.create({
+          code: 'MESSAGE_CHANNEL',
+          name: '消息通道',
+          description: '短信、邮箱、站内信、飞书等消息通道',
+          status: 1
+        })
+      );
+    }
+    const items: Array<Partial<DictItem>> = [
+      { dictId: dict.id, value: 'sms', label: '短信', sortOrder: 1, status: 1 },
+      { dictId: dict.id, value: 'email', label: '邮箱', sortOrder: 2, status: 1 },
+      { dictId: dict.id, value: 'inbox', label: '站内信', sortOrder: 3, status: 1 },
+      { dictId: dict.id, value: 'feishu', label: '飞书', sortOrder: 4, status: 1 }
+    ];
+    for (const item of items) {
+      const exists = await this.dictItemRepo.findOne({
+        where: { dictId: dict.id, value: item.value as string }
+      });
+      if (!exists) {
+        await this.dictItemRepo.save(this.dictItemRepo.create(item));
+      }
+    }
+  }
+
+  private async ensureNotificationTemplateCodes() {
+    const templates = await this.templateRepo
+      .createQueryBuilder('template')
+      .where('template.code IS NULL OR template.code = :empty', { empty: '' })
+      .getMany();
+    for (const template of templates) {
+      const code = this.buildTemplateCode(template.name, template.id);
+      template.code = code;
+      await this.templateRepo.save(template);
+    }
+  }
+
+  private buildTemplateCode(name: string, id: number) {
+    const normalized = name
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 16);
+    return `TPL_${normalized || 'MSG'}_${String(id).padStart(4, '0')}`;
   }
 
   private async ensurePermission() {
