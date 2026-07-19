@@ -4,6 +4,10 @@
 
 建议 C 端直接对接后端统一 API，和管理端共用同一套 `users` 主表与鉴权体系。
 
+- 当前 C 端项目目录：`mobile/`
+- 当前业务入口：`mobile/src/packages/has-web`
+- 框架说明见 `helloagents/wiki/mobile.md`
+
 - C 端只负责业务交互
 - 后端统一负责账号、验证码、权限、上传与个人资料
 - 端差异通过 `user_type`、角色和权限控制
@@ -31,6 +35,8 @@ Authorization: Bearer <accessToken>
 2. `POST /api/auth/code/login`
 3. 首次未绑定时自动注册
 
+对应页面：`mobile/src/packages/has-web/views/LoginView.vue`
+
 ### 邮箱验证码注册/登录
 1. `POST /api/auth/code/send`
 2. `POST /api/auth/code/login`
@@ -40,12 +46,16 @@ Authorization: Bearer <accessToken>
 1. `POST /api/auth/code/send`
 2. `POST /api/auth/code/reset-password`
 
+对应页面：`mobile/src/packages/has-web/views/ResetPasswordView.vue`
+
 ## 4. 个人信息
 
 - `GET /api/auth/profile`：获取当前用户基础信息与权限
 - `GET /api/profile`：获取个人资料
 - `PATCH /api/profile`：更新昵称、邮箱、头像
 - `POST /api/profile/password`：旧密码改密
+
+对应页面：`mobile/src/packages/has-web/views/ProfileView.vue`
 
 ## 5. 头像上传
 

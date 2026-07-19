@@ -29,6 +29,7 @@
 | Resources | 菜单/资源管理 | ✅Stable | [resources](modules/resources.md) |
 | Audit | 审计日志 | ✅Stable | [audit](modules/audit.md) |
 | Frontend | 前端页面与权限控制 | ✅Stable | [frontend](modules/frontend.md) |
+| Mobile | C 端 H5 基础框架 | 🚧In Development | [mobile](mobile.md) |
 | Divination | 六爻占卜 | ✅Stable | [divination](modules/divination.md) |
 | AI | AI 解卦 | ✅Stable | [ai](modules/ai.md) |
 | AuditCenter | 日志中心 | ✅Stable | [audit-center](modules/audit-center.md) |

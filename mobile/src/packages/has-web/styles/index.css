@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-size: theme('fontSize.base');
+    color: theme('colors.gray.800');
+    background-color: theme('colors.gray.50');
+  }
+}
+
+@layer components {
+  .has-page {
+    @apply bg-gray-50;
+    min-height: 100vh;
+  }
+
+  .has-section {
+    @apply bg-white rounded-lg p-16;
+    box-shadow: theme('boxShadow.card');
+  }
+
+  .has-input {
+    @apply w-full h-[44px] px-12 rounded-lg border border-gray-100 text-base outline-none bg-white;
+  }
+
+  .has-input:focus {
+    @apply border-primary-500;
+  }
+}

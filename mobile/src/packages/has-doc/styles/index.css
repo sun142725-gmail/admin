@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 全局基础样式统一，替代UI基础规范 */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent; /* 去除移动端点击黑块 */
+  }
+  body {
+    font-size: theme('fontSize.base');
+    color: theme('colors.gray.800');
+    background-color: theme('colors.gray.50');
+  }
+}
+
+/* 全局通用组件样式，统一卡片、按钮基础样式 */
+@layer components {
+  .app-card {
+    @apply bg-white rounded-lg p-12;
+    box-shadow: theme('boxShadow.card');
+  }
+  .btn-primary {
+    @apply bg-primary-500 text-white rounded-lg flex-center;
+    height: theme('height.btn_md');
+  }
+  .btn-default {
+    @apply bg-white border border-gray-200 text-gray-700 rounded-lg flex-center;
+    height: theme('height.btn_md');
+  }
+}
+.demo-page{
+  height: 100vh;
+}

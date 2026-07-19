@@ -5,6 +5,7 @@
 .
 ├── backend/                 # NestJS 后端
 ├── frontend/                # React 前端
+├── mobile/                  # Vue 3 H5 C 端项目
 ├── nginx/                   # Nginx 配置
 ├── docker-compose.yml       # Docker Compose
 ├── .env.example             # 环境变量示例
@@ -38,11 +39,18 @@
 - 站内信 `/notifications/inbox`
 - 个人中心 `/profile`
 
-## 5. docker-compose / nginx
+## 5. C 端移动端项目
+- 目录：`mobile/`
+- 技术栈：Vue 3 + Vite + Pinia + Vue Router + Vant
+- 业务入口：`mobile/src/packages/has-web`
+- 说明文档：`helloagents/wiki/mobile.md`
+- 组件文档：`mobile/src/components/README.md`
+
+## 6. docker-compose / nginx
 - `docker-compose.yml` 包含 mysql、redis、backend、frontend、nginx
 - Nginx 代理 `/api` 到后端，静态资源由 Nginx 提供
 
-## 6. 初始化数据与测试
+## 7. 初始化数据与测试
 - 默认账号：`admin` / `password`
 - 默认角色：管理员（admin）
 - 默认权限码：`system:user:list` 等（详见下方权限清单）

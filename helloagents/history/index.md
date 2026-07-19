@@ -23,6 +23,8 @@
 | 202602072234 | notification_module | Feature | ✅Completed | 2026-02/202602072234_notification-module/ |
 | 202602092206 | docker_mirror_fix | Fix | ✅Completed | 2026-02/202602092206_docker_mirror_fix/ |
 | 202607191107 | c_account_profile | Feature | ✅Completed | 2026-07/202607191107_c_account_profile/ |
+| 202607191152 | mobile_docs | Feature | ✅Completed | 2026-07/202607191152_mobile_docs/ |
+| 202607191215 | mobile_has_web | Feature | ✅Completed | 2026-07/202607191215_mobile_has_web/ |
 
 ---
 
@@ -51,3 +53,5 @@
 ### 2026-07
 
 - [202607191107_c_account_profile](2026-07/202607191107_c_account_profile/) - C 端账号体系与管理端个人信息模块
+- [202607191152_mobile_docs](2026-07/202607191152_mobile_docs/) - 移动端 H5 框架与 C 端对接说明
+- [202607191215_mobile_has_web](2026-07/202607191215_mobile_has_web/) - has-web C 端业务入口与接口对接骨架
