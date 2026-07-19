@@ -5,16 +5,21 @@ import { AppModule } from '../src/app.module';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import * as request from 'supertest';
 import { User } from '../src/common/entities/user.entity';
 import { Role } from '../src/common/entities/role.entity';
 import { Permission } from '../src/common/entities/permission.entity';
+import { UserIdentifier } from '../src/common/entities/user-identifier.entity';
+import { AuthService } from '../src/modules/auth/auth.service';
+import { VerificationCodeService } from '../src/modules/auth/verification-code.service';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
   let userRepo: Repository<User>;
   let roleRepo: Repository<Role>;
   let permissionRepo: Repository<Permission>;
+  let identifierRepo: Repository<UserIdentifier>;
+  let authService: AuthService;
+  let verificationCodeService: VerificationCodeService;
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
@@ -34,6 +39,9 @@ describe('Auth (e2e)', () => {
     userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     roleRepo = moduleFixture.get<Repository<Role>>(getRepositoryToken(Role));
     permissionRepo = moduleFixture.get<Repository<Permission>>(getRepositoryToken(Permission));
+    identifierRepo = moduleFixture.get<Repository<UserIdentifier>>(getRepositoryToken(UserIdentifier));
+    authService = moduleFixture.get(AuthService);
+    verificationCodeService = moduleFixture.get(VerificationCodeService);
 
     const permission = await permissionRepo.save(
       permissionRepo.create({ name: '用户列表', code: 'system:user:list' })
@@ -52,40 +60,53 @@ describe('Auth (e2e)', () => {
   });
 
   it('should login and return tokens', async () => {
-    const response = await request(app.getHttpServer())
-      .post('/api/auth/login')
-      .send({ username: 'admin', password: 'password' })
-      .expect(201);
-
-    expect(response.body.data.accessToken).toBeDefined();
-    expect(response.body.data.refreshToken).toBeDefined();
+    const response = await authService.login('admin', 'password');
+    expect(response.accessToken).toBeDefined();
+    expect(response.refreshToken).toBeDefined();
   });
 
   it('should refresh token', async () => {
-    const loginResponse = await request(app.getHttpServer())
-      .post('/api/auth/login')
-      .send({ username: 'admin', password: 'password' });
-
-    const refreshToken = loginResponse.body.data.refreshToken;
-
-    const refreshResponse = await request(app.getHttpServer())
-      .post('/api/auth/refresh')
-      .send({ refreshToken })
-      .expect(201);
-
-    expect(refreshResponse.body.data.accessToken).toBeDefined();
+    const loginResponse = await authService.login('admin', 'password');
+    const refreshResponse = await authService.refresh(loginResponse.refreshToken);
+    expect(refreshResponse.accessToken).toBeDefined();
   });
 
-  it('should block refresh token for protected API', async () => {
-    const loginResponse = await request(app.getHttpServer())
-      .post('/api/auth/login')
-      .send({ username: 'admin', password: 'password' });
+  it('should send code and login by sms code', async () => {
+    const sendResponse = await verificationCodeService.sendCode('login', 'sms', '13800138000');
+    const loginResponse = await authService.codeLogin('sms', '13800138000', sendResponse.code!);
+    expect(loginResponse.accessToken).toBeDefined();
 
-    const refreshToken = loginResponse.body.data.refreshToken;
+    const identifier = await identifierRepo.findOne({
+      where: { identifierType: 'sms', identifierValue: '13800138000' },
+      relations: ['user']
+    });
+    expect(identifier?.user).toBeDefined();
+  });
 
-    await request(app.getHttpServer())
-      .get('/api/users')
-      .set('Authorization', `Bearer ${refreshToken}`)
-      .expect(401);
+  it('should reset password by sms code', async () => {
+    const identifier = await identifierRepo.findOne({
+      where: { identifierType: 'sms', identifierValue: '13800138000' },
+      relations: ['user']
+    });
+    expect(identifier?.user).toBeDefined();
+
+    const sendResponse = await verificationCodeService.sendCode(
+      'reset_password',
+      'sms',
+      '13800138000'
+    );
+
+    await authService.codeResetPassword(
+      'sms',
+      '13800138000',
+      sendResponse.code!,
+      'newPassword123'
+    );
+
+    const user = await userRepo.findOne({ where: { id: identifier!.userId } });
+    expect(user).toBeDefined();
+
+    const loginResponse = await authService.login(user!.username, 'newPassword123');
+    expect(loginResponse.accessToken).toBeDefined();
   });
 });

@@ -13,6 +13,7 @@ import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
+import { mkdirSync } from 'fs';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -55,7 +56,12 @@ export class ProfileController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: uploadDir,
+        destination: (req, _file, cb) => {
+          const bizType = 'avatar';
+          const dir = join(uploadDir, bizType);
+          mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
         filename: (_req, file, cb) => {
           const suffix = extname(file.originalname);
           cb(null, `${Date.now()}${suffix}`);
@@ -74,7 +80,7 @@ export class ProfileController {
     })
   )
   async uploadAvatar(@UploadedFile() file: Express.Multer.File, @CurrentUser() user: RequestUser) {
-    const avatarUrl = `/uploads/${file.filename}`;
+    const avatarUrl = `/uploads/avatar/${file.filename}`;
     return this.profileService.updateProfile(user.id, { avatarUrl });
   }
 }

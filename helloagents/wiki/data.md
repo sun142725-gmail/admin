@@ -18,8 +18,61 @@
 | nickname | varchar |  | 昵称 |
 | email | varchar |  | 邮箱 |
 | avatar_url | varchar |  | 头像地址 |
+| user_type | varchar |  | 账号类型，c_end/admin/both |
+| register_channel | varchar |  | 注册来源 |
+| last_login_at | datetime |  | 最近登录时间 |
 | status | tinyint | Not Null | 0=禁用,1=启用 |
 | token_version | int | Not Null | 刷新令牌版本号 |
+| created_at | datetime |  | 创建时间 |
+| updated_at | datetime |  | 更新时间 |
+
+### user_identifiers
+**说明:** 用户登录标识，支持手机号、邮箱等
+
+| 字段 | 类型 | 约束 | 描述 |
+|------|------|------|------|
+| id | bigint | PK | 标识主键 |
+| user_id | bigint | Not Null | 用户ID |
+| identifier_type | varchar | Not Null | phone/email |
+| identifier_value | varchar | Not Null | 手机号/邮箱 |
+| is_primary | tinyint | Not Null | 是否主标识 |
+| verified_at | datetime |  | 验证时间 |
+| status | tinyint | Not Null | 0=禁用,1=启用 |
+| created_at | datetime |  | 创建时间 |
+| updated_at | datetime |  | 更新时间 |
+
+### verification_codes
+**说明:** 短信/邮件验证码记录
+
+| 字段 | 类型 | 约束 | 描述 |
+|------|------|------|------|
+| id | bigint | PK | 验证码主键 |
+| scene | varchar | Not Null | login/register/reset_password |
+| channel | varchar | Not Null | sms/email |
+| target | varchar | Not Null | 手机号/邮箱 |
+| code_hash | varchar | Not Null | 验证码哈希 |
+| expire_at | datetime | Not Null | 过期时间 |
+| consumed_at | datetime |  | 使用时间 |
+| request_ip | varchar |  | 请求 IP |
+| send_status | varchar | Not Null | 发送状态 |
+| fail_reason | varchar |  | 失败原因 |
+| created_at | datetime |  | 创建时间 |
+| updated_at | datetime |  | 更新时间 |
+
+### file_assets
+**说明:** 公共上传文件元数据
+
+| 字段 | 类型 | 约束 | 描述 |
+|------|------|------|------|
+| id | bigint | PK | 文件主键 |
+| biz_type | varchar | Not Null | 业务类型 |
+| storage_provider | varchar | Not Null | 存储提供方 |
+| storage_path | varchar | Not Null | 存储路径 |
+| file_name | varchar | Not Null | 原始文件名 |
+| mime_type | varchar | Not Null | MIME 类型 |
+| file_size | int | Not Null | 文件大小 |
+| file_hash | varchar |  | 文件哈希 |
+| uploaded_by | bigint |  | 上传用户 |
 | created_at | datetime |  | 创建时间 |
 | updated_at | datetime |  | 更新时间 |
 

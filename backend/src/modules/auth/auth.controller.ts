@@ -5,6 +5,9 @@ import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { SendCodeDto } from './dto/send-code.dto';
+import { CodeLoginDto } from './dto/code-login.dto';
+import { CodeResetPasswordDto } from './dto/code-reset-password.dto';
 import { AuthService } from './auth.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequestUser } from '../../common/interfaces/auth.interface';
@@ -17,6 +20,21 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.authService.login(dto.username, dto.password, req.ip);
+  }
+
+  @Post('code/send')
+  async sendCode(@Body() dto: SendCodeDto, @Req() req: Request) {
+    return this.authService.sendCode(dto.scene, dto.channel, dto.target, req.ip);
+  }
+
+  @Post('code/login')
+  async codeLogin(@Body() dto: CodeLoginDto, @Req() req: Request) {
+    return this.authService.codeLogin(dto.channel, dto.target, dto.code, req.ip);
+  }
+
+  @Post('code/reset-password')
+  async codeResetPassword(@Body() dto: CodeResetPasswordDto, @Req() req: Request) {
+    return this.authService.codeResetPassword(dto.channel, dto.target, dto.code, dto.newPassword, req.ip);
   }
 
   @Post('refresh')

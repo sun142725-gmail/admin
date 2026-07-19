@@ -19,6 +19,7 @@ import { LogCenterModule } from './modules/log-center/log-center.module';
 import { DictModule } from './modules/dict/dict.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { FilesModule } from './modules/files/files.module';
 import { User } from './common/entities/user.entity';
 import { Role } from './common/entities/role.entity';
 import { Permission } from './common/entities/permission.entity';
@@ -34,6 +35,9 @@ import { DictItem } from './common/entities/dict-item.entity';
 import { NotificationTemplate } from './common/entities/notification-template.entity';
 import { NotificationPublish } from './common/entities/notification-publish.entity';
 import { NotificationMessage } from './common/entities/notification-message.entity';
+import { UserIdentifier } from './common/entities/user-identifier.entity';
+import { VerificationCode } from './common/entities/verification-code.entity';
+import { FileAsset } from './common/entities/file-asset.entity';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -68,7 +72,10 @@ const isTest = process.env.NODE_ENV === 'test';
               DictItem,
               NotificationTemplate,
               NotificationPublish,
-              NotificationMessage
+              NotificationMessage,
+              UserIdentifier,
+              VerificationCode,
+              FileAsset
             ],
             synchronize: true
           }
@@ -94,7 +101,10 @@ const isTest = process.env.NODE_ENV === 'test';
               DictItem,
               NotificationTemplate,
               NotificationPublish,
-              NotificationMessage
+              NotificationMessage,
+              UserIdentifier,
+              VerificationCode,
+              FileAsset
             ],
             synchronize: process.env.DB_SYNC === 'true'
           }
@@ -110,6 +120,7 @@ const isTest = process.env.NODE_ENV === 'test';
     DivinationModule,
     AuditCenterModule,
     ProfileModule,
+    FilesModule,
     LogCenterModule,
     DictModule,
     NotificationModule,

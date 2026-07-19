@@ -57,7 +57,10 @@ export class ProfileService {
       username: user.username,
       nickname: user.nickname,
       email: user.email,
-      avatarUrl: user.avatarUrl
+      avatarUrl: user.avatarUrl,
+      userType: user.userType,
+      registerChannel: user.registerChannel,
+      lastLoginAt: user.lastLoginAt
     };
   }
 }

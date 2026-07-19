@@ -6,7 +6,7 @@
 ## Module Overview
 - **Responsibility:** 用户资料查看与更新、密码修改、头像上传
 - **Status:** ✅Stable
-- **Last Updated:** 2026-01-25
+- **Last Updated:** 2026-07-19
 
 ## Specifications
 
@@ -20,6 +20,10 @@
 #### Scenario: 修改密码
 - 校验旧密码
 - 更新密码并失效旧 token
+
+#### Scenario: 头像上传
+- 支持上传到公共文件存储目录
+- 业务层以 `bizType` 或路径前缀区分文件用途
 
 ## API Interfaces
 ### GET /api/profile
@@ -42,14 +46,30 @@
 **Input:** multipart file
 **Output:** avatarUrl
 
+### POST /api/files/upload
+**Description:** 公共文件上传
+**Input:** multipart file, bizType
+**Output:** url, id
+
 ## Data Models
 ### users
 | Field | Type | Description |
 |-------|------|-------------|
 | avatar_url | varchar | 头像地址 |
+| user_type | varchar | 账号类型 |
+| register_channel | varchar | 注册来源 |
+| last_login_at | datetime | 最近登录时间 |
+
+### file_assets
+| Field | Type | Description |
+|-------|------|-------------|
+| biz_type | varchar | 文件业务类型 |
+| storage_path | varchar | 存储路径 |
+| uploaded_by | bigint | 上传人 |
 
 ## Dependencies
 - users
+- file_assets
 
 ## Change History
 - [202601251353_profile_audit_center](../../history/2026-01/202601251353_profile_audit_center/) - 新增个人中心模块

@@ -3,6 +3,8 @@
 ## 概述
 所有接口前缀为 `/api`，统一响应结构为 `{ code, message, data, timestamp, traceId }`。
 
+> C 端接入说明请见 [C 端对接说明](c-end-integration.md)
+
 ## 认证方式
 使用 JWT accessToken + refreshToken，refreshToken 仅用于刷新，不可访问业务接口。
 
@@ -14,6 +16,15 @@
 
 #### POST /api/auth/login
 **说明:** 用户登录，返回 accessToken 与 refreshToken。
+
+#### POST /api/auth/code/send
+**说明:** 发送短信/邮件验证码。
+
+#### POST /api/auth/code/login
+**说明:** 验证码登录，未绑定标识时自动注册。
+
+#### POST /api/auth/code/reset-password
+**说明:** 使用验证码重置密码。
 
 #### POST /api/auth/refresh
 **说明:** 刷新令牌。
@@ -145,6 +156,11 @@
 
 #### POST /api/profile/avatar
 **说明:** 上传头像。
+
+### Files
+
+#### POST /api/files/upload
+**说明:** 公共文件上传。
 
 ### Dict
 

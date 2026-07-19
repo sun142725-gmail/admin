@@ -6,7 +6,7 @@
 ## Module Overview
 - **Responsibility:** 用户 CRUD、禁用/重置密码/分配角色
 - **Status:** ✅Stable
-- **Last Updated:** 2025-01-25
+- **Last Updated:** 2026-07-19
 
 ## Specifications
 
@@ -62,9 +62,12 @@
 | Field | Type | Description |
 |-------|------|-------------|
 | status | tinyint | 启用状态 |
+| user_type | varchar | 账号类型 |
+| register_channel | varchar | 注册来源 |
 
 ## Dependencies
 - roles
+- user_identifiers
 
 ## Change History
 - [202601250851_rbac_system](../../history/2026-01/202601250851_rbac_system/) - 初始化用户模块

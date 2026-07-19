@@ -4,14 +4,17 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../../common/entities/user.entity';
+import { UserIdentifier } from '../../common/entities/user-identifier.entity';
+import { VerificationCode } from '../../common/entities/verification-code.entity';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { AuditModule } from '../audit/audit.module';
+import { VerificationCodeService } from './verification-code.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, UserIdentifier, VerificationCode]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,
@@ -19,7 +22,7 @@ import { AuditModule } from '../audit/audit.module';
     }),
     AuditModule
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, VerificationCodeService],
   controllers: [AuthController],
   exports: [AuthService]
 })

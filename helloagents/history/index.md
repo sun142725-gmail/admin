@@ -22,6 +22,7 @@
 | 202601251814 | log_source_dict | Fix | ✅Completed | 2026-01/202601251814_log_source_dict/ |
 | 202602072234 | notification_module | Feature | ✅Completed | 2026-02/202602072234_notification-module/ |
 | 202602092206 | docker_mirror_fix | Fix | ✅Completed | 2026-02/202602092206_docker_mirror_fix/ |
+| 202607191107 | c_account_profile | Feature | ✅Completed | 2026-07/202607191107_c_account_profile/ |
 
 ---
 
@@ -46,3 +47,7 @@
 
 - [202602072234_notification-module](2026-02/202602072234_notification-module/) - 通知管理模块
 - [202602092206_docker_mirror_fix](2026-02/202602092206_docker_mirror_fix/) - Docker 构建镜像源与运行阶段依赖修复
+
+### 2026-07
+
+- [202607191107_c_account_profile](2026-07/202607191107_c_account_profile/) - C 端账号体系与管理端个人信息模块

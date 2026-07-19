@@ -1,7 +1,8 @@
-// 用户实体定义登录信息与角色关联。
-import { Column, Entity, ManyToMany, JoinTable } from 'typeorm';
+// 用户实体定义登录信息、账号类型与角色关联。
+import { Column, Entity, ManyToMany, JoinTable, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { Role } from './role.entity';
+import { UserIdentifier } from './user-identifier.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -20,6 +21,15 @@ export class User extends BaseEntity {
   @Column({ name: 'avatar_url', nullable: true })
   avatarUrl?: string;
 
+  @Column({ name: 'user_type', type: 'varchar', length: 32, default: 'both' })
+  userType!: string;
+
+  @Column({ name: 'register_channel', type: 'varchar', length: 32, nullable: true })
+  registerChannel?: string;
+
+  @Column({ name: 'last_login_at', type: 'datetime', nullable: true })
+  lastLoginAt?: Date;
+
   @Column({ type: 'tinyint', default: 1 })
   status!: number;
 
@@ -33,4 +43,7 @@ export class User extends BaseEntity {
     inverseJoinColumn: { name: 'role_id', referencedColumnName: 'id' }
   })
   roles!: Role[];
+
+  @OneToMany(() => UserIdentifier, (identifier) => identifier.user)
+  identifiers!: UserIdentifier[];
 }
