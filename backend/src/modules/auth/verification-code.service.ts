@@ -1,17 +1,16 @@
 // 验证码服务负责验证码生成、存储、发送与校验。
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomInt } from 'crypto';
 import { Repository } from 'typeorm';
 import { VerificationCode } from '../../common/entities/verification-code.entity';
 import { NotificationTriggerService } from '../notification/notification-trigger.service';
+import { sendSmsVerifyCode } from '../../utils/aliyun-sms';
 
 const LOGIN_TEMPLATE_CODE = 'LOGIN_TEMPLATE_CODE';
 
 @Injectable()
 export class VerificationCodeService {
-  private readonly logger = new Logger(VerificationCodeService.name);
-
   constructor(
     @InjectRepository(VerificationCode)
     private readonly codeRepo: Repository<VerificationCode>,
@@ -72,7 +71,11 @@ export class VerificationCodeService {
           idempotencyKey: `verification:${scene}:${channel}:${target}:${record.id}`
         });
       } else {
-        this.logger.log(`SMS code -> ${target}: ${code}`);
+        await sendSmsVerifyCode({
+          phoneNumber: target,
+          code,
+          min: '5'
+        });
       }
       record.sendStatus = 'sent';
       record.failReason = undefined;

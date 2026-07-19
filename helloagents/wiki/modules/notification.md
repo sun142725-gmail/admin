@@ -27,7 +27,7 @@
 选择模板与通道发布通知，系统生成发布记录并追踪状态。
 - 站内信立即入库
 - 飞书通过通道适配器发送
-- 短信通过短信适配器发送，默认支持控制台模式
+- 短信验证码通过阿里云短信发送，默认模板码 `SMS_337130257`
 - 邮箱通过 SMTP 适配器发送，支持 `process.env` 配置
 - 支持业务模块直接注入 `NotificationTriggerService` 触发发送
 
@@ -136,7 +136,7 @@
 - users
 - FEISHU_BOT_WEBHOOK (env)
 - SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_USER / SMTP_PASS / SMTP_FROM (env)
-- SMS_PROVIDER_MODE (env)
+- ALIYUN_ACCESS_KEY_ID / ALIYUN_ACCESS_KEY_SECRET / ALIYUN_SMS_SIGN_NAME / ALIYUN_SMS_VERIFY_TEMPLATE_CODE (env)
 
 ## Change History
 - [202602072234_notification-module](../../history/2026-02/202602072234_notification-module/) - 通知管理模块

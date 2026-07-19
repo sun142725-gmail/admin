@@ -10,6 +10,9 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@alicloud/dysmsapi20170525": "^4.6.0",
+    "@alicloud/openapi-client": "^0.4.15",
+    "@alicloud/tea-util": "^1.4.11",
     "@nestjs/common": "^10.3.2",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^10.3.2",

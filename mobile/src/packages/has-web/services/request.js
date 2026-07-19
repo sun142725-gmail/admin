@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { showToast } from 'vant'
 
 const ACCESS_TOKEN_KEY = 'has_web_access_token'
 const REFRESH_TOKEN_KEY = 'has_web_refresh_token'
@@ -68,6 +69,8 @@ request.interceptors.response.use(
         return Promise.reject(refreshError)
       }
     }
+    const message = error.response?.data?.message || error.message || '请求失败'
+    showToast(message)
     return Promise.reject(error)
   }
 )
