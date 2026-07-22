@@ -1,4 +1,8 @@
 #!/bin/bash
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
+
 git pull
-docker-compose up -d --build backend
+run_compose up -d --build backend

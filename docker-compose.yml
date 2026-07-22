@@ -75,6 +75,21 @@ services:
       - frontend_dist:/usr/share/nginx/html
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
+  deploy-panel:
+    build: ./deploy-panel
+    container_name: rbac-deploy-panel
+    environment:
+      PUBLISH_SECRET: ${PUBLISH_SECRET:?PUBLISH_SECRET is required}
+      PORT: 9090
+      PROJECT_PATH: /workspace
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./:/workspace
+      - ./deploy-panel/logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
 volumes:
   mysql_data:
   frontend_dist:
