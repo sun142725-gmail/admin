@@ -78,8 +78,9 @@ services:
   deploy-panel:
     build: ./deploy-panel
     container_name: rbac-deploy-panel
+    env_file:
+      - ./deploy-panel/.env
     environment:
-      PUBLISH_SECRET: ${PUBLISH_SECRET:?PUBLISH_SECRET is required}
       PORT: 9090
       PROJECT_PATH: /workspace
     ports:

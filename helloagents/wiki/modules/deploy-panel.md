@@ -37,6 +37,7 @@
 根目录 `docker-compose.yml` 包含 `deploy-panel` 服务：
 
 - 镜像构建上下文为 `./deploy-panel`
+- 通过 `env_file: ./deploy-panel/.env` 读取发布密钥
 - 容器内项目路径为 `/workspace`
 - 发布日志挂载到宿主机 `deploy-panel/logs`
 - 通过 `/var/run/docker.sock` 控制宿主机 Docker

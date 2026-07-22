@@ -6,7 +6,7 @@
 
 项目里的 Node 环境可以全部放在 Docker 内部运行，发布面板也已接入根目录 `docker-compose.yml`。
 
-1. 在项目根目录准备环境变量：
+1. 准备 `deploy-panel/.env`：
 
 ```bash
 PUBLISH_SECRET=replace-with-strong-secret
@@ -41,8 +41,9 @@ Compose 配置摘要：
 ```yaml
 deploy-panel:
   build: ./deploy-panel
+  env_file:
+    - ./deploy-panel/.env
   environment:
-    PUBLISH_SECRET: ${PUBLISH_SECRET}
     PORT: 9090
     PROJECT_PATH: /workspace
   ports:
