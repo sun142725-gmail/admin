@@ -87,6 +87,7 @@ services:
     volumes:
       - ./:/workspace
       - ./deploy-panel/logs:/app/logs
+      - ${HOME}/.ssh:/root/.ssh:ro
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 

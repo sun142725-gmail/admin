@@ -40,6 +40,7 @@
 - 可通过根目录 `.env` 或 shell 环境变量预设发布密钥；缺失时页面首次输入的密钥会持久化为服务端密钥
 - 容器内项目路径为 `/workspace`
 - 发布日志挂载到宿主机 `deploy-panel/logs`
+- 宿主机 `${HOME}/.ssh` 只读挂载到容器 `/root/.ssh`，支持 SSH 方式 `git pull`
 - 通过 `/var/run/docker.sock` 控制宿主机 Docker
 - 对外暴露端口 `9090`
 

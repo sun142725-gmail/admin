@@ -37,6 +37,7 @@
 - 角色功能权限页新增右侧模块导航浮窗，支持滚动定位与模块级全选
 - 角色功能权限页新增“仅看已选权限”与模块折叠/展开能力
 ### 修复
+- 发布面板镜像补充 `openssh-client` 并挂载宿主机 SSH 配置，修复 SSH 仓库 `git pull` 报 `cannot run ssh`
 - 发布面板移除页面硬编码发布密钥，补齐服务端密钥必填校验、JSON 解析保护、运行状态接口与任务锁释放兜底
 - 补充 NestJS TypeORM 与 sqlite3 依赖，修正 Throttler 配置
 - 飞书通知通道改为真实 webhook 发送（环境变量 FEISHU_BOT_WEBHOOK）

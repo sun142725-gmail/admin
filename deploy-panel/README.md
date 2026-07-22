@@ -52,6 +52,7 @@ deploy-panel:
   volumes:
     - ./:/workspace
     - ./deploy-panel/logs:/app/logs
+    - ${HOME}/.ssh:/root/.ssh:ro
     - /var/run/docker.sock:/var/run/docker.sock
 ```
 
@@ -77,6 +78,22 @@ docker-compose up -d --build deploy-panel
 ```bash
 docker port rbac-deploy-panel
 ss -lntp | grep 9090
+```
+
+## Git SSH 拉取
+
+如果项目远程仓库使用 SSH 地址，发布面板容器需要 SSH 客户端和密钥访问权限。镜像已内置 `openssh-client`，Compose 会把宿主机 `${HOME}/.ssh` 只读挂载到容器 `/root/.ssh`。
+
+服务器上需要先确认宿主机本身可以执行：
+
+```bash
+git pull
+```
+
+如果宿主机首次连接 Git 服务器，先在宿主机完成 `known_hosts` 确认，再重建发布面板容器：
+
+```bash
+docker-compose up -d --build deploy-panel
 ```
 
 ## 本地 Node 启动方式
