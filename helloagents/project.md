@@ -8,6 +8,7 @@
 - **鉴权:** JWT accessToken + refreshToken（tokenVersion 策略）
 - **文档:** Swagger
 - **部署:** Docker Compose + Nginx
+- **发布面板:** `deploy-panel` 提供受控 HTTP 发布入口，详见 `helloagents/wiki/modules/deploy-panel.md`
 - **镜像源:** docker.m.daocloud.io/library
 - **Alpine apk 源:** mirrors.aliyun.com/alpine（沿用当前 Alpine 版本路径）
 - **npm registry:** https://registry.npmmirror.com

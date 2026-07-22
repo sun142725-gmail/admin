@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RBAC系统自动化发布面板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    #logBox{
+      white-space: pre-wrap;
+      font-family: Consolas,Menlo,monospace;
+      height: 550px;
+      overflow-y:auto;
+    }
+    .log-info{color:#94a3b8}
+    .log-warn{color:#f97316}
+    .log-error{color:#ef4444}
+    .log-success{color:#10b981}
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-100 p-6 max-w-5xl mx-auto">
+<div class="mb-6">
+  <h1 class="text-2xl font-bold mb-4">🚀 RBAC 自动化发布面板</h1>
+  <div class="flex gap-4 items-center flex-wrap">
+    <div>
+      <label class="mr-2">发布目标：</label>
+      <select id="target" class="bg-gray-800 px-3 py-2 rounded border border-gray-600">
+        <option value="backend">仅后端 backend</option>
+        <option value="frontend">仅前端 frontend</option>
+        <option value="all">全部应用(frontend+backend+nginx)</option>
+      </select>
+    </div>
+    <button id="publishBtn" class="bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded">
+      ▶ 开始发布
+    </button>
+    <button id="refreshLogBtn" class="bg-emerald-700 hover:bg-emerald-800 px-5 py-2 rounded">
+      手动刷新日志
+    </button>
+    <button id="clearBtn" class="bg-gray-700 hover:bg-gray-600 px-5 py-2 rounded">
+      清空页面日志
+    </button>
+  </div>
+</div>
+
+<div class="mb-2 flex justify-between">
+  <span>执行日志输出</span>
+  <span id="status" class="text-blue-400">空闲</span>
+</div>
+<div id="logBox" class="bg-gray-950 border border-gray-700 p-4 rounded-lg"></div>
+
+<script>
+const API_BASE = window.location.origin;
+const TOKEN_STORAGE_KEY = 'rbac_publish_token';
+
+const logBox = document.getElementById('logBox');
+const targetSel = document.getElementById('target');
+const publishBtn = document.getElementById('publishBtn');
+const clearBtn = document.getElementById('clearBtn');
+const refreshLogBtn = document.getElementById('refreshLogBtn');
+const statusText = document.getElementById('status');
+
+let pollingTimer = null;
+let running = false;
+
+function getPublishToken() {
+  let token = localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!token) {
+    token = window.prompt('请输入发布密钥');
+    if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  }
+  return token || '';
+}
+
+function appendLog(text, type='info'){
+  const span = document.createElement('div');
+  span.className = `log-${type}`;
+  const time = new Date().toLocaleTimeString();
+  span.textContent = `[${time}] ${text}`;
+  logBox.appendChild(span);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+clearBtn.onclick = ()=> logBox.innerHTML = "";
+
+// 拉取日志
+async function fetchLog() {
+  try {
+    const res = await fetch(`${API_BASE}/logs`,{
+      headers:{
+        "X-Publish-Token": getPublishToken()
+      }
+    })
+    const text = await res.text();
+    return text;
+  } catch (err){
+    appendLog(`日志请求异常：${err.message}`,"error");
+    return null;
+  }
+}
+
+async function fetchStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/status`, {
+      headers: {
+        "X-Publish-Token": getPublishToken()
+      }
+    });
+    if (!res.ok) return false;
+    const result = await res.json();
+    return Boolean(result.data && result.data.running);
+  } catch (err) {
+    appendLog(`状态请求异常：${err.message}`,"error");
+    return false;
+  }
+}
+
+// 刷新显示日志
+async function renderLog() {
+  const raw = await fetchLog();
+  if(raw !== null){
+    logBox.innerText = raw;
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+}
+
+async function pollTask() {
+  await renderLog();
+  const isTaskRunning = await fetchStatus();
+  running = isTaskRunning;
+  publishBtn.disabled = isTaskRunning;
+  statusText.textContent = isTaskRunning ? "发布执行中..." : "空闲";
+  if (!isTaskRunning && pollingTimer) {
+    clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
+}
+
+refreshLogBtn.onclick = renderLog;
+
+publishBtn.onclick = async ()=>{
+  if(running){
+    appendLog("任务正在执行，请勿重复提交！","warn");
+    return;
+  }
+  const target = targetSel.value;
+  running = true;
+  publishBtn.disabled = true;
+  statusText.textContent = "发布执行中...";
+  appendLog(`发起发布，目标:${target}`,"info");
+
+  try{
+    const resp = await fetch(`${API_BASE}/deploy`,{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "X-Publish-Token": getPublishToken()
+      },
+      body:JSON.stringify({target})
+    })
+    const result = await resp.json();
+    if(!resp.ok) throw new Error(result.message || "请求失败");
+    appendLog(`✅ 发布任务已启动，请观察日志输出`,"success");
+
+    // 启动轮询刷新日志
+    if(pollingTimer) clearInterval(pollingTimer);
+    pollingTimer = setInterval(pollTask, 1500);
+
+  }catch(err){
+    appendLog(`❌ 请求异常:${err.message}`,"error");
+    if (String(err.message).includes('密钥')) {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  }finally{
+    pollTask();
+  }
+}
+
+// 页面打开立刻加载一次日志
+renderLog();
+</script>
+</body>
+</html>
