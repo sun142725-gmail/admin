@@ -37,7 +37,7 @@
 根目录 `docker-compose.yml` 包含 `deploy-panel` 服务：
 
 - 镜像构建上下文为 `./deploy-panel`
-- 通过 `env_file: ./deploy-panel/.env` 读取发布密钥
+- 通过根目录 `.env` 或 shell 环境变量读取发布密钥
 - 容器内项目路径为 `/workspace`
 - 发布日志挂载到宿主机 `deploy-panel/logs`
 - 通过 `/var/run/docker.sock` 控制宿主机 Docker
@@ -48,6 +48,8 @@
 ```bash
 docker compose up -d --build deploy-panel
 ```
+
+注意：`deploy-panel/.env` 仅供直接执行 `node server.js` 使用；通过根目录 Compose 启动时，应在项目根目录 `.env` 中配置 `PUBLISH_SECRET`。
 
 ## 发布目标
 

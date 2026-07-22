@@ -13,7 +13,7 @@
 - 新增用户登录标识、验证码与文件资源数据模型
 - 个人中心返回值补充账号类型与登录来源信息
 ### 变更
-- 发布面板 Docker Compose 配置改为读取 `deploy-panel/.env`，避免根目录环境变量缺失导致启动失败
+- 发布面板 Docker Compose 配置改为读取根目录环境变量，避免服务器缺少 `deploy-panel/.env` 导致启动失败
 - 发布脚本改为兼容 `docker compose` 与 `docker-compose`
 - Docker 镜像源切换为 DaoCloud 仓库
 - Docker 构建镜像源固定为阿里云并补齐后端运行阶段编译依赖

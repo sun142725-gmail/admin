@@ -6,7 +6,7 @@
 
 项目里的 Node 环境可以全部放在 Docker 内部运行，发布面板也已接入根目录 `docker-compose.yml`。
 
-1. 准备 `deploy-panel/.env`：
+1. 在项目根目录准备 `.env`，或在 shell 中导出同名环境变量：
 
 ```bash
 PUBLISH_SECRET=replace-with-strong-secret
@@ -41,9 +41,8 @@ Compose 配置摘要：
 ```yaml
 deploy-panel:
   build: ./deploy-panel
-  env_file:
-    - ./deploy-panel/.env
   environment:
+    PUBLISH_SECRET: ${PUBLISH_SECRET:-}
     PORT: 9090
     PROJECT_PATH: /workspace
   ports:
@@ -54,9 +53,11 @@ deploy-panel:
     - /var/run/docker.sock:/var/run/docker.sock
 ```
 
+注意：`deploy-panel/.env` 只用于本地直接执行 `node server.js`。通过根目录 `docker-compose.yml` 启动时，Compose 默认读取根目录 `.env`，不会自动读取 `deploy-panel/.env`。
+
 ## 本地 Node 启动方式
 
-如需不通过 Docker 直接运行，可复制 `.env.example` 为 `.env` 后修改：
+如需不通过 Docker 直接运行，可复制 `deploy-panel/.env.example` 为 `deploy-panel/.env` 后修改：
 
 ```bash
 PUBLISH_SECRET=replace-with-strong-secret
