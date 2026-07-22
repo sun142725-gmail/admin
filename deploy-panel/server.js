@@ -23,21 +23,27 @@ function loadEnvFile(filePath) {
   }
 }
 
-loadEnvFile(path.join(__dirname, '.env'));
+const ENV_FILE = path.join(__dirname, '.env');
+const SECRET_FILE = path.join(__dirname, 'logs/publish-secret.txt');
 
-const SECRET = process.env.PUBLISH_SECRET;
+loadEnvFile(ENV_FILE);
+
+let SECRET = process.env.PUBLISH_SECRET;
 const PORT = Number(process.env.PORT || 9090);
 const PROJECT_PATH = process.env.PROJECT_PATH || path.resolve(__dirname, '..');
 const LOG_DIR = path.join(__dirname, 'logs');
 const LOG_FILE = path.join(__dirname, './logs/deploy-logs.txt');
 const LOCK_FILE = path.join(__dirname, './task.lock');
 
-if (!SECRET) {
-  console.error('缺少环境变量 PUBLISH_SECRET，发布面板拒绝启动');
-  process.exit(1);
+fs.mkdirSync(LOG_DIR, { recursive: true });
+
+if (!SECRET && fs.existsSync(SECRET_FILE)) {
+  SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
 }
 
-fs.mkdirSync(LOG_DIR, { recursive: true });
+if (!SECRET) {
+  console.warn('未配置 PUBLISH_SECRET，发布面板将进入首次使用初始化模式');
+}
 
 // 脚本映射
 const SCRIPT_MAP = {
@@ -49,6 +55,15 @@ const SCRIPT_MAP = {
 // 简易鉴权
 function checkSecret(token) {
   return Boolean(token) && token === SECRET;
+}
+
+function initSecret(token) {
+  if (SECRET || !token) return false;
+
+  SECRET = token;
+  fs.writeFileSync(SECRET_FILE, token, { encoding: 'utf8', mode: 0o600 });
+  writeLog('发布密钥已完成首次初始化');
+  return true;
 }
 
 // 追加日志到文件
@@ -92,12 +107,22 @@ const server = http.createServer(async (req, res) => {
   }
 
   const token = req.headers['x-publish-token'];
+  if (!SECRET) {
+    if (req.url === '/status' && req.method === 'GET') {
+      return sendJson(res, 200, { code: 200, data: { running: false, initialized: false } });
+    }
+
+    if (!initSecret(token)) {
+      return sendJson(res, 401, { code: 401, message: '请先输入发布密钥完成初始化' });
+    }
+  }
+
   if (!checkSecret(token)) {
     return sendJson(res, 403, { code: 403, message: '密钥非法' });
   }
 
   if (req.url === '/status' && req.method === 'GET') {
-    return sendJson(res, 200, { code: 200, data: { running: isRunning() } });
+    return sendJson(res, 200, { code: 200, data: { running: isRunning(), initialized: true } });
   }
 
   // 触发发布接口 POST /deploy

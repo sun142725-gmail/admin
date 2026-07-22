@@ -6,13 +6,7 @@
 
 项目里的 Node 环境可以全部放在 Docker 内部运行，发布面板也已接入根目录 `docker-compose.yml`。
 
-1. 在项目根目录准备 `.env`，或在 shell 中导出同名环境变量：
-
-```bash
-PUBLISH_SECRET=replace-with-strong-secret
-```
-
-2. 构建并启动发布面板：
+1. 直接构建并启动发布面板：
 
 ```bash
 docker compose up -d --build deploy-panel
@@ -24,10 +18,18 @@ docker compose up -d --build deploy-panel
 docker-compose up -d --build deploy-panel
 ```
 
-3. 浏览器访问发布面板：
+2. 浏览器访问发布面板：
 
 ```text
 http://服务器IP:9090
+```
+
+首次访问后输入的发布密钥会初始化为服务端密钥，并持久化到 `deploy-panel/logs/publish-secret.txt`。后续访问需要输入同一个密钥。
+
+也可以提前在项目根目录 `.env` 或 shell 环境变量中指定固定密钥：
+
+```bash
+PUBLISH_SECRET=replace-with-strong-secret
 ```
 
 页面首次访问会提示输入发布密钥，并保存到浏览器 `localStorage`。如需更换密钥，清理浏览器本地存储后重新输入。
@@ -54,6 +56,28 @@ deploy-panel:
 ```
 
 注意：`deploy-panel/.env` 只用于本地直接执行 `node server.js`。通过根目录 `docker-compose.yml` 启动时，Compose 默认读取根目录 `.env`，不会自动读取 `deploy-panel/.env`。
+
+## 访问异常排查
+
+如果容器创建成功但 `http://服务器IP:9090` 拒绝连接，优先检查容器是否已经退出：
+
+```bash
+docker ps -a | grep rbac-deploy-panel
+docker logs rbac-deploy-panel
+```
+
+如果日志显示进入首次使用初始化模式，说明服务已正常启动，打开页面输入发布密钥即可。如果想提前固定密钥，在项目根目录 `.env` 中添加后重建：
+
+```bash
+docker-compose up -d --build deploy-panel
+```
+
+如果容器状态是 `Up` 但仍无法访问，检查端口监听与服务器防火墙：
+
+```bash
+docker port rbac-deploy-panel
+ss -lntp | grep 9090
+```
 
 ## 本地 Node 启动方式
 

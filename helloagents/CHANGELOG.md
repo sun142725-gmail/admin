@@ -13,6 +13,7 @@
 - 新增用户登录标识、验证码与文件资源数据模型
 - 个人中心返回值补充账号类型与登录来源信息
 ### 变更
+- 发布面板支持首次使用初始化模式，未配置 `PUBLISH_SECRET` 时仍可启动并在页面首次输入密钥
 - 发布面板 Docker Compose 配置改为读取根目录环境变量，避免服务器缺少 `deploy-panel/.env` 导致启动失败
 - 发布脚本改为兼容 `docker compose` 与 `docker-compose`
 - Docker 镜像源切换为 DaoCloud 仓库

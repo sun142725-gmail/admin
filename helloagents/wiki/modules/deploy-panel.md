@@ -19,7 +19,7 @@
 
 ## 环境变量
 
-- `PUBLISH_SECRET`：发布密钥，必填；缺失时服务拒绝启动
+- `PUBLISH_SECRET`：发布密钥；缺失时进入首次使用初始化模式
 - `PORT`：发布面板端口，默认 `9090`
 - `PROJECT_PATH`：部署脚本执行目录，默认 `deploy-panel` 上级目录
 
@@ -37,7 +37,7 @@
 根目录 `docker-compose.yml` 包含 `deploy-panel` 服务：
 
 - 镜像构建上下文为 `./deploy-panel`
-- 通过根目录 `.env` 或 shell 环境变量读取发布密钥
+- 可通过根目录 `.env` 或 shell 环境变量预设发布密钥；缺失时页面首次输入的密钥会持久化为服务端密钥
 - 容器内项目路径为 `/workspace`
 - 发布日志挂载到宿主机 `deploy-panel/logs`
 - 通过 `/var/run/docker.sock` 控制宿主机 Docker
@@ -49,7 +49,7 @@
 docker compose up -d --build deploy-panel
 ```
 
-注意：`deploy-panel/.env` 仅供直接执行 `node server.js` 使用；通过根目录 Compose 启动时，应在项目根目录 `.env` 中配置 `PUBLISH_SECRET`。
+注意：`deploy-panel/.env` 仅供直接执行 `node server.js` 使用；通过根目录 Compose 启动时，可在项目根目录 `.env` 中配置 `PUBLISH_SECRET`，也可首次打开页面完成初始化。
 
 ## 发布目标
 
@@ -62,5 +62,6 @@ docker compose up -d --build deploy-panel
 - 禁止在页面、脚本或文档中写入真实发布密钥
 - 发布入口建议仅暴露在内网或受控环境
 - 发布面板容器挂载宿主机 Docker socket，具备较高权限
+- 首次使用初始化模式下，必须确保服务只暴露在可信网络内，避免他人抢先设置发布密钥
 - 发布前需确认 `PROJECT_PATH` 指向正确项目目录
 - 强制终止服务后如遗留 `task.lock`，需确认无发布任务运行后再删除
