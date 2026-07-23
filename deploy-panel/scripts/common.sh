@@ -6,6 +6,7 @@ CURRENT_STEP="初始化"
 DEPLOY_START_TIME=0
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-admin}"
+export COMPOSE_COMPATIBILITY="${COMPOSE_COMPATIBILITY:-1}"
 HOST_PROJECT_PATH="${HOST_PROJECT_PATH:-$PWD}"
 COMPOSE_FILE_PATH="${COMPOSE_FILE_PATH:-$HOST_PROJECT_PATH/docker-compose.yml}"
 
@@ -62,6 +63,7 @@ preflight() {
   fi
 
   echo "Compose 项目名：$COMPOSE_PROJECT_NAME"
+  echo "Compose 兼容模式：$COMPOSE_COMPATIBILITY"
   echo "容器工作目录：$PWD"
   echo "宿主机项目目录：$HOST_PROJECT_PATH"
 

@@ -36,7 +36,7 @@ PUBLISH_SECRET=replace-with-strong-secret
 
 ## 容器运行机制
 
-`deploy-panel` 服务会把项目根目录挂载到容器内 `/workspace`，同时挂载宿主机 `/var/run/docker.sock`。发布脚本在 `/workspace` 中执行 `git pull`，Docker Compose 则通过 `HOST_PROJECT_PATH` 指向宿主机真实项目目录，因此可以从容器内控制宿主机 Docker 重建服务并正确解析 bind mount。
+`deploy-panel` 服务会把项目根目录挂载到容器内与宿主机一致的绝对路径，默认是 `/home/sun142725/admin`，同时挂载宿主机 `/var/run/docker.sock`。发布脚本在该路径中执行 `git pull` 与 Docker Compose，因此可以从容器内控制宿主机 Docker 重建服务并正确解析 bind mount。
 
 Compose 配置摘要：
 
@@ -46,13 +46,14 @@ deploy-panel:
   environment:
     PUBLISH_SECRET: ${PUBLISH_SECRET:-}
     PORT: 9090
-    PROJECT_PATH: /workspace
+    PROJECT_PATH: ${HOST_PROJECT_PATH:-/home/sun142725/admin}
     HOST_PROJECT_PATH: ${HOST_PROJECT_PATH:-/home/sun142725/admin}
     COMPOSE_PROJECT_NAME: admin
+    COMPOSE_COMPATIBILITY: "1"
   ports:
     - "9090:9090"
   volumes:
-    - ./:/workspace
+    - ./:${HOST_PROJECT_PATH:-/home/sun142725/admin}
     - ./deploy-panel/logs:/app/logs
     - ${HOME}/.ssh:/root/.ssh:ro
     - /var/run/docker.sock:/var/run/docker.sock
@@ -135,6 +136,7 @@ node server.js
 - `all`：执行 `scripts/deploy-all.sh`，拉取最新代码并重建 `backend`、`frontend` 与 `nginx`
 
 发布面板容器固定设置 `COMPOSE_PROJECT_NAME=admin`，避免容器内 `/workspace` 路径或宿主机环境变量导致 Compose 创建 `workspace-*` 新容器。
+同时启用 `COMPOSE_COMPATIBILITY=1`，尽量沿用旧版 Compose 的 `admin_nginx_1` 这类下划线容器命名。
 
 ## 发布速度与缓存
 

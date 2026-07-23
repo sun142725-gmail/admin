@@ -78,13 +78,14 @@ services:
     environment:
       PUBLISH_SECRET: ${PUBLISH_SECRET:-}
       PORT: 9090
-      PROJECT_PATH: /workspace
+      PROJECT_PATH: ${HOST_PROJECT_PATH:-/home/sun142725/admin}
       HOST_PROJECT_PATH: ${HOST_PROJECT_PATH:-/home/sun142725/admin}
       COMPOSE_PROJECT_NAME: admin
+      COMPOSE_COMPATIBILITY: "1"
     ports:
       - "9090:9090"
     volumes:
-      - ./:/workspace
+      - ./:${HOST_PROJECT_PATH:-/home/sun142725/admin}
       - ./deploy-panel/logs:/app/logs
       - ${HOME}/.ssh:/root/.ssh:ro
       - /var/run/docker.sock:/var/run/docker.sock
