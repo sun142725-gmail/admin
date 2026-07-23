@@ -3,6 +3,9 @@
 set -Eeuo pipefail
 
 CURRENT_STEP="初始化"
+DEPLOY_START_TIME=0
+
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-admin}"
 
 on_error() {
   local exit_code=$?
@@ -24,6 +27,15 @@ run_compose() {
   docker-compose "$@"
 }
 
+print_elapsed_time() {
+  local end_time elapsed minutes seconds
+  end_time="$(date +%s)"
+  elapsed=$((end_time - DEPLOY_START_TIME))
+  minutes=$((elapsed / 60))
+  seconds=$((elapsed % 60))
+  echo "发布总耗时：${minutes}分${seconds}秒"
+}
+
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "缺少命令：$1"
@@ -33,6 +45,7 @@ require_command() {
 
 preflight() {
   CURRENT_STEP="环境检查"
+  DEPLOY_START_TIME="$(date +%s)"
   require_command git
   require_command docker
 
@@ -45,6 +58,8 @@ preflight() {
     echo "缺少 Docker Compose：需要 docker compose 或 docker-compose"
     exit 127
   fi
+
+  echo "Compose 项目名：$COMPOSE_PROJECT_NAME"
 }
 
 pull_latest_code() {
@@ -69,9 +84,39 @@ compose_up() {
   DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-1}" COMPOSE_DOCKER_CLI_BUILD="${COMPOSE_DOCKER_CLI_BUILD:-1}" run_compose up -d --build "$@"
 }
 
+compose_up_no_deps() {
+  CURRENT_STEP="重建服务（不启动依赖）：$*"
+  echo "重建服务（不启动依赖）：$*"
+  DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-1}" COMPOSE_DOCKER_CLI_BUILD="${COMPOSE_DOCKER_CLI_BUILD:-1}" run_compose up -d --no-deps --build "$@"
+}
+
+compose_restart_no_deps() {
+  CURRENT_STEP="重启服务（不启动依赖）：$*"
+  echo "重启服务（不启动依赖）：$*"
+  run_compose up -d --no-deps "$@"
+}
+
 deploy_services() {
   preflight
   pull_latest_code
   clean_build_cache_if_needed
   compose_up "$@"
+  print_elapsed_time
+}
+
+deploy_services_no_deps() {
+  preflight
+  pull_latest_code
+  clean_build_cache_if_needed
+  compose_up_no_deps "$@"
+  print_elapsed_time
+}
+
+deploy_frontend() {
+  preflight
+  pull_latest_code
+  clean_build_cache_if_needed
+  compose_up_no_deps frontend
+  compose_restart_no_deps nginx
+  print_elapsed_time
 }

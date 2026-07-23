@@ -3,4 +3,4 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
-deploy_services backend
+deploy_services_no_deps backend

@@ -22,6 +22,7 @@
 - `PUBLISH_SECRET`：发布密钥；缺失时进入首次使用初始化模式
 - `PORT`：发布面板端口，默认 `9090`
 - `PROJECT_PATH`：部署脚本执行目录，默认 `deploy-panel` 上级目录
+- `COMPOSE_PROJECT_NAME`：Compose 项目名，默认 `admin`，用于复用现有 `admin_*` 容器与 volume
 
 ## 运行机制
 
@@ -54,8 +55,8 @@ docker compose up -d --build deploy-panel
 
 ## 发布目标
 
-- `backend`：拉取最新代码并重建 `backend`
-- `frontend`：拉取最新代码并重建 `frontend`、`nginx`
+- `backend`：拉取最新代码并只重建 `backend`，不启动 `mysql`、`redis`
+- `frontend`：拉取最新代码并只重建 `frontend`，随后无依赖重载 `nginx`
 - `all`：拉取最新代码并重建 `backend`、`frontend`、`nginx`
 
 ## 构建优化
@@ -64,6 +65,8 @@ docker compose up -d --build deploy-panel
 - 后端与前端 Dockerfile 使用 BuildKit npm 缓存挂载
 - 前端改为镜像构建阶段执行 `npm ci` 与 `npm run build`，容器启动阶段仅复制 `dist` 到共享卷
 - 发布脚本统一启用 `DOCKER_BUILDKIT=1` 与 `COMPOSE_DOCKER_CLI_BUILD=1`
+- 发布脚本固定默认 `COMPOSE_PROJECT_NAME=admin`，避免容器内路径变化导致创建 `workspace-*` 重复服务
+- 发布完成后输出本次发布总耗时
 - `DEPLOY_CLEAN_CACHE=1` 时执行 `docker builder prune -f`，用于缓存污染或磁盘紧张时的手动清理
 
 ## 错误处理

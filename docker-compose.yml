@@ -81,6 +81,7 @@ services:
       PUBLISH_SECRET: ${PUBLISH_SECRET:-}
       PORT: 9090
       PROJECT_PATH: /workspace
+      COMPOSE_PROJECT_NAME: admin
     ports:
       - "9090:9090"
     volumes:

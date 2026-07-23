@@ -115,9 +115,11 @@ node server.js
 
 ## 发布目标
 
-- `backend`：执行 `scripts/deploy-backend.sh`，拉取最新代码并重建 `backend`
-- `frontend`：执行 `scripts/deploy-frontend.sh`，拉取最新代码并重建 `frontend` 与 `nginx`
+- `backend`：执行 `scripts/deploy-backend.sh`，拉取最新代码并只重建 `backend`，不启动 `mysql`、`redis`
+- `frontend`：执行 `scripts/deploy-frontend.sh`，拉取最新代码并只重建 `frontend`，随后无依赖重载 `nginx`
 - `all`：执行 `scripts/deploy-all.sh`，拉取最新代码并重建 `backend`、`frontend` 与 `nginx`
+
+发布面板容器固定设置 `COMPOSE_PROJECT_NAME=admin`，避免容器内 `/workspace` 路径或宿主机环境变量导致 Compose 创建 `workspace-*` 新容器。
 
 ## 发布速度与缓存
 
@@ -125,6 +127,7 @@ node server.js
 - 前端静态资源在镜像构建阶段完成，容器启动时只复制 `dist` 到 `frontend_dist` 卷
 - 后端和前端依赖安装使用 `npm ci`，并通过 BuildKit npm 缓存减少重复下载
 - 发布脚本默认启用 `DOCKER_BUILDKIT=1` 与 `COMPOSE_DOCKER_CLI_BUILD=1`
+- 发布完成后会输出本次发布总耗时
 
 只有在依赖异常、Dockerfile 变更后缓存疑似污染，或磁盘空间紧张时，才建议清理构建缓存：
 
