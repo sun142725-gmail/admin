@@ -13,6 +13,8 @@
 - 新增用户登录标识、验证码与文件资源数据模型
 - 个人中心返回值补充账号类型与登录来源信息
 ### 变更
+- Docker Compose 移除过期 `version` 字段，并为可选外部 API 环境变量补默认空值以减少发布日志 warning
+- 发布脚本新增 `HOST_PROJECT_PATH` 并固定 Compose project directory，避免容器内 `/workspace` 路径导致 Nginx 文件挂载失败
 - 前端/后端单独发布改为无依赖重建，避免误启动 MySQL/Redis；发布脚本默认固定 Compose 项目名为 `admin`
 - 发布脚本新增发布总耗时输出
 - 优化前后端 Docker 构建缓存，前端改为镜像构建阶段产物构建并减少运行期重复安装

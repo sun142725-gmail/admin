@@ -22,6 +22,7 @@
 - `PUBLISH_SECRET`：发布密钥；缺失时进入首次使用初始化模式
 - `PORT`：发布面板端口，默认 `9090`
 - `PROJECT_PATH`：部署脚本执行目录，默认 `deploy-panel` 上级目录
+- `HOST_PROJECT_PATH`：宿主机项目真实目录，默认 `/home/sun142725/admin`，用于 Docker Compose 解析 bind mount 路径
 - `COMPOSE_PROJECT_NAME`：Compose 项目名，默认 `admin`，用于复用现有 `admin_*` 容器与 volume
 
 ## 运行机制
@@ -40,6 +41,7 @@
 - 镜像构建上下文为 `./deploy-panel`
 - 可通过根目录 `.env` 或 shell 环境变量预设发布密钥；缺失时页面首次输入的密钥会持久化为服务端密钥
 - 容器内项目路径为 `/workspace`
+- Docker Compose 项目目录固定到宿主机真实路径 `HOST_PROJECT_PATH`，避免 bind mount 被解析成容器内 `/workspace`
 - 发布日志挂载到宿主机 `deploy-panel/logs`
 - 宿主机 `${HOME}/.ssh` 只读挂载到容器 `/root/.ssh`，支持 SSH 方式 `git pull`
 - 通过 `/var/run/docker.sock` 控制宿主机 Docker
@@ -66,6 +68,7 @@ docker compose up -d --build deploy-panel
 - 前端改为镜像构建阶段执行 `npm ci` 与 `npm run build`，容器启动阶段仅复制 `dist` 到共享卷
 - 发布脚本统一启用 `DOCKER_BUILDKIT=1` 与 `COMPOSE_DOCKER_CLI_BUILD=1`
 - 发布脚本固定默认 `COMPOSE_PROJECT_NAME=admin`，避免容器内路径变化导致创建 `workspace-*` 重复服务
+- 发布脚本通过 `--project-directory "$HOST_PROJECT_PATH" -f "$HOST_PROJECT_PATH/docker-compose.yml"` 执行 Compose，确保 Nginx 配置等 bind mount 使用宿主机真实路径
 - 发布完成后输出本次发布总耗时
 - `DEPLOY_CLEAN_CACHE=1` 时执行 `docker builder prune -f`，用于缓存污染或磁盘紧张时的手动清理
 

@@ -6,6 +6,8 @@ CURRENT_STEP="初始化"
 DEPLOY_START_TIME=0
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-admin}"
+HOST_PROJECT_PATH="${HOST_PROJECT_PATH:-$PWD}"
+COMPOSE_FILE_PATH="${COMPOSE_FILE_PATH:-$HOST_PROJECT_PATH/docker-compose.yml}"
 
 on_error() {
   local exit_code=$?
@@ -20,11 +22,11 @@ trap on_error ERR
 
 run_compose() {
   if docker compose version >/dev/null 2>&1; then
-    docker compose "$@"
+    docker compose --project-directory "$HOST_PROJECT_PATH" -f "$COMPOSE_FILE_PATH" "$@"
     return
   fi
 
-  docker-compose "$@"
+  docker-compose --project-directory "$HOST_PROJECT_PATH" -f "$COMPOSE_FILE_PATH" "$@"
 }
 
 print_elapsed_time() {
@@ -60,6 +62,19 @@ preflight() {
   fi
 
   echo "Compose 项目名：$COMPOSE_PROJECT_NAME"
+  echo "容器工作目录：$PWD"
+  echo "宿主机项目目录：$HOST_PROJECT_PATH"
+
+  if [ ! -f "$COMPOSE_FILE_PATH" ]; then
+    echo "Compose 文件不存在：$COMPOSE_FILE_PATH"
+    exit 1
+  fi
+
+  if [ ! -f "$HOST_PROJECT_PATH/nginx/nginx.conf" ]; then
+    echo "Nginx 配置不存在或不是文件：$HOST_PROJECT_PATH/nginx/nginx.conf"
+    echo "请确认 HOST_PROJECT_PATH 指向宿主机项目真实目录"
+    exit 1
+  fi
 }
 
 pull_latest_code() {

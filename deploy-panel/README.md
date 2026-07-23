@@ -36,7 +36,7 @@ PUBLISH_SECRET=replace-with-strong-secret
 
 ## 容器运行机制
 
-`deploy-panel` 服务会把项目根目录挂载到容器内 `/workspace`，同时挂载宿主机 `/var/run/docker.sock`。发布脚本在 `/workspace` 中执行 `git pull` 和 Docker Compose 命令，因此可以从容器内控制宿主机 Docker 重建服务。
+`deploy-panel` 服务会把项目根目录挂载到容器内 `/workspace`，同时挂载宿主机 `/var/run/docker.sock`。发布脚本在 `/workspace` 中执行 `git pull`，Docker Compose 则通过 `HOST_PROJECT_PATH` 指向宿主机真实项目目录，因此可以从容器内控制宿主机 Docker 重建服务并正确解析 bind mount。
 
 Compose 配置摘要：
 
@@ -47,6 +47,8 @@ deploy-panel:
     PUBLISH_SECRET: ${PUBLISH_SECRET:-}
     PORT: 9090
     PROJECT_PATH: /workspace
+    HOST_PROJECT_PATH: ${HOST_PROJECT_PATH:-/home/sun142725/admin}
+    COMPOSE_PROJECT_NAME: admin
   ports:
     - "9090:9090"
   volumes:
@@ -57,6 +59,12 @@ deploy-panel:
 ```
 
 注意：`deploy-panel/.env` 只用于本地直接执行 `node server.js`。通过根目录 `docker-compose.yml` 启动时，Compose 默认读取根目录 `.env`，不会自动读取 `deploy-panel/.env`。
+
+`HOST_PROJECT_PATH` 默认是 `/home/sun142725/admin`。如果服务器项目不在这个路径，需要在根目录 `.env` 中覆盖：
+
+```bash
+HOST_PROJECT_PATH=/你的/服务器/项目目录
+```
 
 ## 访问异常排查
 
@@ -78,6 +86,13 @@ docker-compose up -d --build deploy-panel
 ```bash
 docker port rbac-deploy-panel
 ss -lntp | grep 9090
+```
+
+如果发布时报 Nginx 配置挂载错误，检查宿主机真实路径：
+
+```bash
+ls -l /home/sun142725/admin/nginx/nginx.conf
+docker compose exec deploy-panel env | grep HOST_PROJECT_PATH
 ```
 
 ## Git SSH 拉取
