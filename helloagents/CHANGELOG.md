@@ -13,6 +13,8 @@
 - 新增用户登录标识、验证码与文件资源数据模型
 - 个人中心返回值补充账号类型与登录来源信息
 ### 变更
+- 前端发布不再重启 `nginx`，依赖 `frontend_dist` 共享卷更新静态资源
+- 发布面板不再将 Docker Compose stderr 进度统一标记为 `[ERR]`，改按退出码输出成功或失败
 - 发布脚本默认启用 Compose v2 compatibility 模式，减少旧版下划线容器命名迁移影响
 - 发布面板项目挂载路径改为与宿主机真实路径一致，修正容器内无法读取 `HOST_PROJECT_PATH/docker-compose.yml` 的问题
 - Docker Compose 移除过期 `version` 字段，并为可选外部 API 环境变量补默认空值以减少发布日志 warning

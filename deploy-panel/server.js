@@ -161,14 +161,15 @@ const server = http.createServer(async (req, res) => {
       });
 
       proc.stdout.on('data', buf => writeLog(buf.toString()));
-      proc.stderr.on('data', buf => writeLog(`[ERR] ${buf.toString()}`));
+      proc.stderr.on('data', buf => writeLog(buf.toString()));
       proc.on('error', error => {
         writeLog(`[ERR] 发布进程启动失败：${error.message}`);
         unlockTask();
       });
 
       proc.on('close', code => {
-        writeLog(`===== 发布结束，退出码：${code} =====\n`);
+        const result = code === 0 ? '成功' : '失败';
+        writeLog(`===== 发布结束：${result}，退出码：${code} =====\n`);
         unlockTask();
       });
 

@@ -134,6 +134,6 @@ deploy_frontend() {
   pull_latest_code
   clean_build_cache_if_needed
   compose_up_no_deps frontend
-  compose_restart_no_deps nginx
+  echo "Nginx 使用 frontend_dist 共享卷，无需重启"
   print_elapsed_time
 }

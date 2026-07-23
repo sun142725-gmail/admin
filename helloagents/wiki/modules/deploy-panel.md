@@ -59,7 +59,7 @@ docker compose up -d --build deploy-panel
 ## 发布目标
 
 - `backend`：拉取最新代码并只重建 `backend`，不启动 `mysql`、`redis`
-- `frontend`：拉取最新代码并只重建 `frontend`，随后无依赖重载 `nginx`
+- `frontend`：拉取最新代码并只重建 `frontend`；`nginx` 使用共享卷读取静态资源，无需重启
 - `all`：拉取最新代码并重建 `backend`、`frontend`、`nginx`
 
 ## 构建优化
@@ -72,6 +72,7 @@ docker compose up -d --build deploy-panel
 - 发布脚本默认启用 `COMPOSE_COMPATIBILITY=1`，减少 Compose v1 到 v2 后容器命名变化
 - 发布脚本通过 `--project-directory "$HOST_PROJECT_PATH" -f "$HOST_PROJECT_PATH/docker-compose.yml"` 执行 Compose，确保 Compose 文件和 Nginx 配置在容器内可读，且 bind mount 使用宿主机真实路径
 - 发布完成后输出本次发布总耗时
+- 发布面板按脚本退出码判断成功或失败，不再把 Docker Compose stderr 进度统一标记为错误
 - `DEPLOY_CLEAN_CACHE=1` 时执行 `docker builder prune -f`，用于缓存污染或磁盘紧张时的手动清理
 
 ## 错误处理

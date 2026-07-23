@@ -75,7 +75,7 @@ export const HomePage: React.FC = () => {
     <div>
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
         <Title level={3} style={{ marginBottom: 0 }}>
-          系统资源总览
+          系统资源总览--------
         </Title>
         <Space>
           <Tooltip
