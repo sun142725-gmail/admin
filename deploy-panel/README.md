@@ -119,6 +119,21 @@ node server.js
 - `frontend`：执行 `scripts/deploy-frontend.sh`，拉取最新代码并重建 `frontend` 与 `nginx`
 - `all`：执行 `scripts/deploy-all.sh`，拉取最新代码并重建 `backend`、`frontend` 与 `nginx`
 
+## 发布速度与缓存
+
+- 默认保留 Docker 构建缓存，用于提升后续发布速度
+- 前端静态资源在镜像构建阶段完成，容器启动时只复制 `dist` 到 `frontend_dist` 卷
+- 后端和前端依赖安装使用 `npm ci`，并通过 BuildKit npm 缓存减少重复下载
+- 发布脚本默认启用 `DOCKER_BUILDKIT=1` 与 `COMPOSE_DOCKER_CLI_BUILD=1`
+
+只有在依赖异常、Dockerfile 变更后缓存疑似污染，或磁盘空间紧张时，才建议清理构建缓存：
+
+```bash
+DEPLOY_CLEAN_CACHE=1 ./deploy-panel/scripts/deploy-frontend.sh
+```
+
+发布面板容器内也支持同名环境变量。设置 `DEPLOY_CLEAN_CACHE=1` 后，本次发布会先执行 `docker builder prune -f`，然后再重建服务。
+
 ## 接口
 
 - `POST /deploy`：触发发布任务，请求头必须包含 `X-Publish-Token`
@@ -129,7 +144,7 @@ node server.js
 
 ## 安全注意事项
 
-- 必须配置 `PUBLISH_SECRET`，未配置时服务会拒绝启动
+- 可配置 `PUBLISH_SECRET` 固定发布密钥；未配置时会进入首次使用初始化模式
 - 不要把真实发布密钥写入 `publish.html`、脚本或仓库文档
 - 建议只在内网或受控跳板机上开放该服务
 - 部署脚本会执行 `git pull` 与 `docker compose up -d --build`，请确认 `PROJECT_PATH` 指向正确仓库
@@ -139,5 +154,6 @@ node server.js
 
 - 日志文件：`logs/deploy-logs.txt`
 - 任务锁文件：`task.lock`
+- 每次发布开始前会清空上一轮发布日志，页面只展示本次发布记录
 
 如果服务进程被强制终止，可能遗留 `task.lock`。确认没有部署任务运行后，可以手动删除该文件。

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # 前端镜像用于构建静态资源。
 FROM docker.m.daocloud.io/library/node:20-alpine
 WORKDIR /app
@@ -6,8 +7,8 @@ RUN npm config set registry https://registry.npmmirror.com
 RUN npm config set fetch-retries 5
 RUN npm config set fetch-retry-mintimeout 20000
 RUN npm config set fetch-retry-maxtimeout 120000
-RUN npm cache clean --force
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm npm ci
 COPY . .
-CMD ["npm", "run", "build"]
+RUN npm run build
+CMD ["sh", "-c", "rm -rf /frontend-dist/* && cp -r dist/* /frontend-dist/ && tail -f /dev/null"]

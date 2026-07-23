@@ -73,6 +73,10 @@ function writeLog(content) {
   fs.appendFileSync(LOG_FILE, line, 'utf8');
 }
 
+function resetLog() {
+  fs.writeFileSync(LOG_FILE, '', 'utf8');
+}
+
 // 判断是否正在执行
 function isRunning() {
   return fs.existsSync(LOCK_FILE);
@@ -148,6 +152,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       lockTask();
+      resetLog();
       writeLog(`===== 开始发布 target:${target} =====`);
 
       // 异步执行shell脚本

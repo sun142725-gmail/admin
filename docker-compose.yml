@@ -62,7 +62,6 @@ services:
       - backend
     volumes:
       - frontend_dist:/frontend-dist
-    command: sh -c "npm install && npm run build && cp -r dist/* /frontend-dist/ && tail -f /dev/null"
 
   nginx:
     image: docker.m.daocloud.io/library/nginx:alpine

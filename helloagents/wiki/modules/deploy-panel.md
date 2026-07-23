@@ -29,7 +29,7 @@
 2. 页面通过 `X-Publish-Token` 请求服务端接口。
 3. 服务端校验密钥，通过 `task.lock` 防止重复发布。
 4. 服务端按发布目标调用对应 shell 脚本。
-5. 脚本输出追加到 `logs/deploy-logs.txt`。
+5. 服务端清空上一轮发布日志，脚本输出追加到 `logs/deploy-logs.txt`。
 6. 页面轮询 `/logs` 与 `/status` 展示实时日志和运行状态。
 
 ## Docker 部署
@@ -57,6 +57,21 @@ docker compose up -d --build deploy-panel
 - `backend`：拉取最新代码并重建 `backend`
 - `frontend`：拉取最新代码并重建 `frontend`、`nginx`
 - `all`：拉取最新代码并重建 `backend`、`frontend`、`nginx`
+
+## 构建优化
+
+- 默认保留 Docker 构建缓存，减少依赖重复下载
+- 后端与前端 Dockerfile 使用 BuildKit npm 缓存挂载
+- 前端改为镜像构建阶段执行 `npm ci` 与 `npm run build`，容器启动阶段仅复制 `dist` 到共享卷
+- 发布脚本统一启用 `DOCKER_BUILDKIT=1` 与 `COMPOSE_DOCKER_CLI_BUILD=1`
+- `DEPLOY_CLEAN_CACHE=1` 时执行 `docker builder prune -f`，用于缓存污染或磁盘紧张时的手动清理
+
+## 错误处理
+
+- 发布脚本执行环境预检查 `git`、`docker` 与 Docker Compose
+- `git pull` 使用 `--ff-only`，避免发布过程中产生合并提交
+- 脚本失败时输出失败步骤、失败命令与退出码
+- 服务端通过 `task.lock` 防止重复发布，并在进程关闭后释放锁
 
 ## 安全约束
 
