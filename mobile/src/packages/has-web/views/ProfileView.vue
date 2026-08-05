@@ -1,29 +1,22 @@
 <template>
-  <div class="has-screen">
-    <!-- 渐变 Hero 头部 -->
+  <div class="profile-screen">
+    <!-- Hero -->
     <div class="profile-hero">
       <div class="profile-avatar-wrap" @click="triggerUpload">
-        <div class="profile-avatar">
-          <van-image
-            v-if="form.avatarUrl"
-            width="80"
-            height="80"
-            :src="form.avatarUrl"
-          />
-          <div v-else class="w-[80px] h-[80px] rounded-full flex-center bg-white/20">
-            <van-icon name="user-o" size="40" color="#fff" />
-          </div>
+        <van-image v-if="form.avatarUrl" round width="72" height="72" :src="form.avatarUrl" />
+        <div v-else class="profile-avatar-fallback">
+          <van-icon name="user-o" size="36" color="#fff" />
         </div>
-        <div class="absolute -bottom-2 -right-2 w-[28px] h-[28px] rounded-full bg-white flex-center shadow-card z-10">
-          <van-icon name="photograph" size="14" color="#0ea5e9" />
+        <div class="profile-avatar-camera">
+          <van-icon name="photograph" size="12" color="#0ea5e9" />
         </div>
       </div>
-      <div class="profile-name">{{ form.nickname || '未设置昵称' }}</div>
-      <div class="profile-meta">{{ form.email || '未绑定邮箱' }}</div>
+      <h2 class="profile-name">{{ form.nickname || '未设置昵称' }}</h2>
+      <p class="profile-meta">{{ maskedEmail || form.username || '' }}</p>
     </div>
 
     <!-- 隐藏的上传组件 -->
-    <self-upload
+    <SelfUpload
       ref="uploadRef"
       v-model="form.avatarUrl"
       accept="image/*"
@@ -32,161 +25,142 @@
       @change="onAvatarChange"
     />
 
-    <!-- 内容区 -->
-    <div class="flex-1 overflow-y-auto px-16 pt-24 has-tab-safe">
-      <div class="space-y-16 pb-20">
-        <!-- 个人资料 -->
-        <div class="profile-card">
-          <div class="profile-card-title">个人资料</div>
-          <div class="space-y-16">
-            <div class="profile-field">
-              <div class="profile-field-label">昵称</div>
-              <input
-                v-model.trim="form.nickname"
-                class="profile-input"
-                placeholder="请输入昵称"
-              />
+    <div class="profile-content">
+      <!-- 当前家庭 -->
+      <div class="profile-card" v-if="familyStore.currentFamily">
+        <div class="family-card-row">
+          <div class="family-card-info">
+            <div class="family-card-avatar" :style="avatarStyle">
+              <van-icon :name="familyAvatar.icon" size="20" :color="familyAvatar.color" />
             </div>
-            <div class="profile-field">
-              <div class="profile-field-label">邮箱</div>
-              <input
-                v-model.trim="form.email"
-                class="profile-input"
-                type="email"
-                placeholder="请输入邮箱"
-              />
+            <div>
+              <p class="family-card-name">{{ familyStore.currentFamily.name }}</p>
+              <p class="family-card-meta">{{ familyStore.currentFamily.memberCount }} 位成员</p>
             </div>
           </div>
-          <button class="profile-save-btn" :disabled="saving" @click="onSave">
-            <van-loading v-if="saving" size="18" color="#fff" />
-            <span v-else>保存资料</span>
-          </button>
+          <van-button
+            v-if="familyStore.families.length > 1"
+            size="small"
+            plain
+            round
+            type="primary"
+            @click="showFamilyPicker = true"
+          >
+            切换
+          </van-button>
         </div>
-
-        <!-- 安全设置 -->
-        <div class="profile-card">
-          <div class="profile-card-title">安全设置</div>
-          <div class="divide-y divide-gray-50">
-            <div class="profile-action-row" @click="$router.push('/reset-password')">
-              <div class="profile-action-label">
-                <div class="profile-action-icon" style="background: rgba(255, 125, 0, 0.1)">
-                  <van-icon name="lock" size="18" color="#ff7d00" />
-                </div>
-                修改密码
-              </div>
-              <van-icon name="arrow" size="16" color="#c9cdd4" />
-            </div>
-            <div class="profile-action-row">
-              <div class="profile-action-label">
-                <div class="profile-action-icon" style="background: rgba(14, 165, 233, 0.1)">
-                  <van-icon name="phone-o" size="18" color="#0ea5e9" />
-                </div>
-                绑定手机
-              </div>
-              <span class="text-sm text-gray-400">{{ maskedPhone || '未绑定' }}</span>
-            </div>
-            <div class="profile-action-row">
-              <div class="profile-action-label">
-                <div class="profile-action-icon" style="background: rgba(0, 180, 42, 0.1)">
-                  <van-icon name="envelop-o" size="18" color="#00b42a" />
-                </div>
-                绑定邮箱
-              </div>
-              <span class="text-sm text-gray-400">{{ maskedEmail || '未绑定' }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 账号信息 -->
-        <div class="profile-card">
-          <div class="profile-card-title">账号信息</div>
-          <div class="divide-y divide-gray-50">
-            <div class="profile-action-row">
-              <div class="profile-action-label">账号</div>
-              <span class="text-sm text-gray-400">{{ form.username || '-' }}</span>
-            </div>
-            <div class="profile-action-row">
-              <div class="profile-action-label">账号类型</div>
-              <span class="text-sm text-gray-400">{{ form.userType || '-' }}</span>
-            </div>
-            <div class="profile-action-row">
-              <div class="profile-action-label">注册来源</div>
-              <span class="text-sm text-gray-400">{{ registerChannelText }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 退出登录 -->
-        <button class="home-logout" @click="onLogout">退出登录</button>
       </div>
-    </div>
 
-    <!-- 底部 Tab -->
-    <div class="has-bottom-tab">
-      <div class="flex gap-8">
-        <button class="has-tab-item" @click="$router.push('/home')">
-          <van-icon name="wap-home-o" size="20" />
-          <span>首页</span>
-        </button>
-        <button class="has-tab-item is-active" @click="$router.push('/profile')">
-          <van-icon name="user-o" size="20" />
-          <span>个人中心</span>
+      <!-- 个人资料 -->
+      <div class="profile-card">
+        <div class="profile-card-title">个人资料</div>
+        <div class="profile-field">
+          <span class="profile-field-label">昵称</span>
+          <input v-model.trim="form.nickname" class="profile-input" placeholder="请输入昵称" />
+        </div>
+        <div class="profile-field">
+          <span class="profile-field-label">邮箱</span>
+          <input v-model.trim="form.email" class="profile-input" type="email" placeholder="请输入邮箱" />
+        </div>
+        <button class="profile-save-btn" :disabled="saving" @click="onSave">
+          <van-loading v-if="saving" size="18" color="#fff" />
+          <span v-else>保存资料</span>
         </button>
       </div>
+
+      <!-- 菜单 -->
+      <div class="profile-card">
+        <div class="profile-menu-row" @click="$router.push('/members')">
+          <div class="profile-menu-left">
+            <div class="profile-menu-icon" style="background: #e0f2fe; color: #0ea5e9">
+              <van-icon name="friends-o" size="18" />
+            </div>
+            <span class="profile-menu-label">家庭管理</span>
+          </div>
+          <van-icon name="arrow" color="#cbd5e1" size="14" />
+        </div>
+        <div class="profile-menu-row" @click="$router.push('/reset-password')">
+          <div class="profile-menu-left">
+            <div class="profile-menu-icon" style="background: #fef3c7; color: #f59e0b">
+              <van-icon name="lock" size="18" />
+            </div>
+            <span class="profile-menu-label">修改密码</span>
+          </div>
+          <van-icon name="arrow" color="#cbd5e1" size="14" />
+        </div>
+        <div class="profile-menu-row" @click="$router.push('/settings')">
+          <div class="profile-menu-left">
+            <div class="profile-menu-icon" style="background: #f1f5f9; color: #64748b">
+              <van-icon name="setting-o" size="18" />
+            </div>
+            <span class="profile-menu-label">设置</span>
+          </div>
+          <van-icon name="arrow" color="#cbd5e1" size="14" />
+        </div>
+      </div>
+
+      <!-- 退出登录 -->
+      <button class="profile-logout-btn" @click="onLogout">退出登录</button>
     </div>
+
+    <!-- 家庭切换选择器 -->
+    <van-popup v-model:show="showFamilyPicker" round position="bottom" teleport="body">
+      <van-picker
+        :columns="familyColumns"
+        title="切换家庭"
+        @confirm="onFamilySwitch"
+        @cancel="showFamilyPicker = false"
+      />
+    </van-popup>
+
+    <TabBar />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
-import { useAuthStore } from '../stores/auth'
-import { useProfileStore } from '../stores/profile'
+import { showConfirmDialog, showToast } from 'vant'
+import { useAuthStore } from '@/stores/auth'
+import { useProfileStore } from '@/stores/profile'
+import { useFamilyStore } from '@/stores/family'
+import { getAvatarById } from '@/constants/avatars'
+import { updateProfile } from '@/services/user'
+import TabBar from '@/components/TabBar.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
+const familyStore = useFamilyStore()
+
 const saving = ref(false)
 const uploadRef = ref(null)
+const showFamilyPicker = ref(false)
 
 const form = reactive({
   username: '',
   nickname: '',
   email: '',
-  avatarUrl: '',
-  userType: '',
-  registerChannel: ''
+  avatarUrl: ''
 })
 
-const registerChannelText = computed(() => {
-  const map = { sms: '手机号', email: '邮箱', username: '用户名' }
-  return map[form.registerChannel] || form.registerChannel || '-'
-})
+const familyAvatar = computed(() => getAvatarById(familyStore.currentFamily?.avatar))
+const avatarStyle = computed(() => ({ background: familyAvatar.value.bg }))
 
-const maskedPhone = computed(() => {
-  const phone = authStore.profile?.phone || profileStore.profile?.phone
-  if (!phone) return ''
-  return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+const familyColumns = computed(() => {
+  return familyStore.families.map((f) => ({
+    text: f.name,
+    value: f.id
+  }))
 })
 
 const maskedEmail = computed(() => {
-  const email = authStore.profile?.email || profileStore.profile?.email
+  const email = form.email || authStore.profile?.email
   if (!email) return ''
   const [name, domain] = email.split('@')
   if (!domain) return email
-  const visible = name.slice(0, Math.min(2, name.length))
-  return `${visible}${'*'.repeat(Math.max(name.length - 2, 0))}@${domain}`
+  return `${name.slice(0, 2)}${'*'.repeat(Math.max(name.length - 2, 0))}@${domain}`
 })
-
-function fillForm(profile = {}) {
-  form.username = profile.username || ''
-  form.nickname = profile.nickname || ''
-  form.email = profile.email || ''
-  form.avatarUrl = profile.avatarUrl || ''
-  form.userType = profile.userType || ''
-  form.registerChannel = profile.registerChannel || ''
-}
 
 function triggerUpload() {
   uploadRef.value?.trigger?.()
@@ -195,28 +169,129 @@ function triggerUpload() {
 async function onSave() {
   saving.value = true
   try {
-    await profileStore.saveProfile({
+    await updateProfile({
       nickname: form.nickname,
-      email: form.email
+      avatarUrl: form.avatarUrl
     })
     showToast('资料已保存')
+  } catch {
+    // toast 已处理
   } finally {
     saving.value = false
   }
 }
 
 function onAvatarChange() {
-  showToast('C 端头像上传接口暂未开放')
-  form.avatarUrl = profileStore.profile?.avatarUrl || ''
+  showToast('头像上传接口暂未对接')
+}
+
+async function onFamilySwitch({ selectedValues }) {
+  const familyId = selectedValues[0]
+  try {
+    await familyStore.switchFamilyAction(familyId)
+    showFamilyPicker.value = false
+    showToast('已切换家庭')
+  } catch {
+    // toast 已处理
+  }
 }
 
 async function onLogout() {
-  await authStore.logout()
-  router.replace('/login')
+  showConfirmDialog({
+    title: '退出登录',
+    message: '确定要退出当前账号吗？'
+  }).then(async () => {
+    await authStore.logout()
+    familyStore.reset()
+    router.replace('/login')
+  }).catch(() => {})
 }
 
 onMounted(async () => {
   const profile = await profileStore.loadProfile()
-  fillForm(profile)
+  form.username = profile?.username || ''
+  form.nickname = profile?.nickname || ''
+  form.email = profile?.email || ''
+  form.avatarUrl = profile?.avatarUrl || ''
+
+  if (!familyStore.currentFamily) {
+    try {
+      await familyStore.loadFamilies()
+    } catch {
+      // ignore
+    }
+  }
 })
 </script>
+
+<style scoped>
+.profile-screen { min-height: 100vh; background: #f8fafc; padding-bottom: 72px; }
+
+/* Hero */
+.profile-hero {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  padding: 48px 24px 32px; text-align: center; position: relative; overflow: hidden;
+}
+.profile-hero::before {
+  content: ''; position: absolute; top: -30px; right: -30px;
+  width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.08);
+}
+.profile-avatar-wrap {
+  width: 72px; height: 72px; margin: 0 auto 12px; position: relative; display: inline-block;
+}
+.profile-avatar-fallback {
+  width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+}
+.profile-avatar-camera {
+  position: absolute; bottom: -2px; right: -2px; width: 24px; height: 24px;
+  border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1;
+}
+.profile-name { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; position: relative; z-index: 1; }
+.profile-meta { font-size: 12px; color: rgba(255,255,255,0.8); position: relative; z-index: 1; }
+
+.profile-content { padding: 16px; }
+
+/* Family Card */
+.profile-card { background: #fff; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+.family-card-row { display: flex; align-items: center; justify-content: space-between; }
+.family-card-info { display: flex; align-items: center; gap: 12px; }
+.family-card-avatar { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.family-card-name { font-size: 15px; font-weight: 600; color: #1e293b; }
+.family-card-meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+
+/* Profile fields */
+.profile-card-title { font-size: 14px; font-weight: 600; color: #64748b; margin-bottom: 12px; }
+.profile-field { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+.profile-field:last-of-type { border-bottom: none; }
+.profile-field-label { font-size: 14px; color: #475569; font-weight: 500; }
+.profile-input {
+  flex: 1; text-align: right; font-size: 14px; color: #1e293b;
+  border: none; outline: none; background: transparent; -webkit-appearance: none;
+}
+.profile-save-btn {
+  width: 100%; height: 44px; border-radius: 22px; border: none; margin-top: 16px;
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.profile-save-btn:active { opacity: 0.9; }
+.profile-save-btn:disabled { opacity: 0.5; }
+
+/* Menu */
+.profile-menu-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; cursor: pointer; }
+.profile-menu-row:last-child { border-bottom: none; }
+.profile-menu-row:active { background: #f8fafc; }
+.profile-menu-left { display: flex; align-items: center; gap: 10px; }
+.profile-menu-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.profile-menu-label { font-size: 14px; color: #1e293b; font-weight: 500; }
+
+/* Logout */
+.profile-logout-btn {
+  width: 100%; height: 46px; border-radius: 23px; border: 1px solid #ef4444;
+  background: transparent; color: #ef4444; font-size: 15px; font-weight: 500;
+  cursor: pointer; margin-top: 8px;
+}
+.profile-logout-btn:active { background: #fef2f2; }
+</style>

@@ -1,221 +1,304 @@
 <template>
-  <div class="has-screen">
-    <!-- 渐变 Hero 头部 -->
-    <div class="home-hero">
-      <div class="flex items-start justify-between">
-        <div>
-          <div class="home-hero-greeting">{{ greeting }}</div>
-          <div class="home-hero-name">{{ displayName }}</div>
-          <div class="home-hero-desc">{{ today }} · HAS Web 统一账号体系</div>
-        </div>
-        <div class="home-hero-avatar" @click="$router.push('/profile')">
-          <van-image
-            v-if="profileStore.profile?.avatarUrl"
-            round
-            width="48"
-            height="48"
-            :src="profileStore.profile.avatarUrl"
-          />
-          <div v-else class="w-[48px] h-[48px] rounded-full flex-center bg-white/20">
-            <van-icon name="user-o" size="24" color="#fff" />
+  <div class="home-screen">
+    <!-- Hero -->
+    <div class="fam-hero">
+      <div class="fam-hero-top">
+        <div class="fam-hero-info">
+          <div class="fam-hero-avatar" :style="avatarStyle">
+            <van-icon :name="familyAvatar.icon" size="24" :color="familyAvatar.color" />
+          </div>
+          <div>
+            <h1 class="fam-hero-name">{{ family?.name || '我的家庭' }}</h1>
+            <p class="fam-hero-meta">{{ memberCount }} 位成员</p>
           </div>
         </div>
+        <div class="fam-hero-settings" @click="$router.push('/members')">
+          <van-icon name="setting-o" size="20" color="#fff" />
+        </div>
+      </div>
+
+      <!-- 成员头像列表 -->
+      <div class="fam-hero-members" v-if="dashboard?.members?.length">
+        <div
+          v-for="(m, i) in dashboard.members.slice(0, 5)"
+          :key="m.id"
+          class="fam-member-chip"
+          :style="{ marginLeft: i > 0 ? '-8px' : '0' }"
+        >
+          <van-image v-if="m.avatarUrl" round width="28" height="28" :src="m.avatarUrl" />
+          <span v-else class="fam-member-chip-fallback">{{ (m.nickname || '?')[0] }}</span>
+        </div>
+        <span v-if="dashboard.members.length > 5" class="fam-member-more">
+          +{{ dashboard.members.length - 5 }}
+        </span>
       </div>
     </div>
 
     <!-- 概览卡片 -->
-    <div class="home-overview">
-      <div class="home-overview-card">
-        <div class="home-overview-item">
-          <div class="home-overview-value">{{ loginMethod }}</div>
-          <div class="home-overview-label">登录方式</div>
-        </div>
-        <div class="home-overview-divider" />
-        <div class="home-overview-item">
-          <div class="home-overview-value flex items-center gap-6">
-            <span class="home-status-dot is-success" />
-            <span>正常</span>
+    <div class="fam-overview">
+      <div class="fam-overview-item">
+        <span class="fam-overview-value">{{ stats.memberCount }}</span>
+        <span class="fam-overview-label">成员</span>
+      </div>
+      <div class="fam-overview-divider"></div>
+      <div class="fam-overview-item">
+        <span class="fam-overview-value">{{ stats.pendingTodoCount }}</span>
+        <span class="fam-overview-label">待办</span>
+      </div>
+      <div class="fam-overview-divider"></div>
+      <div class="fam-overview-item">
+        <span class="fam-overview-value">{{ stats.noticeCount }}</span>
+        <span class="fam-overview-label">公告</span>
+      </div>
+    </div>
+
+    <!-- 快捷入口 -->
+    <div class="fam-section">
+      <h3 class="fam-section-title">快捷入口</h3>
+      <div class="fam-action-grid">
+        <div class="fam-action-item" @click="$router.push('/members')">
+          <div class="fam-action-icon" style="background: #e0f2fe; color: #0ea5e9">
+            <van-icon name="friends-o" size="22" />
           </div>
-          <div class="home-overview-label">账号状态</div>
+          <span class="fam-action-label">成员管理</span>
         </div>
-        <div class="home-overview-divider" />
-        <div class="home-overview-item">
-          <div class="home-overview-value">{{ securityLevel }}</div>
-          <div class="home-overview-label">安全等级</div>
+        <div class="fam-action-item" @click="$router.push('/todos')">
+          <div class="fam-action-icon" style="background: #d1fae5; color: #10b981">
+            <van-icon name="todo-list-o" size="22" />
+          </div>
+          <span class="fam-action-label">家务待办</span>
+        </div>
+        <div class="fam-action-item" @click="$router.push('/notices')">
+          <div class="fam-action-icon" style="background: #fef3c7; color: #f59e0b">
+            <van-icon name="bell" size="22" />
+          </div>
+          <span class="fam-action-label">家庭公告</span>
+        </div>
+        <div class="fam-action-item" @click="handleInvite">
+          <div class="fam-action-icon" style="background: #ede9fe; color: #8b5cf6">
+            <van-icon name="share-o" size="22" />
+          </div>
+          <span class="fam-action-label">邀请码</span>
         </div>
       </div>
     </div>
 
-    <!-- 内容区 -->
-    <div class="flex-1 overflow-y-auto px-16 pt-24 has-tab-safe">
-      <div class="space-y-16 pb-20">
-        <!-- 快捷入口 -->
-        <div class="home-card">
-          <div class="home-card-header">
-            <div class="home-section-title">快捷入口</div>
-            <div class="home-section-sub">常用功能</div>
-          </div>
-          <div class="home-action-grid">
-            <button
-              v-for="item in quickActions"
-              :key="item.name"
-              class="home-action-item active:opacity-60 transition-opacity"
-              @click="item.action"
-            >
-              <div class="home-action-icon" :style="{ background: `${item.color}15` }">
-                <van-icon :name="item.icon" size="22" :color="item.color" />
-              </div>
-              <div class="home-action-label">{{ item.name }}</div>
-            </button>
-          </div>
-        </div>
+    <!-- 最近动态 -->
+    <div class="fam-section">
+      <h3 class="fam-section-title">最近动态</h3>
 
-        <!-- 账号安全 -->
-        <div class="home-card">
-          <div class="home-card-header">
-            <div class="home-section-title">账号安全</div>
-            <span
-              class="inline-flex items-center gap-6 text-xs text-success px-10 py-2 rounded-full"
-              style="background: rgba(16, 185, 129, 0.08)"
-            >
-              <span class="home-status-dot is-success" />
-              已登录
-            </span>
+      <!-- 最新公告 -->
+      <div class="fam-card" v-if="dashboard?.latestAnnouncement" @click="$router.push('/notices')">
+        <div class="fam-card-left">
+          <div class="fam-card-icon" style="background: #fef3c7; color: #f59e0b">
+            <van-icon name="volume-o" size="18" />
           </div>
-          <div class="home-list">
-            <div class="home-list-item">
-              <div class="home-list-label">
-                <van-icon name="shield-o" size="18" color="#86909c" />
-                登录密码
-              </div>
-              <div class="home-list-value" @click="$router.push('/reset-password')">修改</div>
-            </div>
-            <div class="home-list-item">
-              <div class="home-list-label">
-                <van-icon name="phone-o" size="18" color="#86909c" />
-                绑定手机
-              </div>
-              <div class="home-list-value">{{ maskedPhone || '未绑定' }}</div>
-            </div>
-            <div class="home-list-item">
-              <div class="home-list-label">
-                <van-icon name="envelop-o" size="18" color="#86909c" />
-                绑定邮箱
-              </div>
-              <div class="home-list-value">{{ maskedEmail || '未绑定' }}</div>
-            </div>
+          <div class="fam-card-content">
+            <p class="fam-card-title">{{ dashboard.latestAnnouncement.title }}</p>
+            <p class="fam-card-time">{{ formatTime(dashboard.latestAnnouncement.publishedAt) }}</p>
           </div>
         </div>
+        <van-icon name="arrow" color="#cbd5e1" size="14" />
+      </div>
 
-        <!-- 业务预留区 -->
-        <div class="home-card">
-          <div class="home-card-header">
-            <div class="home-section-title">业务预留</div>
+      <!-- 最新待办 -->
+      <div
+        v-for="todo in dashboard?.latestTodos || []"
+        :key="todo.id"
+        class="fam-card"
+        @click="$router.push(`/todos/${todo.id}`)"
+      >
+        <div class="fam-card-left">
+          <div class="fam-card-icon" style="background: #d1fae5; color: #10b981">
+            <van-icon name="checked" size="18" />
           </div>
-          <div class="text-sm text-gray-400 leading-relaxed">
-            这里可以继续承载业务卡片、消息提醒、订单 / 工具入口或活动内容。
+          <div class="fam-card-content">
+            <p class="fam-card-title">{{ todo.title }}</p>
+            <p class="fam-card-time">执行人：{{ todo.assigneeName }} · {{ todo.dueDate }}</p>
           </div>
         </div>
+        <van-icon name="arrow" color="#cbd5e1" size="14" />
+      </div>
+
+      <!-- 空状态 -->
+      <div class="fam-empty" v-if="!dashboard?.latestAnnouncement && !(dashboard?.latestTodos?.length)">
+        <van-icon name="info-o" size="32" color="#cbd5e1" />
+        <p class="fam-empty-text">还没有动态，开始添加待办或发布公告吧</p>
       </div>
     </div>
 
-    <!-- 底部 Tab -->
-    <div class="has-bottom-tab">
-      <div class="flex gap-8">
-        <button class="has-tab-item is-active" @click="$router.push('/home')">
-          <van-icon name="wap-home-o" size="20" />
-          <span>首页</span>
-        </button>
-        <button class="has-tab-item" @click="$router.push('/profile')">
-          <van-icon name="user-o" size="20" />
-          <span>个人中心</span>
-        </button>
+    <div style="height: 72px"></div>
+
+    <!-- 邀请码弹窗 -->
+    <van-popup v-model:show="showInvite" round teleport="body" :style="{ width: '320px', padding: '24px' }">
+      <div class="invite-dialog">
+        <h3 class="invite-title">家庭邀请码</h3>
+        <div class="invite-code-box">
+          <span class="invite-code-text">{{ inviteCode || '加载中...' }}</span>
+        </div>
+        <p class="invite-hint">有效期至 {{ formatTime(inviteExpiresAt) }}</p>
+        <div class="invite-actions">
+          <van-button block round plain @click="handleCopyCode">复制邀请码</van-button>
+          <van-button block round type="primary" @click="handleRegenerate">重新生成</van-button>
+        </div>
       </div>
-    </div>
+    </van-popup>
+
+    <TabBar />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
-import { useProfileStore } from '../stores/profile'
+import { computed, onMounted, ref } from 'vue'
+import { showToast } from 'vant'
+import { useFamilyStore } from '@/stores/family'
+import { getAvatarById } from '@/constants/avatars'
+import TabBar from '@/components/TabBar.vue'
 
-const router = useRouter()
-const authStore = useAuthStore()
-const profileStore = useProfileStore()
+const familyStore = useFamilyStore()
 
-const displayName = computed(() => {
-  return (
-    profileStore.profile?.nickname ||
-    authStore.profile?.nickname ||
-    authStore.profile?.username ||
-    'HAS 用户'
-  )
+const showInvite = ref(false)
+const inviteCode = ref('')
+const inviteExpiresAt = ref('')
+
+const family = computed(() => familyStore.currentFamily)
+const dashboard = computed(() => familyStore.dashboard)
+const memberCount = computed(() => dashboard.value?.members?.length || family.value?.memberCount || 0)
+
+const familyAvatar = computed(() => {
+  return getAvatarById(family.value?.avatar)
 })
 
-const loginMethod = computed(() => {
-  const p = authStore.profile || profileStore.profile || {}
-  if (p.registerChannel === 'sms') return '手机号'
-  if (p.registerChannel === 'email') return '邮箱'
-  return '账号'
+const avatarStyle = computed(() => ({
+  background: familyAvatar.value.bg
+}))
+
+const stats = computed(() => {
+  return dashboard.value?.stats || { memberCount: 0, pendingTodoCount: 0, noticeCount: 0 }
 })
 
-const securityLevel = computed(() => {
-  const p = authStore.profile || profileStore.profile || {}
-  let score = 1
-  if (p.password) score++
-  if (p.phone) score++
-  if (p.email) score++
-  if (score >= 3) return '高'
-  if (score === 2) return '中'
-  return '低'
-})
-
-const maskedPhone = computed(() => {
-  const phone = authStore.profile?.phone || profileStore.profile?.phone
-  if (!phone) return ''
-  return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
-})
-
-const maskedEmail = computed(() => {
-  const email = authStore.profile?.email || profileStore.profile?.email
-  if (!email) return ''
-  const [name, domain] = email.split('@')
-  if (!domain) return email
-  const visible = name.slice(0, Math.min(2, name.length))
-  return `${visible}${'*'.repeat(Math.max(name.length - 2, 0))}@${domain}`
-})
-
-const greeting = computed(() => {
-  const h = new Date().getHours()
-  if (h < 6) return '凌晨好'
-  if (h < 12) return '早上好'
-  if (h < 14) return '中午好'
-  if (h < 18) return '下午好'
-  return '晚上好'
-})
-
-const today = computed(() => {
-  const d = new Date()
-  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-  return `${d.getMonth() + 1}月${d.getDate()}日 ${week[d.getDay()]}`
-})
-
-const quickActions = [
-  { name: '资料', icon: 'user-o', color: '#0ea5e9', action: () => router.push('/profile') },
-  { name: '头像', icon: 'photo-o', color: '#00b42a', action: () => router.push('/profile') },
-  { name: '安全', icon: 'shield-o', color: '#ff7d00', action: () => router.push('/reset-password') },
-  { name: '退出', icon: 'revoke', color: '#f53f3f', action: onLogout }
-]
-
-async function onLogout() {
-  await authStore.logout()
-  router.replace('/login')
+function formatTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const month = d.getMonth() + 1
+  const day = d.getDate()
+  return `${month}月${day}日`
 }
 
-onMounted(() => {
-  authStore.loadAuthProfile().catch(() => {})
-  profileStore.loadProfile().catch(() => {})
+async function handleInvite() {
+  showInvite.value = true
+  if (!familyStore.inviteCode) {
+    try {
+      await familyStore.loadInviteCode()
+    } catch {
+      // 可能不是房主
+    }
+  }
+  inviteCode.value = familyStore.inviteCode
+  inviteExpiresAt.value = familyStore.inviteCodeExpiresAt
+}
+
+async function handleRegenerate() {
+  try {
+    await familyStore.regenerateInviteCode()
+    inviteCode.value = familyStore.inviteCode
+    inviteExpiresAt.value = familyStore.inviteCodeExpiresAt
+  } catch {
+    // toast 已由拦截器处理
+  }
+}
+
+function handleCopyCode() {
+  if (!inviteCode.value) return
+  navigator.clipboard?.writeText(inviteCode.value)
+  showToast('已复制')
+}
+
+onMounted(async () => {
+  if (familyStore.currentFamilyId) {
+    try {
+      await familyStore.loadDashboard()
+    } catch {
+      // 可能还没家庭
+    }
+  } else {
+    try {
+      await familyStore.loadFamilies()
+      if (familyStore.currentFamilyId) {
+        await familyStore.loadDashboard()
+      }
+    } catch {
+      // ignore
+    }
+  }
 })
 </script>
+
+<style scoped>
+.home-screen { min-height: 100vh; background: #f8fafc; }
+
+/* Hero */
+.fam-hero {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  padding: 48px 20px 32px;
+  position: relative;
+  overflow: hidden;
+}
+.fam-hero::before {
+  content: ''; position: absolute; top: -30px; right: -30px;
+  width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.08);
+}
+.fam-hero-top { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 1; }
+.fam-hero-info { display: flex; align-items: center; gap: 12px; }
+.fam-hero-avatar { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+.fam-hero-name { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+.fam-hero-meta { font-size: 12px; color: rgba(255,255,255,0.8); }
+.fam-hero-settings { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; }
+.fam-hero-members { display: flex; align-items: center; margin-top: 20px; position: relative; z-index: 1; }
+.fam-member-chip { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; border: 2px solid #0284c7; display: flex; align-items: center; justify-content: center; }
+.fam-member-chip-fallback { font-size: 12px; font-weight: 600; color: #fff; }
+.fam-member-more { font-size: 12px; color: rgba(255,255,255,0.8); margin-left: 8px; }
+
+/* Overview */
+.fam-overview {
+  background: #fff; border-radius: 16px; margin: -20px 16px 0; padding: 16px 0;
+  display: flex; align-items: center; justify-content: space-around;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06); position: relative; z-index: 2;
+}
+.fam-overview-item { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
+.fam-overview-value { font-size: 22px; font-weight: 700; color: #1e293b; }
+.fam-overview-label { font-size: 11px; color: #94a3b8; }
+.fam-overview-divider { width: 1px; height: 28px; background: #e2e8f0; }
+
+/* Section */
+.fam-section { padding: 20px 16px 0; }
+.fam-section-title { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 12px; }
+
+/* Action Grid */
+.fam-action-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: #fff; border-radius: 16px; padding: 16px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+.fam-action-item { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+.fam-action-item:active { opacity: 0.7; }
+.fam-action-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.fam-action-label { font-size: 11px; color: #64748b; }
+
+/* Card */
+.fam-card { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+.fam-card-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.fam-card-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.fam-card-content { flex: 1; min-width: 0; }
+.fam-card-title { font-size: 14px; font-weight: 500; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fam-card-time { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+/* Empty */
+.fam-empty { text-align: center; padding: 32px 0; }
+.fam-empty-text { font-size: 13px; color: #94a3b8; margin-top: 8px; }
+
+/* Invite Dialog */
+.invite-dialog { text-align: center; }
+.invite-title { font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 20px; }
+.invite-code-box { background: #f0f9ff; border-radius: 12px; padding: 20px; margin-bottom: 8px; }
+.invite-code-text { font-size: 32px; font-weight: 700; color: #0ea5e9; letter-spacing: 6px; }
+.invite-hint { font-size: 12px; color: #94a3b8; margin-bottom: 20px; }
+.invite-actions { display: flex; gap: 8px; }
+.invite-actions :deep(.van-button) { flex: 1; }
+</style>
