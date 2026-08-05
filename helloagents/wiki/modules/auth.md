@@ -17,6 +17,7 @@
 #### Scenario: 登录
 - 输入用户名/手机号/邮箱 + 密码
 - 返回 accessToken 与 refreshToken
+- profile 补充 phone 与 currentFamilyId，便于移动端登录后进入家庭上下文
 
 #### Scenario: 验证码登录/注册
 - 手机号或邮箱 + 验证码登录
@@ -99,4 +100,6 @@
 
 ## Change History
 - [2026-08-05] 密码登录支持手机号与邮箱账号，并兼容原用户名登录
+- [2026-08-05] profile 补充手机号与当前活跃家庭 ID
+- [2026-08-06] profile 支持从邮箱登录标识回填 email
 - [202601250851_rbac_system](../../history/2026-01/202601250851_rbac_system/) - 初始化认证模块

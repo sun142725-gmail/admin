@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../../common/entities/user.entity';
 import { UserIdentifier } from '../../common/entities/user-identifier.entity';
 import { VerificationCode } from '../../common/entities/verification-code.entity';
+import { UserSetting } from '../../common/entities/user-setting.entity';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
@@ -15,7 +16,7 @@ import { VerificationCodeService } from './verification-code.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, UserIdentifier, VerificationCode]),
+    TypeOrmModule.forFeature([User, UserIdentifier, VerificationCode, UserSetting]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,

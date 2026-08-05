@@ -11,6 +11,7 @@ import { QueryFailedError, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../../common/entities/user.entity';
 import { UserIdentifier } from '../../common/entities/user-identifier.entity';
+import { UserSetting } from '../../common/entities/user-setting.entity';
 import { TOKEN_TYPE_ACCESS, TOKEN_TYPE_REFRESH } from '../../common/constants';
 import { AuditService } from '../audit/audit.service';
 import { VerificationCodeService } from './verification-code.service';
@@ -22,6 +23,8 @@ export class AuthService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(UserIdentifier)
     private readonly identifierRepo: Repository<UserIdentifier>,
+    @InjectRepository(UserSetting)
+    private readonly settingRepo: Repository<UserSetting>,
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
     private readonly verificationCodeService: VerificationCodeService
@@ -288,11 +291,17 @@ export class AuthService {
       throw new UnauthorizedException('用户不存在');
     }
     const payload = await this.buildUserPayload(user);
+    const identifiers = await this.identifierRepo.find({ where: { userId, status: 1 } });
+    const setting = await this.settingRepo.findOne({ where: { userId } });
+    const phone = identifiers.find((item) => item.identifierType === 'sms')?.identifierValue;
+    const email = user.email ?? identifiers.find((item) => item.identifierType === 'email')?.identifierValue;
     return {
       ...payload,
       id: user.id,
       nickname: user.nickname,
-      email: user.email,
+      email,
+      phone,
+      currentFamilyId: setting?.currentFamilyId ? String(setting.currentFamilyId) : null,
       avatarUrl: user.avatarUrl,
       userType: user.userType,
       registerChannel: user.registerChannel,

@@ -20,6 +20,7 @@ import { DictModule } from './modules/dict/dict.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { FilesModule } from './modules/files/files.module';
+import { FamilyModule } from './modules/family/family.module';
 import { User } from './common/entities/user.entity';
 import { Role } from './common/entities/role.entity';
 import { Permission } from './common/entities/permission.entity';
@@ -38,6 +39,12 @@ import { NotificationMessage } from './common/entities/notification-message.enti
 import { UserIdentifier } from './common/entities/user-identifier.entity';
 import { VerificationCode } from './common/entities/verification-code.entity';
 import { FileAsset } from './common/entities/file-asset.entity';
+import { Family } from './common/entities/family.entity';
+import { FamilyMember } from './common/entities/family-member.entity';
+import { FamilyInviteCode } from './common/entities/family-invite-code.entity';
+import { FamilyTodo } from './common/entities/family-todo.entity';
+import { FamilyAnnouncement } from './common/entities/family-announcement.entity';
+import { UserSetting } from './common/entities/user-setting.entity';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -75,7 +82,13 @@ const isTest = process.env.NODE_ENV === 'test';
               NotificationMessage,
               UserIdentifier,
               VerificationCode,
-              FileAsset
+              FileAsset,
+              Family,
+              FamilyMember,
+              FamilyInviteCode,
+              FamilyTodo,
+              FamilyAnnouncement,
+              UserSetting
             ],
             synchronize: true
           }
@@ -104,7 +117,13 @@ const isTest = process.env.NODE_ENV === 'test';
               NotificationMessage,
               UserIdentifier,
               VerificationCode,
-              FileAsset
+              FileAsset,
+              Family,
+              FamilyMember,
+              FamilyInviteCode,
+              FamilyTodo,
+              FamilyAnnouncement,
+              UserSetting
             ],
             synchronize: process.env.DB_SYNC === 'true'
           }
@@ -124,7 +143,8 @@ const isTest = process.env.NODE_ENV === 'test';
     LogCenterModule,
     DictModule,
     NotificationModule,
-    DashboardModule
+    DashboardModule,
+    FamilyModule
   ],
   providers: [
     {

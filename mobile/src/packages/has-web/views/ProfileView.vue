@@ -2,8 +2,8 @@
   <div class="profile-screen">
     <!-- Hero -->
     <div class="profile-hero">
-      <div class="profile-avatar-wrap" @click="triggerUpload">
-        <van-image v-if="form.avatarUrl" round width="72" height="72" :src="form.avatarUrl" />
+      <div class="profile-avatar-wrap" @click="$router.push('/edit-profile')">
+        <van-image v-if="avatarUrl" round width="72" height="72" :src="avatarUrl" />
         <div v-else class="profile-avatar-fallback">
           <van-icon name="user-o" size="36" color="#fff" />
         </div>
@@ -11,19 +11,9 @@
           <van-icon name="photograph" size="12" color="#0ea5e9" />
         </div>
       </div>
-      <h2 class="profile-name">{{ form.nickname || '未设置昵称' }}</h2>
-      <p class="profile-meta">{{ maskedEmail || form.username || '' }}</p>
+      <h2 class="profile-name">{{ nickname || '未设置昵称' }}</h2>
+      <p class="profile-meta">{{ maskedEmail || username || '' }}</p>
     </div>
-
-    <!-- 隐藏的上传组件 -->
-    <SelfUpload
-      ref="uploadRef"
-      v-model="form.avatarUrl"
-      accept="image/*"
-      :max-size="2"
-      class="hidden"
-      @change="onAvatarChange"
-    />
 
     <div class="profile-content">
       <!-- 当前家庭 -->
@@ -51,28 +41,20 @@
         </div>
       </div>
 
-      <!-- 个人资料 -->
-      <div class="profile-card">
-        <div class="profile-card-title">个人资料</div>
-        <div class="profile-field">
-          <span class="profile-field-label">昵称</span>
-          <input v-model.trim="form.nickname" class="profile-input" placeholder="请输入昵称" />
-        </div>
-        <div class="profile-field">
-          <span class="profile-field-label">邮箱</span>
-          <input v-model.trim="form.email" class="profile-input" type="email" placeholder="请输入邮箱" />
-        </div>
-        <button class="profile-save-btn" :disabled="saving" @click="onSave">
-          <van-loading v-if="saving" size="18" color="#fff" />
-          <span v-else>保存资料</span>
-        </button>
-      </div>
-
       <!-- 菜单 -->
       <div class="profile-card">
-        <div class="profile-menu-row" @click="$router.push('/members')">
+        <div class="profile-menu-row" @click="$router.push('/edit-profile')">
           <div class="profile-menu-left">
             <div class="profile-menu-icon" style="background: #e0f2fe; color: #0ea5e9">
+              <van-icon name="contact" size="18" />
+            </div>
+            <span class="profile-menu-label">编辑资料</span>
+          </div>
+          <van-icon name="arrow" color="#cbd5e1" size="14" />
+        </div>
+        <div class="profile-menu-row" @click="$router.push('/members')">
+          <div class="profile-menu-left">
+            <div class="profile-menu-icon" style="background: #ede9fe; color: #8b5cf6">
               <van-icon name="friends-o" size="18" />
             </div>
             <span class="profile-menu-label">家庭管理</span>
@@ -118,14 +100,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
 import { useProfileStore } from '@/stores/profile'
 import { useFamilyStore } from '@/stores/family'
 import { getAvatarById } from '@/constants/avatars'
-import { updateProfile } from '@/services/user'
 import TabBar from '@/components/TabBar.vue'
 
 const router = useRouter()
@@ -133,16 +114,14 @@ const authStore = useAuthStore()
 const profileStore = useProfileStore()
 const familyStore = useFamilyStore()
 
-const saving = ref(false)
-const uploadRef = ref(null)
 const showFamilyPicker = ref(false)
 
-const form = reactive({
-  username: '',
-  nickname: '',
-  email: '',
-  avatarUrl: ''
-})
+// 直接从 authStore.profile 取展示数据
+const profile = computed(() => authStore.profile || {})
+const nickname = computed(() => profile.value?.nickname || '')
+const username = computed(() => profile.value?.username || '')
+const email = computed(() => profile.value?.email || '')
+const avatarUrl = computed(() => profile.value?.avatarUrl || '')
 
 const familyAvatar = computed(() => getAvatarById(familyStore.currentFamily?.avatar))
 const avatarStyle = computed(() => ({ background: familyAvatar.value.bg }))
@@ -155,35 +134,11 @@ const familyColumns = computed(() => {
 })
 
 const maskedEmail = computed(() => {
-  const email = form.email || authStore.profile?.email
-  if (!email) return ''
-  const [name, domain] = email.split('@')
-  if (!domain) return email
+  if (!email.value) return ''
+  const [name, domain] = email.value.split('@')
+  if (!domain) return email.value
   return `${name.slice(0, 2)}${'*'.repeat(Math.max(name.length - 2, 0))}@${domain}`
 })
-
-function triggerUpload() {
-  uploadRef.value?.trigger?.()
-}
-
-async function onSave() {
-  saving.value = true
-  try {
-    await updateProfile({
-      nickname: form.nickname,
-      avatarUrl: form.avatarUrl
-    })
-    showToast('资料已保存')
-  } catch {
-    // toast 已处理
-  } finally {
-    saving.value = false
-  }
-}
-
-function onAvatarChange() {
-  showToast('头像上传接口暂未对接')
-}
 
 async function onFamilySwitch({ selectedValues }) {
   const familyId = selectedValues[0]
@@ -208,11 +163,15 @@ async function onLogout() {
 }
 
 onMounted(async () => {
-  const profile = await profileStore.loadProfile()
-  form.username = profile?.username || ''
-  form.nickname = profile?.nickname || ''
-  form.email = profile?.email || ''
-  form.avatarUrl = profile?.avatarUrl || ''
+  // authStore.profile 已有数据则直接用，否则加载一次
+  if (!authStore.profile) {
+    try {
+      await profileStore.loadProfile()
+      authStore.profile = profileStore.profile
+    } catch {
+      // ignore
+    }
+  }
 
   if (!familyStore.currentFamily) {
     try {
@@ -253,31 +212,13 @@ onMounted(async () => {
 
 .profile-content { padding: 16px; }
 
-/* Family Card */
+/* Cards */
 .profile-card { background: #fff; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
 .family-card-row { display: flex; align-items: center; justify-content: space-between; }
 .family-card-info { display: flex; align-items: center; gap: 12px; }
 .family-card-avatar { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
 .family-card-name { font-size: 15px; font-weight: 600; color: #1e293b; }
 .family-card-meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
-
-/* Profile fields */
-.profile-card-title { font-size: 14px; font-weight: 600; color: #64748b; margin-bottom: 12px; }
-.profile-field { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
-.profile-field:last-of-type { border-bottom: none; }
-.profile-field-label { font-size: 14px; color: #475569; font-weight: 500; }
-.profile-input {
-  flex: 1; text-align: right; font-size: 14px; color: #1e293b;
-  border: none; outline: none; background: transparent; -webkit-appearance: none;
-}
-.profile-save-btn {
-  width: 100%; height: 44px; border-radius: 22px; border: none; margin-top: 16px;
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-  color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
-.profile-save-btn:active { opacity: 0.9; }
-.profile-save-btn:disabled { opacity: 0.5; }
 
 /* Menu */
 .profile-menu-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; cursor: pointer; }
