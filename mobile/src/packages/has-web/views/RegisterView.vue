@@ -6,10 +6,10 @@
     <!-- 品牌区域 -->
     <div class="auth-brand !pt-32 !pb-24">
       <div class="auth-brand-icon">
-        <van-icon name="lock" size="32" color="#fff" />
+        <van-icon name="friends-o" size="32" color="#fff" />
       </div>
-      <div class="auth-brand-title">重置密码</div>
-      <div class="auth-brand-subtitle">通过手机号或邮箱验证码重置登录密码</div>
+      <div class="auth-brand-title">创建账号</div>
+      <div class="auth-brand-subtitle">注册后即可使用 HAS Web 全部功能</div>
     </div>
 
     <!-- 表单卡片 -->
@@ -21,14 +21,14 @@
           :class="{ 'is-active': channel === 'sms' }"
           @click="channel = 'sms'"
         >
-          手机号
+          手机号注册
         </div>
         <div
           class="auth-channel-tab"
           :class="{ 'is-active': channel === 'email' }"
           @click="channel = 'email'"
         >
-          邮箱
+          邮箱注册
         </div>
       </div>
 
@@ -72,24 +72,24 @@
           </div>
         </div>
 
-        <!-- 新密码 -->
+        <!-- 密码 -->
         <div class="auth-field">
           <div class="auth-input-icon">
             <van-icon name="lock" size="18" />
           </div>
           <input
-            v-model.trim="form.newPassword"
+            v-model.trim="form.password"
             class="auth-input"
             :type="showPassword ? 'text' : 'password'"
             maxlength="32"
-            placeholder="设置新密码（8-32位，含字母和数字）"
+            placeholder="设置密码（8-32位，含字母和数字）"
           />
           <div class="auth-input-action" @click="showPassword = !showPassword">
             <van-icon :name="showPassword ? 'eye-o' : 'closed-eye'" size="18" color="#86909c" />
           </div>
         </div>
 
-        <!-- 确认新密码 -->
+        <!-- 确认密码 -->
         <div class="auth-field">
           <div class="auth-input-icon">
             <van-icon name="lock" size="18" />
@@ -99,8 +99,8 @@
             class="auth-input"
             :type="showConfirm ? 'text' : 'password'"
             maxlength="32"
-            placeholder="请再次输入新密码"
-            @keyup.enter="onReset"
+            placeholder="请再次输入密码"
+            @keyup.enter="onRegister"
           />
           <div class="auth-input-action" @click="showConfirm = !showConfirm">
             <van-icon :name="showConfirm ? 'eye-o' : 'closed-eye'" size="18" color="#86909c" />
@@ -111,17 +111,33 @@
       <!-- 提交按钮 -->
       <button
         class="auth-submit mt-28"
-        :class="{ 'opacity-60': loading }"
-        :disabled="loading"
-        @click="onReset"
+        :class="{ 'opacity-60': authStore.loading }"
+        :disabled="authStore.loading"
+        @click="onRegister"
       >
-        <van-loading v-if="loading" size="20" color="#fff" />
-        <span v-else>确认重置</span>
+        <van-loading v-if="authStore.loading" size="20" color="#fff" />
+        <span v-else>注 册</span>
       </button>
 
       <!-- 底部链接 -->
       <div class="auth-footer">
+        <span class="text-gray-400">已有账号？</span>
         <span class="auth-footer-link" @click="$router.replace('/login')">返回登录</span>
+      </div>
+
+      <!-- 协议 -->
+      <div class="auth-agreement">
+        <input
+          v-model="agreed"
+          type="checkbox"
+          class="auth-agreement-checkbox"
+        />
+        <span>
+          注册即表示同意
+          <span class="text-primary-500">《用户协议》</span>
+          和
+          <span class="text-primary-500">《隐私政策》</span>
+        </span>
       </div>
     </div>
   </div>
@@ -131,7 +147,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { sendCode, resetPasswordByCode } from '@/services/auth'
+import { useAuthStore } from '../stores/auth'
 import { useCountdown } from '../composables/useCountdown'
 import {
   validateTarget,
@@ -144,17 +160,18 @@ import {
 } from '../utils/validators'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const { countdown, start } = useCountdown(60)
 
 const channel = ref('sms')
 const showPassword = ref(false)
 const showConfirm = ref(false)
-const loading = ref(false)
+const agreed = ref(false)
 
 const form = reactive({
   target: '',
   code: '',
-  newPassword: '',
+  password: '',
   confirmPassword: ''
 })
 
@@ -172,12 +189,11 @@ function validateTargetField() {
 
 async function onSendCode() {
   if (!validateTargetField()) return
-  await sendCode({ channel: channel.value, scene: 'reset_password', target: form.target })
-  showToast('验证码已发送')
+  await authStore.requestCode(channel.value, 'register', form.target)
   start()
 }
 
-async function onReset() {
+async function onRegister() {
   if (!validateTargetField()) return
 
   if (!form.code) {
@@ -188,31 +204,36 @@ async function onReset() {
     showToast('验证码为 6 位数字')
     return
   }
-  if (!form.newPassword) {
-    showToast('请设置新密码')
+  if (!form.password) {
+    showToast('请设置密码')
     return
   }
-  if (!isPassword(form.newPassword)) {
+  if (!isPassword(form.password)) {
     showToast('密码需 8-32 位，至少包含字母和数字')
     return
   }
-  if (form.newPassword !== form.confirmPassword) {
+  if (form.password !== form.confirmPassword) {
     showToast('两次输入的密码不一致')
     return
   }
+  if (!agreed.value) {
+    showToast('请先同意用户协议和隐私政策')
+    return
+  }
 
-  loading.value = true
-  try {
-    await resetPasswordByCode({
-      channel: channel.value,
-      target: form.target,
-      code: form.code,
-      newPassword: form.newPassword
-    })
-    showToast('密码已重置，请重新登录')
+  await authStore.register({
+    channel: channel.value,
+    target: form.target,
+    code: form.code,
+    password: form.password
+  })
+
+  showToast('注册成功')
+  // 如果注册后已自动登录则直接进入首页，否则跳转登录页
+  if (authStore.isLoggedIn) {
+    router.replace('/home')
+  } else {
     router.replace('/login')
-  } finally {
-    loading.value = false
   }
 }
 </script>

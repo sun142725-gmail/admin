@@ -1,74 +1,125 @@
 <template>
   <div class="has-screen">
-    <div class="px-16 pt-14 pb-12 bg-white border-b border-gray-100 flex-between flex-shrink-0">
-      <div>
-        <div class="text-lg font-bold text-gray-800">首页</div>
-        <div class="text-xs text-gray-400 mt-2">HAS Web</div>
-      </div>
-      <van-image
-        round
-        width="40"
-        height="40"
-        :src="profileStore.profile?.avatarUrl"
-        @click="$router.push('/profile')"
-      >
-        <template #error>
-          <div class="w-[40px] h-[40px] rounded-full bg-primary-50 flex-center">
-            <van-icon name="user-o" size="20" color="#0ea5e9" />
-          </div>
-        </template>
-      </van-image>
-    </div>
-
-    <div class="flex-1 overflow-y-auto px-16 pt-16 has-tab-safe">
-      <div class="has-card-stack">
-        <div class="has-section bg-primary-500 text-white">
-          <div class="text-sm opacity-90">欢迎回来</div>
-          <div class="text-2xl font-bold mt-6">{{ displayName }}</div>
-          <div class="text-xs opacity-80 mt-10 leading-relaxed">
-            当前账号通过统一用户体系登录，C 端只展示业务入口和个人资料。
+    <!-- 渐变 Hero 头部 -->
+    <div class="home-hero">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="home-hero-greeting">{{ greeting }}</div>
+          <div class="home-hero-name">{{ displayName }}</div>
+          <div class="home-hero-desc">{{ today }} · HAS Web 统一账号体系</div>
+        </div>
+        <div class="home-hero-avatar" @click="$router.push('/profile')">
+          <van-image
+            v-if="profileStore.profile?.avatarUrl"
+            round
+            width="48"
+            height="48"
+            :src="profileStore.profile.avatarUrl"
+          />
+          <div v-else class="w-[48px] h-[48px] rounded-full flex-center bg-white/20">
+            <van-icon name="user-o" size="24" color="#fff" />
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="has-section">
-          <div class="flex-between mb-14">
-            <div class="text-base font-bold text-gray-800">快捷入口</div>
-            <div class="text-xs text-gray-400">常用功能</div>
+    <!-- 概览卡片 -->
+    <div class="home-overview">
+      <div class="home-overview-card">
+        <div class="home-overview-item">
+          <div class="home-overview-value">{{ loginMethod }}</div>
+          <div class="home-overview-label">登录方式</div>
+        </div>
+        <div class="home-overview-divider" />
+        <div class="home-overview-item">
+          <div class="home-overview-value flex items-center gap-6">
+            <span class="home-status-dot is-success" />
+            <span>正常</span>
           </div>
-          <div class="grid grid-cols-4 gap-12 text-center">
+          <div class="home-overview-label">账号状态</div>
+        </div>
+        <div class="home-overview-divider" />
+        <div class="home-overview-item">
+          <div class="home-overview-value">{{ securityLevel }}</div>
+          <div class="home-overview-label">安全等级</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="flex-1 overflow-y-auto px-16 pt-24 has-tab-safe">
+      <div class="space-y-16 pb-20">
+        <!-- 快捷入口 -->
+        <div class="home-card">
+          <div class="home-card-header">
+            <div class="home-section-title">快捷入口</div>
+            <div class="home-section-sub">常用功能</div>
+          </div>
+          <div class="home-action-grid">
             <button
               v-for="item in quickActions"
               :key="item.name"
-              class="py-8 rounded-lg active:bg-gray-50 transition-colors"
+              class="home-action-item active:opacity-60 transition-opacity"
               @click="item.action"
             >
-              <div class="mx-auto w-[44px] h-[44px] rounded-lg flex-center" :style="{ background: `${item.color}18` }">
+              <div class="home-action-icon" :style="{ background: `${item.color}15` }">
                 <van-icon :name="item.icon" size="22" :color="item.color" />
               </div>
-              <div class="text-xs text-gray-700 mt-8">{{ item.name }}</div>
+              <div class="home-action-label">{{ item.name }}</div>
             </button>
           </div>
         </div>
 
-        <div class="has-section">
-          <div class="flex-between mb-12">
-            <div class="text-base font-bold text-gray-800">账号状态</div>
-            <base-tag type="success">已登录</base-tag>
+        <!-- 账号安全 -->
+        <div class="home-card">
+          <div class="home-card-header">
+            <div class="home-section-title">账号安全</div>
+            <span
+              class="inline-flex items-center gap-6 text-xs text-success px-10 py-2 rounded-full"
+              style="background: rgba(16, 185, 129, 0.08)"
+            >
+              <span class="home-status-dot is-success" />
+              已登录
+            </span>
           </div>
-          <div class="text-sm text-gray-500 leading-relaxed">
-            后续这里可以扩展登录安全、绑定状态、消息提醒等信息。
+          <div class="home-list">
+            <div class="home-list-item">
+              <div class="home-list-label">
+                <van-icon name="shield-o" size="18" color="#86909c" />
+                登录密码
+              </div>
+              <div class="home-list-value" @click="$router.push('/reset-password')">修改</div>
+            </div>
+            <div class="home-list-item">
+              <div class="home-list-label">
+                <van-icon name="phone-o" size="18" color="#86909c" />
+                绑定手机
+              </div>
+              <div class="home-list-value">{{ maskedPhone || '未绑定' }}</div>
+            </div>
+            <div class="home-list-item">
+              <div class="home-list-label">
+                <van-icon name="envelop-o" size="18" color="#86909c" />
+                绑定邮箱
+              </div>
+              <div class="home-list-value">{{ maskedEmail || '未绑定' }}</div>
+            </div>
           </div>
         </div>
 
-        <div class="has-section">
-          <div class="text-base font-bold text-gray-800 mb-12">业务预留区</div>
-          <div class="text-sm text-gray-500 leading-relaxed">
-            这里可以继续承载业务卡片、消息提醒、订单/工具入口或活动内容。
+        <!-- 业务预留区 -->
+        <div class="home-card">
+          <div class="home-card-header">
+            <div class="home-section-title">业务预留</div>
+          </div>
+          <div class="text-sm text-gray-400 leading-relaxed">
+            这里可以继续承载业务卡片、消息提醒、订单 / 工具入口或活动内容。
           </div>
         </div>
       </div>
     </div>
 
+    <!-- 底部 Tab -->
     <div class="has-bottom-tab">
       <div class="flex gap-8">
         <button class="has-tab-item is-active" @click="$router.push('/home')">
@@ -95,7 +146,60 @@ const authStore = useAuthStore()
 const profileStore = useProfileStore()
 
 const displayName = computed(() => {
-  return profileStore.profile?.nickname || authStore.profile?.nickname || authStore.profile?.username || 'HAS 用户'
+  return (
+    profileStore.profile?.nickname ||
+    authStore.profile?.nickname ||
+    authStore.profile?.username ||
+    'HAS 用户'
+  )
+})
+
+const loginMethod = computed(() => {
+  const p = authStore.profile || profileStore.profile || {}
+  if (p.registerChannel === 'sms') return '手机号'
+  if (p.registerChannel === 'email') return '邮箱'
+  return '账号'
+})
+
+const securityLevel = computed(() => {
+  const p = authStore.profile || profileStore.profile || {}
+  let score = 1
+  if (p.password) score++
+  if (p.phone) score++
+  if (p.email) score++
+  if (score >= 3) return '高'
+  if (score === 2) return '中'
+  return '低'
+})
+
+const maskedPhone = computed(() => {
+  const phone = authStore.profile?.phone || profileStore.profile?.phone
+  if (!phone) return ''
+  return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+})
+
+const maskedEmail = computed(() => {
+  const email = authStore.profile?.email || profileStore.profile?.email
+  if (!email) return ''
+  const [name, domain] = email.split('@')
+  if (!domain) return email
+  const visible = name.slice(0, Math.min(2, name.length))
+  return `${visible}${'*'.repeat(Math.max(name.length - 2, 0))}@${domain}`
+})
+
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  if (h < 6) return '凌晨好'
+  if (h < 12) return '早上好'
+  if (h < 14) return '中午好'
+  if (h < 18) return '下午好'
+  return '晚上好'
+})
+
+const today = computed(() => {
+  const d = new Date()
+  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${week[d.getDay()]}`
 })
 
 const quickActions = [

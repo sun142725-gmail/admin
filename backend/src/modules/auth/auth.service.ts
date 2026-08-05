@@ -61,11 +61,43 @@ export class AuthService {
     return { accessToken, refreshToken, profile: payload };
   }
 
-  async validateUser(username: string, password: string) {
-    const user = await this.userRepo.findOne({
-      where: { username },
+  private inferIdentifierType(account: string) {
+    if (account.includes('@')) {
+      return 'email';
+    }
+    if (/^\+?\d[\d\s-]{5,}$/.test(account)) {
+      return 'sms';
+    }
+    return null;
+  }
+
+  private async findPasswordLoginUser(account: string) {
+    const normalizedAccount = account.trim();
+    const identifierType = this.inferIdentifierType(normalizedAccount);
+    if (identifierType) {
+      const user = await this.findUserByIdentifier(identifierType, normalizedAccount);
+      if (user) {
+        return this.userRepo.findOne({
+          where: { id: user.id },
+          relations: ['roles', 'roles.permissions']
+        });
+      }
+    }
+    const email = normalizedAccount.toLowerCase();
+    return this.userRepo.findOne({
+      where: [
+        { username: normalizedAccount },
+        { email }
+      ],
       relations: ['roles', 'roles.permissions']
     });
+  }
+
+  async validateUser(account: string | undefined, password: string) {
+    if (!account?.trim()) {
+      throw new BadRequestException('账号不能为空');
+    }
+    const user = await this.findPasswordLoginUser(account);
     if (!user || user.status !== 1) {
       throw new UnauthorizedException('账号或密码错误');
     }
@@ -76,11 +108,11 @@ export class AuthService {
     return user;
   }
 
-  async login(username: string, password: string, ip?: string) {
-    const user = await this.validateUser(username, password);
+  async login(account: string | undefined, password: string, ip?: string) {
+    const user = await this.validateUser(account, password);
     user.lastLoginAt = new Date();
     await this.userRepo.save(user);
-    await this.auditService.log('login', 'auth', `用户 ${username} 登录`, user.id, ip);
+    await this.auditService.log('login', 'auth', `用户 ${user.username} 密码登录`, user.id, ip);
     return this.signTokens(user);
   }
 

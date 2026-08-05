@@ -19,7 +19,7 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() req: Request) {
-    return this.authService.login(dto.username, dto.password, req.ip);
+    return this.authService.login(dto.account ?? dto.username, dto.password, req.ip);
   }
 
   @Post('code/send')

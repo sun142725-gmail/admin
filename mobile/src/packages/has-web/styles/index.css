@@ -91,4 +91,382 @@
   .has-tab-item.is-active {
     @apply text-primary-500 bg-primary-50;
   }
+
+  /* ========== Auth 页面专用 ========== */
+
+  .auth-screen {
+    @apply has-page flex flex-col;
+    background: linear-gradient(180deg, #f0f9ff 0%, #f2f3f5 240px);
+  }
+
+  .auth-brand {
+    @apply flex flex-col items-center pt-[48px] pb-32;
+  }
+
+  .auth-brand-icon {
+    @apply w-[64px] h-[64px] rounded-xl flex-center;
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    box-shadow: 0 8px 24px rgba(14, 165, 233, 0.3);
+  }
+
+  .auth-brand-title {
+    @apply text-2xl font-bold text-gray-800 mt-16;
+  }
+
+  .auth-brand-subtitle {
+    @apply text-sm text-gray-400 mt-6;
+  }
+
+  .auth-card {
+    @apply bg-white rounded-xl mx-16 p-24 shadow-card;
+  }
+
+  .auth-mode-tabs {
+    @apply flex bg-gray-50 rounded-xl p-4 mb-24;
+  }
+
+  .auth-mode-tab {
+    @apply flex-1 text-center py-10 text-sm font-medium rounded-lg transition-all duration-200;
+    @apply text-gray-400;
+  }
+
+  .auth-mode-tab.is-active {
+    @apply bg-white text-primary-600;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  .auth-channel-tabs {
+    @apply flex border-b border-gray-100 mb-20;
+  }
+
+  .auth-channel-tab {
+    @apply flex-1 text-center pb-12 text-sm font-medium transition-colors;
+    @apply text-gray-400 border-b-2;
+    border-color: transparent;
+  }
+
+  .auth-channel-tab.is-active {
+    @apply text-primary-600 border-primary-500;
+  }
+
+  .auth-field {
+    @apply relative;
+  }
+
+  .auth-field-label {
+    @apply absolute left-12 top-0 h-[44px] flex items-center text-gray-400 text-sm pointer-events-none;
+  }
+
+  .auth-input {
+    @apply w-full h-[48px] pl-[44px] pr-12 rounded-xl border border-gray-100 text-base bg-gray-50 transition-all;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .auth-input:focus {
+    @apply border-primary-400 bg-white;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  }
+
+  .auth-input-icon {
+    @apply absolute left-12 top-1/2 -translate-y-1/2 flex items-center text-gray-300;
+    pointer-events: none;
+  }
+
+  .auth-input-action {
+    @apply absolute right-12 top-1/2 -translate-y-1/2 flex items-center;
+  }
+
+  .auth-code-btn {
+    @apply h-[32px] px-12 rounded-lg text-xs font-medium whitespace-nowrap transition-colors;
+    @apply text-primary-500 bg-primary-50;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .auth-code-btn:disabled {
+    @apply text-gray-300 bg-gray-50;
+  }
+
+  .auth-submit {
+    @apply w-full h-[48px] rounded-xl text-base font-semibold transition-all;
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+  }
+
+  .auth-submit:active {
+    transform: scale(0.98);
+  }
+
+  .auth-footer {
+    @apply flex items-center justify-center gap-8 mt-20 text-sm;
+  }
+
+  .auth-footer-link {
+    @apply text-primary-500 active:text-primary-700 transition-colors;
+  }
+
+  .auth-agreement {
+    @apply flex items-start gap-8 mt-16 text-xs text-gray-400 leading-relaxed;
+  }
+
+  .auth-agreement-checkbox {
+    @apply mt-2 flex-shrink-0;
+  }
+
+  /* ========== 首页 / 个人中心专用 ========== */
+
+  /* 渐变 Hero 头部 */
+  .home-hero {
+    @apply relative overflow-hidden;
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    padding: 48px 20px 56px;
+  }
+
+  .home-hero::after {
+    content: '';
+    position: absolute;
+    top: -60px;
+    right: -40px;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+  }
+
+  .home-hero::before {
+    content: '';
+    position: absolute;
+    bottom: -30px;
+    left: -50px;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    pointer-events: none;
+  }
+
+  .home-hero-greeting {
+    @apply text-sm;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .home-hero-name {
+    @apply text-2xl font-bold text-white mt-6;
+  }
+
+  .home-hero-desc {
+    @apply text-xs mt-10 leading-relaxed;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .home-hero-avatar {
+    @apply w-[48px] h-[48px] rounded-full overflow-hidden border-2;
+    border-color: rgba(255, 255, 255, 0.4);
+    flex-shrink: 0;
+  }
+
+  /* 概览卡片（叠在 hero 下方） */
+  .home-overview {
+    @apply mx-16 -mt-32 relative z-10;
+  }
+
+  .home-overview-card {
+    @apply bg-white rounded-xl p-20 shadow-card;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .home-overview-item {
+    @apply flex flex-col items-center;
+    flex: 1;
+  }
+
+  .home-overview-value {
+    @apply text-xl font-bold text-gray-800;
+  }
+
+  .home-overview-label {
+    @apply text-xs text-gray-400 mt-4;
+  }
+
+  .home-overview-divider {
+    width: 1px;
+    height: 32px;
+    background: theme('colors.gray.100');
+  }
+
+  /* 通用区块标题 */
+  .home-section-title {
+    @apply text-base font-bold text-gray-800;
+  }
+
+  .home-section-sub {
+    @apply text-xs text-gray-400;
+  }
+
+  /* 功能卡片 */
+  .home-card {
+    @apply bg-white rounded-xl p-20 shadow-card mx-16;
+  }
+
+  .home-card-header {
+    @apply flex items-center justify-between mb-16;
+  }
+
+  /* 快捷功能网格 */
+  .home-action-grid {
+    @apply grid grid-cols-4 gap-12;
+  }
+
+  .home-action-item {
+    @apply flex flex-col items-center;
+    padding: 8px 0;
+  }
+
+  .home-action-icon {
+    @apply w-[48px] h-[48px] rounded-xl flex-center;
+  }
+
+  .home-action-label {
+    @apply text-xs text-gray-700 mt-8;
+  }
+
+  /* 状态指示器 */
+  .home-status-dot {
+    @apply w-[8px] h-[8px] rounded-full inline-block;
+  }
+
+  .home-status-dot.is-success {
+    background: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  }
+
+  /* 列表行 */
+  .home-list {
+    @apply divide-y divide-gray-50;
+  }
+
+  .home-list-item {
+    @apply flex items-center justify-between py-[14px];
+  }
+
+  .home-list-label {
+    @apply flex items-center gap-10 text-sm text-gray-700;
+  }
+
+  .home-list-value {
+    @apply text-sm text-gray-400;
+  }
+
+  /* 退出登录按钮 */
+  .home-logout {
+    @apply w-full h-[48px] rounded-xl text-base font-medium transition-all;
+    background: #fff;
+    color: #f53f3f;
+    border: 1px solid #ffece8;
+  }
+
+  .home-logout:active {
+    background: #fff5f5;
+  }
+
+  /* ========== 个人中心头部 ========== */
+
+  .profile-hero {
+    @apply relative overflow-hidden flex flex-col items-center;
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    padding: 48px 20px 64px;
+  }
+
+  .profile-hero::after {
+    content: '';
+    position: absolute;
+    top: -40px;
+    right: -30px;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+  }
+
+  .profile-avatar-wrap {
+    @apply relative;
+    z-index: 1;
+  }
+
+  .profile-avatar {
+    @apply w-[80px] h-[80px] rounded-full overflow-hidden border-4;
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .profile-name {
+    @apply text-xl font-bold text-white mt-16;
+    z-index: 1;
+  }
+
+  .profile-meta {
+    @apply text-sm mt-6;
+    color: rgba(255, 255, 255, 0.8);
+    z-index: 1;
+  }
+
+  /* 资料卡片 */
+  .profile-card {
+    @apply bg-white rounded-xl mx-16 p-20 shadow-card;
+  }
+
+  .profile-card-title {
+    @apply text-base font-bold text-gray-800 mb-16;
+  }
+
+  .profile-field {
+    @apply relative;
+  }
+
+  .profile-field-label {
+    @apply text-xs text-gray-400 mb-6;
+  }
+
+  .profile-input {
+    @apply w-full h-[44px] px-12 rounded-lg border border-gray-100 text-sm bg-gray-50 transition-all;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .profile-input:focus {
+    @apply border-primary-400 bg-white;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  }
+
+  .profile-save-btn {
+    @apply w-full h-[44px] rounded-lg text-sm font-semibold transition-all mt-20;
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    color: #fff;
+  }
+
+  .profile-save-btn:active {
+    transform: scale(0.98);
+  }
+
+  .profile-action-row {
+    @apply flex items-center justify-between py-[14px];
+  }
+
+  .profile-action-label {
+    @apply flex items-center gap-10 text-sm text-gray-700;
+  }
+
+  .profile-action-icon {
+    @apply w-[36px] h-[36px] rounded-lg flex-center;
+  }
 }
+

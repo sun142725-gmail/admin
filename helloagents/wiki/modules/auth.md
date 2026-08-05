@@ -6,7 +6,7 @@
 ## Module Overview
 - **Responsibility:** 处理用户名密码登录、验证码登录注册、验证码重置密码、刷新、退出与权限校验
 - **Status:** ✅Stable
-- **Last Updated:** 2026-07-19
+- **Last Updated:** 2026-08-05
 
 ## Specifications
 
@@ -15,7 +15,7 @@
 支持登录、刷新令牌、验证码登录注册与验证码重置密码。
 
 #### Scenario: 登录
-- 输入用户名/密码
+- 输入用户名/手机号/邮箱 + 密码
 - 返回 accessToken 与 refreshToken
 
 #### Scenario: 验证码登录/注册
@@ -33,7 +33,7 @@
 ## API Interfaces
 ### POST /api/auth/login
 **Description:** 用户登录
-**Input:** username, password
+**Input:** account 或 username, password
 **Output:** accessToken, refreshToken, profile
 
 ### POST /api/auth/code/send
@@ -98,4 +98,5 @@
 - permissions
 
 ## Change History
+- [2026-08-05] 密码登录支持手机号与邮箱账号，并兼容原用户名登录
 - [202601250851_rbac_system](../../history/2026-01/202601250851_rbac_system/) - 初始化认证模块

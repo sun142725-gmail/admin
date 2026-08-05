@@ -131,6 +131,8 @@ function trigger() {
   inputRef.value?.click()
 }
 
+defineExpose({ trigger })
+
 function onChange(e: Event) {
   const target = e.target as HTMLInputElement
   const files = Array.from(target.files || [])

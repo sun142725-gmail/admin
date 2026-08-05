@@ -10,7 +10,13 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: () => import('../views/LoginView.vue'),
-    meta: { title: '登录注册', guest: true }
+    meta: { title: '登录', guest: true }
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: () => import('../views/RegisterView.vue'),
+    meta: { title: '注册', guest: true }
   },
   {
     path: '/reset-password',
