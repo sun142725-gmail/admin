@@ -81,7 +81,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { showToast } from 'vant'
-import { formRules } from '../../../../components/SelfForm.vue'
+import { formRules } from '@shared/components/SelfForm.vue'
 
 const formRef = ref()
 const pageScroll = ref()

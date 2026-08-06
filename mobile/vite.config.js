@@ -44,7 +44,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@c': resolve(rootDir, 'src'),
+      '@shared': resolve(rootDir, 'src/shared'),
       '@': appDir
     }
   },

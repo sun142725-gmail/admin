@@ -12,6 +12,7 @@
 - `deploy-panel/publish.html`：发布操作页面，支持选择发布目标、刷新日志与查看执行状态
 - `deploy-panel/scripts/deploy-backend.sh`：后端发布脚本
 - `deploy-panel/scripts/deploy-frontend.sh`：前端与 Nginx 发布脚本
+- `deploy-panel/scripts/deploy-mobile.sh`：移动端 has-doc 与 has-web 发布脚本
 - `deploy-panel/scripts/deploy-all.sh`：全量发布脚本
 - `deploy-panel/scripts/common.sh`：Docker Compose 命令兼容封装
 - `deploy-panel/logs/deploy-logs.txt`：发布日志文件
@@ -60,12 +61,13 @@ docker compose up -d --build deploy-panel
 
 - `backend`：拉取最新代码并只重建 `backend`，不启动 `mysql`、`redis`
 - `frontend`：拉取最新代码并只重建 `frontend`；`nginx` 使用共享卷读取静态资源，无需重启
-- `all`：拉取最新代码并重建 `backend`、`frontend`、`nginx`
+- `mobile`：拉取最新代码并只重建 `mobile`，构建产物包含 `/has-doc/` 与 `/has-web/`
+- `all`：拉取最新代码并重建 `backend`、`frontend`、`mobile`、`nginx`
 
 ## 构建优化
 
 - 默认保留 Docker 构建缓存，减少依赖重复下载
-- 后端与前端 Dockerfile 使用 BuildKit npm 缓存挂载
+- 后端、前端与移动端 Dockerfile 使用 `npm ci`，依赖层随 lockfile 缓存
 - 前端改为镜像构建阶段执行 `npm ci` 与 `npm run build`，容器启动阶段仅复制 `dist` 到共享卷
 - 发布脚本统一启用 `DOCKER_BUILDKIT=1` 与 `COMPOSE_DOCKER_CLI_BUILD=1`
 - 发布脚本固定默认 `COMPOSE_PROJECT_NAME=admin`，避免容器内路径变化导致创建 `workspace-*` 重复服务

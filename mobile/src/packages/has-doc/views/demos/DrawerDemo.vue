@@ -171,7 +171,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { showToast } from 'vant'
-import { formRules } from '../../../../components/SelfForm.vue'
+import { formRules } from '@shared/components/SelfForm.vue'
 
 interface BottomForm {
   name: string

@@ -4,6 +4,7 @@
 
 ## [未发布]
 ### 新增
+- 移动端 `has-doc` 与 `has-web` 接入发布平台，新增 `mobile` 构建服务与 `/has-doc/`、`/has-web/` Nginx 路由
 - 新增家庭协作后端模块，覆盖家庭创建/加入、成员、待办、公告、概览与移动端用户设置接口
 - 发布面板新增 Dockerfile，并接入根目录 `docker-compose.yml` 的 `deploy-panel` 服务
 - 新增 `deploy-panel` 自动化发布面板文档，说明环境变量、发布目标、接口与安全约束
@@ -14,6 +15,8 @@
 - 新增用户登录标识、验证码与文件资源数据模型
 - 个人中心返回值补充账号类型与登录来源信息
 ### 变更
+- 移动端公共组件、工具、常量、hooks、composables 与 locales 统一迁移到 `mobile/src/shared`，并通过 `@shared/*` 引入
+- 移除前端、后端与移动端 Dockerfile 的 Docker Hub `docker/dockerfile` 前端依赖，避免弱网环境构建超时
 - Auth profile 补充手机号与当前活跃家庭 ID，适配移动端家庭上下文
 - Auth 密码登录支持使用手机号或邮箱账号，并兼容原用户名登录
 - 前端发布不再重启 `nginx`，依赖 `frontend_dist` 共享卷更新静态资源

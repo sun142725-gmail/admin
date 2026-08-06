@@ -19,8 +19,9 @@ C 端移动端 H5 基础框架
 - 通过 `VITE_APP` 选择当前应用
 
 #### Scenario: 组件复用
-- `src/components` 下组件自动全局注册
+- `src/shared/components` 下组件由各应用入口通过 `@shared/components` 插件全局注册
 - 页面直接使用 `<base-button />` 等标签
+- 公共工具、常量、hooks、composables、locales 统一通过 `@shared/*` 引入
 
 #### Scenario: 后端对接
 - 请求统一走 `VITE_API_BASE_URL`，默认 `/api`
@@ -30,6 +31,12 @@ C 端移动端 H5 基础框架
 - 新增 `mobile/src/packages/has-web`
 - 覆盖登录注册、首页、个人中心
 - 独立封装 `auth/profile/files` API 与 `auth/profile` store
+
+#### Scenario: 生产部署
+- `has-doc` 发布到 `/has-doc/`
+- `has-web` 发布到 `/has-web/`
+- Docker Compose 通过 `mobile` 服务构建两个应用并写入 `mobile_dist` 卷
+- Nginx 通过 `/usr/share/nginx/mobile` 挂载 `mobile_dist`，分别路由到两个应用目录
 
 ## API Interfaces
 - `src/packages/has-web/api/auth.js`：验证码登录、发送验证码、重置密码、刷新、退出
@@ -48,5 +55,6 @@ C 端移动端 H5 基础框架
 - better-scroll
 
 ## Change History
+- [未发布] - 移动端 has-doc / has-web 接入发布平台与 Nginx 子路径部署
 - [202607191215_mobile_has_web](../../history/2026-07/202607191215_mobile_has_web/) - 新增 has-web 登录注册、首页、个人中心与接口对接骨架
 - [202607191152_mobile_docs](../../history/2026-07/202607191152_mobile_docs/) - 补充移动端 H5 框架说明

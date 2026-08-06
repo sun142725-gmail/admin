@@ -55,8 +55,8 @@
                 <div>
                   <h3 class="text-base font-bold text-gray-800 mb-8">使用说明</h3>
                   <p class="text-sm text-gray-500 leading-relaxed">
-                    组件统一存放在 <code class="text-primary-500">src/components</code>，基于
-                    <code class="text-primary-500">unplugin-vue-components</code> 自动注册，页面中直接使用
+                    组件统一存放在 <code class="text-primary-500">src/shared/components</code>，由
+                    <code class="text-primary-500">@shared/components</code> 统一注册，页面中直接使用
                     <code class="text-primary-500">&lt;base-button /&gt;</code> 等标签即可，无需手动 import。
                   </p>
                 </div>

@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 # 后端镜像用于构建与运行 NestJS 服务。
 FROM docker.m.daocloud.io/library/node:20-alpine AS builder
 WORKDIR /app
@@ -10,7 +9,7 @@ RUN npm config set fetch-retry-mintimeout 20000
 RUN npm config set fetch-retry-maxtimeout 120000
 COPY package.json package-lock.json* ./
 # 构建阶段仅需编译 TypeScript，跳过依赖安装脚本可避免 sqlite3/node-gyp 网络编译失败。
-RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
+RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 
@@ -24,6 +23,6 @@ RUN npm config set fetch-retries 5
 RUN npm config set fetch-retry-mintimeout 20000
 RUN npm config set fetch-retry-maxtimeout 120000
 COPY --from=builder /app/package.json /app/package-lock.json* ./
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
+RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 CMD ["node", "dist/main.js"]

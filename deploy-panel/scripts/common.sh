@@ -137,3 +137,12 @@ deploy_frontend() {
   echo "Nginx 使用 frontend_dist 共享卷，无需重启"
   print_elapsed_time
 }
+
+deploy_mobile() {
+  preflight
+  pull_latest_code
+  clean_build_cache_if_needed
+  compose_up_no_deps mobile
+  echo "Nginx 使用 mobile_dist 共享卷，无需重启"
+  print_elapsed_time
+}

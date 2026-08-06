@@ -1,6 +1,6 @@
 # 公共组件库使用说明
 
-组件统一放在 `src/components` 目录下，基于 `unplugin-vue-components` 自动按需注册，页面中直接使用标签即可，无需手动 `import`。
+组件统一放在 `src/shared/components` 目录下，通过入口应用注册的 `@shared/components` 插件全局注册，页面中直接使用标签即可，无需逐个 `import`。
 
 所有组件均以 `Base` 前缀命名，例如 `<base-button />`。
 

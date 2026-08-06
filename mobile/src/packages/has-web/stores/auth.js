@@ -90,8 +90,12 @@ export const useAuthStore = defineStore('has-web-auth', () => {
   async function logout() {
     try {
       await requestLogout()
-    } catch {
-      // 退出失败时仍清理本地登录态。
+    } catch (e) {
+      // 接口失败不阻塞退出，仍清理本地登录态
+      // 常见原因：token 已过期 / 后端未实现 / 网络异常
+      if (import.meta.env.DEV) {
+        console.warn('[auth] logout API failed, clearing local state anyway:', e?.message || e)
+      }
     }
     clearTokens()
     accessToken.value = ''

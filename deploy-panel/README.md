@@ -133,7 +133,13 @@ node server.js
 
 - `backend`：执行 `scripts/deploy-backend.sh`，拉取最新代码并只重建 `backend`，不启动 `mysql`、`redis`
 - `frontend`：执行 `scripts/deploy-frontend.sh`，拉取最新代码并只重建 `frontend`；`nginx` 使用共享卷读取静态资源，无需重启
-- `all`：执行 `scripts/deploy-all.sh`，拉取最新代码并重建 `backend`、`frontend` 与 `nginx`
+- `mobile`：执行 `scripts/deploy-mobile.sh`，拉取最新代码并构建 `has-doc` 与 `has-web`；`nginx` 使用共享卷读取静态资源，无需重启
+- `all`：执行 `scripts/deploy-all.sh`，拉取最新代码并重建 `backend`、`frontend`、`mobile` 与 `nginx`
+
+移动端访问路径：
+
+- `/has-doc/`：HAS 组件文档应用
+- `/has-web/`：HAS C 端业务应用
 
 发布面板容器固定设置 `COMPOSE_PROJECT_NAME=admin`，避免容器内 `/workspace` 路径或宿主机环境变量导致 Compose 创建 `workspace-*` 新容器。
 同时启用 `COMPOSE_COMPATIBILITY=1`，尽量沿用旧版 Compose 的 `admin_nginx_1` 这类下划线容器命名。
@@ -142,7 +148,7 @@ node server.js
 
 - 默认保留 Docker 构建缓存，用于提升后续发布速度
 - 前端静态资源在镜像构建阶段完成，容器启动时只复制 `dist` 到 `frontend_dist` 卷
-- 后端和前端依赖安装使用 `npm ci`，并通过 BuildKit npm 缓存减少重复下载
+- 后端、前端和移动端依赖安装使用 `npm ci`，依赖层会随 `package-lock.json` 缓存
 - 发布脚本默认启用 `DOCKER_BUILDKIT=1` 与 `COMPOSE_DOCKER_CLI_BUILD=1`
 - 发布完成后会输出本次发布总耗时
 - Docker Compose 可能把正常构建进度写到 stderr，发布面板按退出码判断成功或失败
