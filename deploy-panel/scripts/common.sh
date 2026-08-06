@@ -138,11 +138,13 @@ deploy_frontend() {
   print_elapsed_time
 }
 
-deploy_mobile() {
+deploy_mobile_app() {
+  local service="$1"
+  local app_path="$2"
   preflight
   pull_latest_code
   clean_build_cache_if_needed
-  compose_up_no_deps mobile
-  echo "Nginx 使用 mobile_dist 共享卷，无需重启"
+  compose_up_no_deps "$service"
+  echo "Nginx 使用 mobile_dist 共享卷读取 $app_path，无需重启"
   print_elapsed_time
 }

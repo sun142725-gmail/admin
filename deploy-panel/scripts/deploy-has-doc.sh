@@ -3,4 +3,4 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
-deploy_services backend frontend mobile-has-doc mobile-has-web nginx
+deploy_mobile_app mobile-has-doc /has-doc/

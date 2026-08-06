@@ -1,5 +1,8 @@
-# Mobile H5 镜像用于构建 has-doc 与 has-web 静态资源。
+# Mobile H5 镜像用于构建单个 H5 应用静态资源。
 FROM docker.m.daocloud.io/library/node:20-alpine
+
+ARG MOBILE_APP=has-doc
+ENV MOBILE_APP=${MOBILE_APP}
 
 WORKDIR /app
 
@@ -13,6 +16,6 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 COPY . .
-RUN npm run build:has-doc && npm run build:has-web
+RUN npm run build:${MOBILE_APP}
 
-CMD ["sh", "-c", "rm -rf /mobile-dist/* && mkdir -p /mobile-dist/has-doc /mobile-dist/has-web && cp -r dist/has-doc/* /mobile-dist/has-doc/ && cp -r dist/has-web/* /mobile-dist/has-web/ && tail -f /dev/null"]
+CMD ["sh", "-c", "rm -rf /mobile-dist/${MOBILE_APP} && mkdir -p /mobile-dist/${MOBILE_APP} && cp -r dist/${MOBILE_APP}/* /mobile-dist/${MOBILE_APP}/ && tail -f /dev/null"]

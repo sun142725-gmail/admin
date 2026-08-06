@@ -61,8 +61,19 @@ services:
     volumes:
       - frontend_dist:/frontend-dist
 
-  mobile:
-    build: ./mobile
+  mobile-has-doc:
+    build:
+      context: ./mobile
+      args:
+        MOBILE_APP: has-doc
+    volumes:
+      - mobile_dist:/mobile-dist
+
+  mobile-has-web:
+    build:
+      context: ./mobile
+      args:
+        MOBILE_APP: has-web
     volumes:
       - mobile_dist:/mobile-dist
 
@@ -71,7 +82,8 @@ services:
     depends_on:
       - backend
       - frontend
-      - mobile
+      - mobile-has-doc
+      - mobile-has-web
     ports:
       - "80:80"
     volumes:

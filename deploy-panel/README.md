@@ -133,8 +133,9 @@ node server.js
 
 - `backend`：执行 `scripts/deploy-backend.sh`，拉取最新代码并只重建 `backend`，不启动 `mysql`、`redis`
 - `frontend`：执行 `scripts/deploy-frontend.sh`，拉取最新代码并只重建 `frontend`；`nginx` 使用共享卷读取静态资源，无需重启
-- `mobile`：执行 `scripts/deploy-mobile.sh`，拉取最新代码并构建 `has-doc` 与 `has-web`；`nginx` 使用共享卷读取静态资源，无需重启
-- `all`：执行 `scripts/deploy-all.sh`，拉取最新代码并重建 `backend`、`frontend`、`mobile` 与 `nginx`
+- `has-doc`：执行 `scripts/deploy-has-doc.sh`，拉取最新代码并只构建 `has-doc`；`nginx` 使用共享卷读取静态资源，无需重启
+- `has-web`：执行 `scripts/deploy-has-web.sh`，拉取最新代码并只构建 `has-web`；`nginx` 使用共享卷读取静态资源，无需重启
+- `all`：执行 `scripts/deploy-all.sh`，拉取最新代码并重建 `backend`、`frontend`、`has-doc`、`has-web` 与 `nginx`
 
 移动端访问路径：
 
@@ -148,7 +149,7 @@ node server.js
 
 - 默认保留 Docker 构建缓存，用于提升后续发布速度
 - 前端静态资源在镜像构建阶段完成，容器启动时只复制 `dist` 到 `frontend_dist` 卷
-- 后端、前端和移动端依赖安装使用 `npm ci`，依赖层会随 `package-lock.json` 缓存
+- 后端、前端和移动端依赖安装使用 `npm ci`，移动端 `has-doc` / `has-web` 分服务构建，依赖层会随 `package-lock.json` 缓存
 - 发布脚本默认启用 `DOCKER_BUILDKIT=1` 与 `COMPOSE_DOCKER_CLI_BUILD=1`
 - 发布完成后会输出本次发布总耗时
 - Docker Compose 可能把正常构建进度写到 stderr，发布面板按退出码判断成功或失败

@@ -12,7 +12,8 @@
 - `deploy-panel/publish.html`：发布操作页面，支持选择发布目标、刷新日志与查看执行状态
 - `deploy-panel/scripts/deploy-backend.sh`：后端发布脚本
 - `deploy-panel/scripts/deploy-frontend.sh`：前端与 Nginx 发布脚本
-- `deploy-panel/scripts/deploy-mobile.sh`：移动端 has-doc 与 has-web 发布脚本
+- `deploy-panel/scripts/deploy-has-doc.sh`：移动端 has-doc 发布脚本
+- `deploy-panel/scripts/deploy-has-web.sh`：移动端 has-web 发布脚本
 - `deploy-panel/scripts/deploy-all.sh`：全量发布脚本
 - `deploy-panel/scripts/common.sh`：Docker Compose 命令兼容封装
 - `deploy-panel/logs/deploy-logs.txt`：发布日志文件
@@ -61,8 +62,9 @@ docker compose up -d --build deploy-panel
 
 - `backend`：拉取最新代码并只重建 `backend`，不启动 `mysql`、`redis`
 - `frontend`：拉取最新代码并只重建 `frontend`；`nginx` 使用共享卷读取静态资源，无需重启
-- `mobile`：拉取最新代码并只重建 `mobile`，构建产物包含 `/has-doc/` 与 `/has-web/`
-- `all`：拉取最新代码并重建 `backend`、`frontend`、`mobile`、`nginx`
+- `has-doc`：拉取最新代码并只重建 `mobile-has-doc`，构建产物发布到 `/has-doc/`
+- `has-web`：拉取最新代码并只重建 `mobile-has-web`，构建产物发布到 `/has-web/`
+- `all`：拉取最新代码并重建 `backend`、`frontend`、`mobile-has-doc`、`mobile-has-web`、`nginx`
 
 ## 构建优化
 

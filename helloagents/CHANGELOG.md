@@ -15,6 +15,7 @@
 - 新增用户登录标识、验证码与文件资源数据模型
 - 个人中心返回值补充账号类型与登录来源信息
 ### 变更
+- 移动端发布由单一 `mobile` 目标拆分为 `has-doc` 与 `has-web` 两个独立发布目标
 - 移动端公共组件、工具、常量、hooks、composables 与 locales 统一迁移到 `mobile/src/shared`，并通过 `@shared/*` 引入
 - 移除前端、后端与移动端 Dockerfile 的 Docker Hub `docker/dockerfile` 前端依赖，避免弱网环境构建超时
 - Auth profile 补充手机号与当前活跃家庭 ID，适配移动端家庭上下文

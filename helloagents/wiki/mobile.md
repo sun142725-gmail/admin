@@ -35,7 +35,7 @@ C 端移动端 H5 基础框架
 #### Scenario: 生产部署
 - `has-doc` 发布到 `/has-doc/`
 - `has-web` 发布到 `/has-web/`
-- Docker Compose 通过 `mobile` 服务构建两个应用并写入 `mobile_dist` 卷
+- Docker Compose 通过 `mobile-has-doc` 与 `mobile-has-web` 两个服务分别构建应用并写入 `mobile_dist` 卷
 - Nginx 通过 `/usr/share/nginx/mobile` 挂载 `mobile_dist`，分别路由到两个应用目录
 
 ## API Interfaces
@@ -55,6 +55,6 @@ C 端移动端 H5 基础框架
 - better-scroll
 
 ## Change History
-- [未发布] - 移动端 has-doc / has-web 接入发布平台与 Nginx 子路径部署
+- [未发布] - 移动端 has-doc / has-web 接入发布平台与 Nginx 子路径部署，支持两个应用分别发布
 - [202607191215_mobile_has_web](../../history/2026-07/202607191215_mobile_has_web/) - 新增 has-web 登录注册、首页、个人中心与接口对接骨架
 - [202607191152_mobile_docs](../../history/2026-07/202607191152_mobile_docs/) - 补充移动端 H5 框架说明

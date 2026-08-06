@@ -49,7 +49,8 @@ if (!SECRET) {
 const SCRIPT_MAP = {
   backend: path.join(__dirname, 'scripts/deploy-backend.sh'),
   frontend: path.join(__dirname, 'scripts/deploy-frontend.sh'),
-  mobile: path.join(__dirname, 'scripts/deploy-mobile.sh'),
+  'has-doc': path.join(__dirname, 'scripts/deploy-has-doc.sh'),
+  'has-web': path.join(__dirname, 'scripts/deploy-has-web.sh'),
   all: path.join(__dirname, 'scripts/deploy-all.sh')
 };
 
