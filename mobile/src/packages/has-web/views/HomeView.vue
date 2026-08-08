@@ -55,7 +55,7 @@
     <!-- 快捷入口 -->
     <div class="fam-section">
       <h3 class="fam-section-title">快捷入口</h3>
-      <div class="fam-action-grid">
+      <div class="fam-action-grid fam-action-grid--5">
         <div class="fam-action-item" @click="$router.push('/members')">
           <div class="fam-action-icon" style="background: #e0f2fe; color: #0ea5e9">
             <van-icon name="friends-o" size="22" />
@@ -73,6 +73,12 @@
             <van-icon name="bell" size="22" />
           </div>
           <span class="fam-action-label">家庭公告</span>
+        </div>
+        <div class="fam-action-item" @click="$router.push('/milestones')">
+          <div class="fam-action-icon" style="background: #fce7f3; color: #ec4899">
+            <van-icon name="medal-o" size="22" />
+          </div>
+          <span class="fam-action-label">大事纪</span>
         </div>
         <div class="fam-action-item" @click="handleInvite">
           <div class="fam-action-icon" style="background: #ede9fe; color: #8b5cf6">
@@ -276,6 +282,7 @@ onMounted(async () => {
 
 /* Action Grid */
 .fam-action-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: #fff; border-radius: 16px; padding: 16px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+.fam-action-grid--5 { grid-template-columns: repeat(5, 1fr); }
 .fam-action-item { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
 .fam-action-item:active { opacity: 0.7; }
 .fam-action-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }

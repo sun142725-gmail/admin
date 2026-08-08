@@ -80,6 +80,18 @@ const routes = [
     meta: { title: '编辑资料', requiresAuth: true }
   },
   {
+    path: '/milestones',
+    name: 'Milestones',
+    component: () => import('../views/MilestonesView.vue'),
+    meta: { title: '家庭大事纪', requiresAuth: true }
+  },
+  {
+    path: '/milestones/summary',
+    name: 'MilestoneSummary',
+    component: () => import('../views/MilestoneSummaryView.vue'),
+    meta: { title: '纪事碑文', requiresAuth: true }
+  },
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('../views/SettingsView.vue'),
