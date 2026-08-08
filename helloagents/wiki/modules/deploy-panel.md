@@ -66,6 +66,13 @@ docker compose up -d --build deploy-panel
 - `has-web`：拉取最新代码并只重建 `mobile-has-web`，构建产物发布到 `/has-web/`
 - `all`：拉取最新代码并重建 `backend`、`frontend`、`mobile-has-doc`、`mobile-has-web`、`nginx`
 
+## 首次接入与日常发布
+
+- 首次新增应用、Compose 服务、volume 挂载或 Nginx 路由时，需要重建相关基础服务一次
+- 新增 `has-doc` / `has-web` 这类移动端应用时，首次执行 `docker compose up -d --build mobile-has-doc mobile-has-web nginx`
+- 首次接入完成后，日常代码发布只发布对应应用目标，不需要重启 Nginx
+- 判断原则：新增服务、挂载或 Nginx 路由时重建 Nginx；普通代码更新只发布对应应用
+
 ## 构建优化
 
 - 默认保留 Docker 构建缓存，减少依赖重复下载

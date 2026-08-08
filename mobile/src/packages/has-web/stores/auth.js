@@ -37,7 +37,14 @@ export const useAuthStore = defineStore('has-web-auth', () => {
       const data = response.data ?? response
       setTokens(data)
       accessToken.value = data.accessToken
-      profile.value = data.profile
+      // signTokens 返回的 profile 只是 JWT payload（sub/username/roles/permissions）
+      // 需要再调 GET /auth/profile 拿完整信息（email/nickname/avatarUrl 等）
+      try {
+        await loadAuthProfile()
+      } catch {
+        // profile 拉取失败不阻塞登录流程，后续可重试
+        profile.value = data.profile
+      }
       return data
     } finally {
       loading.value = false
@@ -51,7 +58,11 @@ export const useAuthStore = defineStore('has-web-auth', () => {
       const data = response.data ?? response
       setTokens(data)
       accessToken.value = data.accessToken
-      profile.value = data.profile
+      try {
+        await loadAuthProfile()
+      } catch {
+        profile.value = data.profile
+      }
       return data
     } finally {
       loading.value = false

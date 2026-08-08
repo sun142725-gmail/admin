@@ -142,6 +142,29 @@ node server.js
 - `/has-doc/`：HAS 组件文档应用
 - `/has-web/`：HAS C 端业务应用
 
+## 首次接入与日常发布
+
+首次新增应用、Compose 服务、volume 挂载或 Nginx 路由时，需要重建相关基础服务一次。例如本次首次接入 `has-doc` / `has-web` 时，需要执行：
+
+```bash
+docker compose up -d --build mobile-has-doc mobile-has-web nginx
+```
+
+也可以执行全量重建：
+
+```bash
+docker compose up -d --build
+```
+
+完成首次接入后，日常代码发布不需要重启 Nginx：
+
+- 只改 `has-doc`：发布面板选择 `仅移动端 has-doc`
+- 只改 `has-web`：发布面板选择 `仅移动端 has-web`
+- 只改管理后台：发布面板选择 `仅前端 frontend`
+- 只改后端：发布面板选择 `仅后端 backend`
+
+简单判断：新增服务、挂载或 Nginx 路由时重建 Nginx 一次；普通代码更新只发布对应应用。
+
 发布面板容器固定设置 `COMPOSE_PROJECT_NAME=admin`，避免容器内 `/workspace` 路径或宿主机环境变量导致 Compose 创建 `workspace-*` 新容器。
 同时启用 `COMPOSE_COMPATIBILITY=1`，尽量沿用旧版 Compose 的 `admin_nginx_1` 这类下划线容器命名。
 
