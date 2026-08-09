@@ -14,6 +14,7 @@
         'is-checked': model === opt.value,
         'is-disabled': disabled || opt.disabled
       }"
+      @click="onChange(opt)"
     >
       <span class="base-radio__circle">
         <span v-if="model === opt.value" class="base-radio__dot" :style="dotStyle"></span>
@@ -24,8 +25,7 @@
         :value="opt.value"
         :checked="model === opt.value"
         :disabled="disabled || opt.disabled"
-        :name="name"
-        @change="onChange(opt.value)"
+        @change="onChange(opt)"
       />
       <span class="base-radio__label">{{ opt.label }}</span>
     </label>
@@ -53,10 +53,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'change'])
-
-// 唯一 name 属性，确保同一组内 radio 互斥
-let uidCounter = 0
-const name = `base-radio-${++uidCounter}`
 
 const model = computed({
   get: () => props.modelValue,
@@ -96,9 +92,10 @@ const normalizedOptions = computed(() => {
   })
 })
 
-function onChange(value) {
-  model.value = value
-  emit('change', value)
+function onChange(opt) {
+  if (props.disabled || opt.disabled || model.value === opt.value) return
+  model.value = opt.value
+  emit('change', opt.value)
 }
 </script>
 

@@ -13,7 +13,8 @@
       <!-- 事件归属 -->
       <div class="ms-edit-field">
         <label class="ms-edit-label">事件归属 <span class="ms-edit-required">*</span></label>
-        <base-radio
+        <BaseRadio
+          class="ms-edit-type-radio"
           v-model="form.type"
           :options="typeOptions"
           :disabled="mode === 'edit'"
@@ -113,6 +114,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { showToast } from 'vant'
+import BaseRadio from '@shared/components/BaseRadio.vue'
 import { uploadFile } from '@/services/files'
 import { useMilestoneStore } from '@/stores/milestone'
 import { useFamilyStore } from '@/stores/family'
@@ -297,6 +299,11 @@ async function handleSubmit() {
   font-weight: 500;
   color: #334155;
   margin-bottom: 8px;
+}
+
+.ms-edit-type-radio {
+  min-height: 28px;
+  align-items: center;
 }
 
 .ms-edit-required {
