@@ -44,6 +44,7 @@ import { FamilyMember } from './common/entities/family-member.entity';
 import { FamilyInviteCode } from './common/entities/family-invite-code.entity';
 import { FamilyTodo } from './common/entities/family-todo.entity';
 import { FamilyAnnouncement } from './common/entities/family-announcement.entity';
+import { FamilyMilestone } from './common/entities/family-milestone.entity';
 import { UserSetting } from './common/entities/user-setting.entity';
 
 const isTest = process.env.NODE_ENV === 'test';
@@ -88,6 +89,7 @@ const isTest = process.env.NODE_ENV === 'test';
               FamilyInviteCode,
               FamilyTodo,
               FamilyAnnouncement,
+              FamilyMilestone,
               UserSetting
             ],
             synchronize: true
@@ -123,6 +125,7 @@ const isTest = process.env.NODE_ENV === 'test';
               FamilyInviteCode,
               FamilyTodo,
               FamilyAnnouncement,
+              FamilyMilestone,
               UserSetting
             ],
             synchronize: process.env.DB_SYNC === 'true'

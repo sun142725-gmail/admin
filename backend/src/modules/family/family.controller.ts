@@ -15,6 +15,10 @@ import { CreateTodoDto } from './dto/create-todo.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto';
 import { PageDto } from './dto/page.dto';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
+import { CreateMilestoneDto } from './dto/create-milestone.dto';
+import { UpdateMilestoneDto } from './dto/update-milestone.dto';
+import { QueryMilestoneDto } from './dto/query-milestone.dto';
+import { ToggleMilestoneCoreDto } from './dto/toggle-milestone-core.dto';
 
 @ApiTags('Family')
 @ApiBearerAuth()
@@ -146,6 +150,51 @@ export class FamilyController {
   @Delete(':familyId/todos/:todoId')
   deleteTodo(@CurrentUser() user: RequestUser, @Param('familyId') familyId: string, @Param('todoId') todoId: string) {
     return this.familyService.deleteTodo(user.id, familyId, todoId);
+  }
+
+  @Get(':familyId/milestones')
+  milestones(@CurrentUser() user: RequestUser, @Param('familyId') familyId: string, @Query() query: QueryMilestoneDto) {
+    return this.familyService.listMilestones(user.id, familyId, query);
+  }
+
+  @Get(':familyId/milestones/summary')
+  milestoneSummary(@CurrentUser() user: RequestUser, @Param('familyId') familyId: string, @Query('type') type: 'personal' | 'family') {
+    return this.familyService.milestoneSummary(user.id, familyId, type);
+  }
+
+  @Get(':familyId/milestones/:milestoneId')
+  milestoneDetail(@CurrentUser() user: RequestUser, @Param('familyId') familyId: string, @Param('milestoneId') milestoneId: string) {
+    return this.familyService.milestoneDetail(user.id, familyId, milestoneId);
+  }
+
+  @Post(':familyId/milestones')
+  createMilestone(@CurrentUser() user: RequestUser, @Param('familyId') familyId: string, @Body() dto: CreateMilestoneDto) {
+    return this.familyService.createMilestone(user.id, familyId, dto);
+  }
+
+  @Put(':familyId/milestones/:milestoneId')
+  updateMilestone(
+    @CurrentUser() user: RequestUser,
+    @Param('familyId') familyId: string,
+    @Param('milestoneId') milestoneId: string,
+    @Body() dto: UpdateMilestoneDto
+  ) {
+    return this.familyService.updateMilestone(user.id, familyId, milestoneId, dto);
+  }
+
+  @Patch(':familyId/milestones/:milestoneId/core')
+  toggleMilestoneCore(
+    @CurrentUser() user: RequestUser,
+    @Param('familyId') familyId: string,
+    @Param('milestoneId') milestoneId: string,
+    @Body() dto: ToggleMilestoneCoreDto
+  ) {
+    return this.familyService.toggleMilestoneCore(user.id, familyId, milestoneId, dto.isCore);
+  }
+
+  @Delete(':familyId/milestones/:milestoneId')
+  deleteMilestone(@CurrentUser() user: RequestUser, @Param('familyId') familyId: string, @Param('milestoneId') milestoneId: string) {
+    return this.familyService.deleteMilestone(user.id, familyId, milestoneId);
   }
 
   @Get(':familyId/announcements')

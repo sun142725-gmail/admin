@@ -20,6 +20,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest();
     const traceId = ensureTraceId(request, response);
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let code = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = '服务器错误';
     let data: unknown = null;
 
@@ -28,11 +29,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       if (status === HttpStatus.BAD_REQUEST) {
         status = HttpStatus.UNPROCESSABLE_ENTITY;
       }
+      code = status;
       const errorResponse = exception.getResponse();
       if (typeof errorResponse === 'string') {
         message = errorResponse;
       } else if (typeof errorResponse === 'object' && errorResponse) {
-        const payload = errorResponse as { message?: string | string[] };
+        const payload = errorResponse as { code?: number; message?: string | string[] };
+        if (typeof payload.code === 'number') {
+          code = payload.code;
+        }
         if (Array.isArray(payload.message)) {
           message = payload.message.join('; ');
         } else if (payload.message) {
@@ -58,7 +63,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     response.status(status).json({
-      code: status,
+      code,
       message,
       data,
       timestamp: new Date().toISOString(),

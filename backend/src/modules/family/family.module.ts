@@ -6,6 +6,7 @@ import { FamilyMember } from '../../common/entities/family-member.entity';
 import { FamilyInviteCode } from '../../common/entities/family-invite-code.entity';
 import { FamilyTodo } from '../../common/entities/family-todo.entity';
 import { FamilyAnnouncement } from '../../common/entities/family-announcement.entity';
+import { FamilyMilestone } from '../../common/entities/family-milestone.entity';
 import { User } from '../../common/entities/user.entity';
 import { UserSetting } from '../../common/entities/user-setting.entity';
 import { UserIdentifier } from '../../common/entities/user-identifier.entity';
@@ -21,6 +22,7 @@ import { FamilyService } from './family.service';
       FamilyInviteCode,
       FamilyTodo,
       FamilyAnnouncement,
+      FamilyMilestone,
       User,
       UserSetting,
       UserIdentifier

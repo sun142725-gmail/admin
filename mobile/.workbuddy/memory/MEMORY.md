@@ -35,6 +35,30 @@ Vue 3 + Vant 4 + Pinia + TailwindCSS + Vite
 - Composable：src/packages/has-web/composables/useCountdown.js
 - 样式：src/packages/has-web/styles/index.css
 
+## shared/components 目录 Vant 组件使用规则（重要）
+
+**实测结论：Vant 4 RadioGroup 通过 `useChildren(RADIO_KEY)` + Radio `useParent(RADIO_KEY)` 基于 provide/inject 通信。在 shared/ 目录下的封装组件内使用 `van-radio-group` + `van-radio` 时，render 函数编译产物中 Radio 子节点未正确建立 provide/inject 链路，导致 radio 子项不渲染（但模板有占位，HTML 看不到）。**
+
+**最终方案：BaseRadio 不依赖 Vant Radio 组件，纯 HTML + CSS 实现**。这样既绕开 Vant 通信链路问题，也避免了 shared/ 目录与 VantResolver 的兼容性陷阱。
+
+```vue
+<!-- shared/components/BaseRadio.vue -->
+<template>
+  <label class="base-radio__item">
+    <span class="base-radio__circle">
+      <span v-if="checked" class="base-radio__dot"></span>
+    </span>
+    <input type="radio" :value="opt.value" :checked="model === opt.value"
+           :disabled="disabled" @change="model = opt.value" />
+    <span class="base-radio__label">{{ opt.label }}</span>
+  </label>
+</template>
+```
+
+Props：`modelValue` / `options`（简单数组或对象数组）/ `direction`（horizontal/vertical）/ `disabled` / `theme`（primary/warning/success/danger）。
+
+应用目录（`src/packages/*/components/`）下的组件仍可继续用 Vant 组件的 kebab-case 标签，VantResolver 会处理 JS + CSS 自动导入。
+
 ## 接口约定
 - 统一响应：{ code, message, data }
 - 认证：Authorization: Bearer <accessToken>

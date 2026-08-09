@@ -26,6 +26,7 @@
 | 202607191152 | mobile_docs | Feature | ✅Completed | 2026-07/202607191152_mobile_docs/ |
 | 202607191215 | mobile_has_web | Feature | ✅Completed | 2026-07/202607191215_mobile_has_web/ |
 | 202608052351 | family_backend | Feature | ✅Completed | 2026-08/202608052351_family_backend/ |
+| 202608081814 | family_milestone_api | Feature | ✅Completed | 2026-08/202608081814_family_milestone_api/ |
 
 ---
 
@@ -60,3 +61,4 @@
 ### 2026-08
 
 - [202608052351_family_backend](2026-08/202608052351_family_backend/) - 家庭协作后端模块
+- [202608081814_family_milestone_api](2026-08/202608081814_family_milestone_api/) - 家庭大事纪服务端接口

@@ -6,6 +6,7 @@ import { FamilyMember } from './family-member.entity';
 import { FamilyInviteCode } from './family-invite-code.entity';
 import { FamilyTodo } from './family-todo.entity';
 import { FamilyAnnouncement } from './family-announcement.entity';
+import { FamilyMilestone } from './family-milestone.entity';
 
 @Entity('families')
 export class Family extends BaseEntity {
@@ -33,4 +34,7 @@ export class Family extends BaseEntity {
 
   @OneToMany(() => FamilyAnnouncement, (announcement) => announcement.family)
   announcements!: FamilyAnnouncement[];
+
+  @OneToMany(() => FamilyMilestone, (milestone) => milestone.family)
+  milestones!: FamilyMilestone[];
 }

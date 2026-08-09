@@ -1,12 +1,13 @@
 // 家庭服务实现家庭、成员、待办、公告和移动端用户设置的业务逻辑。
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Family } from '../../common/entities/family.entity';
 import { FamilyMember } from '../../common/entities/family-member.entity';
 import { FamilyInviteCode } from '../../common/entities/family-invite-code.entity';
 import { FamilyTodo } from '../../common/entities/family-todo.entity';
 import { FamilyAnnouncement } from '../../common/entities/family-announcement.entity';
+import { FamilyMilestone } from '../../common/entities/family-milestone.entity';
 import { User } from '../../common/entities/user.entity';
 import { UserSetting } from '../../common/entities/user-setting.entity';
 import { UserIdentifier } from '../../common/entities/user-identifier.entity';
@@ -16,6 +17,9 @@ import { CreateTodoDto } from './dto/create-todo.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto';
 import { QueryTodoDto } from './dto/query-todo.dto';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
+import { CreateMilestoneDto } from './dto/create-milestone.dto';
+import { UpdateMilestoneDto } from './dto/update-milestone.dto';
+import { QueryMilestoneDto } from './dto/query-milestone.dto';
 import { PageDto } from './dto/page.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 
@@ -30,6 +34,7 @@ export class FamilyService {
     @InjectRepository(FamilyInviteCode) private readonly inviteRepo: Repository<FamilyInviteCode>,
     @InjectRepository(FamilyTodo) private readonly todoRepo: Repository<FamilyTodo>,
     @InjectRepository(FamilyAnnouncement) private readonly announcementRepo: Repository<FamilyAnnouncement>,
+    @InjectRepository(FamilyMilestone) private readonly milestoneRepo: Repository<FamilyMilestone>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(UserSetting) private readonly settingRepo: Repository<UserSetting>,
     @InjectRepository(UserIdentifier) private readonly identifierRepo: Repository<UserIdentifier>
@@ -49,6 +54,10 @@ export class FamilyService {
 
   private memberNickname(user?: User | null) {
     return (user?.nickname || user?.username || '家庭成员').trim().slice(0, 20);
+  }
+
+  private async syncMemberNickname(userId: number, user: User) {
+    await this.memberRepo.update({ userId }, { nickname: this.memberNickname(user) });
   }
 
   private async getSetting(userId: number) {
@@ -133,6 +142,82 @@ export class FamilyService {
       publishedAt: announcement.publishedAt,
       createdAt: announcement.createdAt
     };
+  }
+
+  private formatMilestone(milestone: FamilyMilestone) {
+    return {
+      id: String(milestone.id),
+      familyId: String(milestone.familyId),
+      type: milestone.type,
+      title: milestone.title,
+      happenDate: milestone.happenDate,
+      desc: milestone.desc,
+      isCore: milestone.isCore,
+      creatorId: String(milestone.creatorId),
+      creatorName: milestone.creatorName,
+      relatedMemberIds: (milestone.relatedMemberIds ?? []).map((id) => String(id)),
+      imageList: milestone.imageList ?? [],
+      createdAt: milestone.createdAt,
+      updatedAt: milestone.updatedAt
+    };
+  }
+
+  private validateMilestoneDate(happenDate: string) {
+    const match = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(happenDate);
+    if (!match) {
+      throw new BadRequestException('发生时间格式应为 YYYY-MM 或 YYYY-MM-DD');
+    }
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = match[3] ? Number(match[3]) : 1;
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (month < 1 || month > 12 || parsed.getUTCFullYear() !== year || parsed.getUTCMonth() + 1 !== month || parsed.getUTCDate() !== day) {
+      throw new BadRequestException('发生时间无效');
+    }
+    const comparableDate = match[3] ? happenDate : `${happenDate}-01`;
+    const today = new Date().toISOString().slice(0, 10);
+    if (comparableDate > today) {
+      throw new BadRequestException('发生时间不能晚于今天');
+    }
+  }
+
+  private async ensureMilestoneRelatedMembers(familyId: number, relatedMemberIds: number[]) {
+    if (!relatedMemberIds.length) {
+      return;
+    }
+    const uniqueIds = Array.from(new Set(relatedMemberIds));
+    const count = await this.memberRepo.count({ where: { familyId, userId: In(uniqueIds) } });
+    if (count !== uniqueIds.length) {
+      throw new BadRequestException('关联成员必须属于当前家庭');
+    }
+  }
+
+  private async requireMilestone(familyId: number, milestoneIdRaw: string) {
+    const milestone = await this.milestoneRepo.findOne({ where: { id: this.toId(milestoneIdRaw), familyId } });
+    if (!milestone) {
+      throw new NotFoundException('大事纪不存在');
+    }
+    return milestone;
+  }
+
+  private assertMilestoneEditable(milestone: FamilyMilestone, userId: number, role: 'owner' | 'member') {
+    const isCreator = milestone.creatorId === userId;
+    const isOwner = role === 'owner';
+    if (milestone.type === 'personal' && !isCreator) {
+      throw new ForbiddenException({ code: 40303, message: '无权编辑/删除他人个人事件' });
+    }
+    if (milestone.type === 'family' && !isCreator && !isOwner) {
+      throw new ForbiddenException({ code: 40301, message: '无权编辑/删除该家庭事件' });
+    }
+  }
+
+  private assertMilestoneCoreEditable(milestone: FamilyMilestone, userId: number, role: 'owner' | 'member') {
+    if (milestone.type === 'personal' && milestone.creatorId !== userId) {
+      throw new ForbiddenException({ code: 40302, message: '个人事件核心标记仅本人可修改' });
+    }
+    if (milestone.type === 'family' && role !== 'owner') {
+      throw new ForbiddenException({ code: 40302, message: '家庭事件核心标记仅房主可修改' });
+    }
   }
 
   async createFamily(userId: number, dto: CreateFamilyDto) {
@@ -413,6 +498,141 @@ export class FamilyService {
     return { success: true };
   }
 
+  async listMilestones(userId: number, familyIdRaw: string, query: QueryMilestoneDto) {
+    const familyId = this.toId(familyIdRaw);
+    await this.requireMember(familyId, userId);
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 50;
+    const qb = this.milestoneRepo
+      .createQueryBuilder('milestone')
+      .where('milestone.familyId = :familyId', { familyId })
+      .andWhere('milestone.type = :type', { type: query.type })
+      .orderBy('milestone.happenDate', 'DESC')
+      .addOrderBy('milestone.id', 'DESC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize);
+    if (query.isCore !== undefined) {
+      qb.andWhere('milestone.isCore = :isCore', { isCore: query.isCore });
+    }
+    const [list, total] = await qb.getManyAndCount();
+    return { list: list.map((milestone) => this.formatMilestone(milestone)), total, page, pageSize };
+  }
+
+  async milestoneSummary(userId: number, familyIdRaw: string, type: 'personal' | 'family') {
+    const familyId = this.toId(familyIdRaw);
+    await this.requireMember(familyId, userId);
+    if (type !== 'personal' && type !== 'family') {
+      throw new BadRequestException('type 参数错误');
+    }
+    const list = await this.milestoneRepo.find({
+      where: { familyId, type, isCore: true },
+      order: { happenDate: 'ASC', id: 'ASC' }
+    });
+    return {
+      type,
+      title: type === 'personal' ? '个人纪事碑文' : '家庭纪事碑文',
+      list: list.map((milestone) => ({
+        id: String(milestone.id),
+        happenDate: milestone.happenDate,
+        title: milestone.title,
+        desc: milestone.desc
+      }))
+    };
+  }
+
+  async milestoneDetail(userId: number, familyIdRaw: string, milestoneId: string) {
+    const familyId = this.toId(familyIdRaw);
+    await this.requireMember(familyId, userId);
+    return this.formatMilestone(await this.requireMilestone(familyId, milestoneId));
+  }
+
+  async createMilestone(userId: number, familyIdRaw: string, dto: CreateMilestoneDto) {
+    const familyId = this.toId(familyIdRaw);
+    const member = await this.requireMember(familyId, userId);
+    const title = dto.title.trim();
+    if (!title) {
+      throw new BadRequestException('事件标题不能为空');
+    }
+    this.validateMilestoneDate(dto.happenDate);
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+    if (dto.isCore && dto.type === 'family' && member.role !== 'owner') {
+      throw new ForbiddenException({ code: 40302, message: '家庭事件核心标记仅房主可操作' });
+    }
+    const relatedMemberIds = dto.type === 'personal' ? [userId] : dto.relatedMemberIds?.length ? dto.relatedMemberIds : [userId];
+    await this.ensureMilestoneRelatedMembers(familyId, relatedMemberIds);
+    const milestone = await this.milestoneRepo.save(
+      this.milestoneRepo.create({
+        familyId,
+        type: dto.type,
+        title,
+        happenDate: dto.happenDate,
+        desc: dto.desc ?? '',
+        isCore: dto.isCore ?? false,
+        creatorId: userId,
+        creatorName: this.userName(user).trim().slice(0, 50) || '家庭成员',
+        relatedMemberIds,
+        imageList: dto.imageList ?? []
+      })
+    );
+    return this.formatMilestone(await this.requireMilestone(familyId, String(milestone.id)));
+  }
+
+  async updateMilestone(userId: number, familyIdRaw: string, milestoneId: string, dto: UpdateMilestoneDto) {
+    const familyId = this.toId(familyIdRaw);
+    const member = await this.requireMember(familyId, userId);
+    const milestone = await this.requireMilestone(familyId, milestoneId);
+    this.assertMilestoneEditable(milestone, userId, member.role);
+    if (dto.title !== undefined) {
+      const title = dto.title.trim();
+      if (!title) {
+        throw new BadRequestException('事件标题不能为空');
+      }
+      milestone.title = title;
+    }
+    if (dto.happenDate !== undefined) {
+      this.validateMilestoneDate(dto.happenDate);
+      milestone.happenDate = dto.happenDate;
+    }
+    if (dto.desc !== undefined) {
+      milestone.desc = dto.desc;
+    }
+    if (dto.isCore !== undefined && dto.isCore !== milestone.isCore) {
+      this.assertMilestoneCoreEditable(milestone, userId, member.role);
+      milestone.isCore = dto.isCore;
+    }
+    if (dto.relatedMemberIds !== undefined) {
+      milestone.relatedMemberIds = milestone.type === 'personal' ? [milestone.creatorId] : dto.relatedMemberIds;
+      await this.ensureMilestoneRelatedMembers(familyId, milestone.relatedMemberIds);
+    }
+    if (dto.imageList !== undefined) {
+      milestone.imageList = dto.imageList;
+    }
+    await this.milestoneRepo.save(milestone);
+    return this.formatMilestone(await this.requireMilestone(familyId, milestoneId));
+  }
+
+  async toggleMilestoneCore(userId: number, familyIdRaw: string, milestoneId: string, isCore: boolean) {
+    const familyId = this.toId(familyIdRaw);
+    const member = await this.requireMember(familyId, userId);
+    const milestone = await this.requireMilestone(familyId, milestoneId);
+    this.assertMilestoneCoreEditable(milestone, userId, member.role);
+    milestone.isCore = isCore;
+    await this.milestoneRepo.save(milestone);
+    return { id: String(milestone.id), isCore: milestone.isCore, updatedAt: milestone.updatedAt };
+  }
+
+  async deleteMilestone(userId: number, familyIdRaw: string, milestoneId: string) {
+    const familyId = this.toId(familyIdRaw);
+    const member = await this.requireMember(familyId, userId);
+    const milestone = await this.requireMilestone(familyId, milestoneId);
+    this.assertMilestoneEditable(milestone, userId, member.role);
+    await this.milestoneRepo.delete({ id: milestone.id });
+    return { success: true };
+  }
+
   async listAnnouncements(userId: number, familyIdRaw: string, query: PageDto) {
     const familyId = this.toId(familyIdRaw);
     await this.requireMember(familyId, userId);
@@ -507,6 +727,9 @@ export class FamilyService {
     }
     Object.assign(user, dto);
     await this.userRepo.save(user);
+    if (dto.nickname !== undefined) {
+      await this.syncMemberNickname(userId, user);
+    }
     return this.profile(userId);
   }
 

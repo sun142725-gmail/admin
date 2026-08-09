@@ -157,6 +157,29 @@
 #### POST /api/profile/avatar
 **说明:** 上传头像。
 
+### Family
+
+#### GET /api/family/:familyId/milestones
+**说明:** 查询家庭大事纪列表，支持 `type=personal|family`、`isCore` 与分页，家庭成员可访问。
+
+#### GET /api/family/:familyId/milestones/summary
+**说明:** 查询核心高光事件碑文汇总，支持 `type=personal|family`，按发生时间正序返回精简字段。
+
+#### GET /api/family/:familyId/milestones/:milestoneId
+**说明:** 查询大事纪详情，家庭成员可访问。
+
+#### POST /api/family/:familyId/milestones
+**说明:** 创建大事纪，创建人从 JWT 获取；个人事件自动关联本人，家庭事件关联成员必须属于当前家庭。
+
+#### PUT /api/family/:familyId/milestones/:milestoneId
+**说明:** 更新大事纪；个人事件仅创建人可编辑，家庭事件允许创建人或房主编辑。
+
+#### PATCH /api/family/:familyId/milestones/:milestoneId/core
+**说明:** 切换核心高光标记；个人事件仅创建人可切换，家庭事件仅房主可切换。
+
+#### DELETE /api/family/:familyId/milestones/:milestoneId
+**说明:** 删除大事纪；个人事件仅创建人可删除，家庭事件允许创建人或房主删除。
+
 ### Files
 
 #### POST /api/files/upload

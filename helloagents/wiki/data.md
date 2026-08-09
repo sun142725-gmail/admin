@@ -304,9 +304,34 @@
 | created_at | datetime |  | 创建时间 |
 | updated_at | datetime |  | 更新时间 |
 
+### family_milestones
+**说明:** 家庭大事纪事件，支持个人/家庭事件、核心标记与碑文汇总。
+
+| 字段 | 类型 | 约束 | 描述 |
+|------|------|------|------|
+| id | bigint | PK | 大事纪主键 |
+| family_id | bigint | Index | 所属家庭 ID |
+| type | varchar | Index | personal/family |
+| title | varchar | Not Null | 事件标题 |
+| happen_date | varchar | Index | 发生时间，YYYY-MM 或 YYYY-MM-DD |
+| desc | varchar |  | 事件详情 |
+| is_core | boolean | Index | 是否核心高光事件 |
+| creator_id | bigint | Index | 创建人用户 ID |
+| creator_name | varchar | Not Null | 创建人名称冗余 |
+| related_member_ids | json | Not Null | 关联家庭成员用户 ID 数组 |
+| image_list | json | Not Null | 配图 URL 数组 |
+| created_at | datetime |  | 创建时间 |
+| updated_at | datetime |  | 更新时间 |
+
+**索引:**
+- idx_milestone_list: family_id, type, happen_date
+- idx_milestone_summary: family_id, type, is_core, happen_date
+- idx_milestone_creator: creator_id
+
 ---
 
 ## 关系
 - users ↔ roles: 多对多（user_roles）
 - roles ↔ permissions: 多对多（role_permissions）
 - resources 可绑定 permission_code 用于菜单与按钮控制
+- families → family_milestones: 一对多

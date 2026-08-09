@@ -1,11 +1,13 @@
 <!--
  * BaseDatePicker 日期选择器
- * 用途：封装 Vant DatePicker + Popup，支持年月日 / 仅年月两种精度，
- *       统一项目中所有日期选择交互。放入 shared/components/ 即自动全局注册为 <base-date-picker />。
+ * 用途：封装 Vant DatePicker + Popup，支持年月日 / 仅年月两种精度。
+ *       使用 Vant 4 内置工具栏（showToolbar），不重复渲染 toolbar。
+ *       放入 shared/components/ 即自动全局注册为 <base-date-picker />。
  * 依赖：vant（van-popup / van-date-picker / van-icon）
  -->
 <template>
   <div class="base-date-picker">
+    <!-- 触发器 -->
     <div
       class="base-date-picker__trigger"
       :class="{ 'is-placeholder': !displayValue }"
@@ -15,29 +17,28 @@
       <van-icon name="arrow-down" size="14" color="#c0c4cc" />
     </div>
 
+    <!-- 日期选择弹窗 -->
     <van-popup
       v-model:show="popupVisible"
       round
       position="bottom"
       teleport="body"
     >
-      <div class="base-date-picker__toolbar">
-        <span class="base-date-picker__cancel" @click="popupVisible = false">取消</span>
-        <span class="base-date-picker__title">{{ toolbarTitle }}</span>
-        <span class="base-date-picker__confirm" @click="onConfirm">确认</span>
-      </div>
       <van-date-picker
         v-model="pickerValue"
         :columns-type="columnsType"
         :min-date="minDate"
         :max-date="maxDate"
+        :title="toolbarTitle"
+        @confirm="onConfirm"
+        @cancel="onCancel"
       />
     </van-popup>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 
 const props = defineProps({
   /** 绑定值，YYYY-MM-DD 或 YYYY-MM */
@@ -70,12 +71,16 @@ const toolbarTitle = computed(() => {
 
 const displayValue = computed(() => {
   if (!props.modelValue) return ''
-  return props.modelValue.replaceAll('-', '/')
+  return props.modelValue.replaceAll('-', ' / ')
 })
 
-// 弹窗打开时同步当前值到 picker
-watch(popupVisible, (visible) => {
+/**
+ * 弹窗打开时同步当前值到 picker
+ * 使用 nextTick 确保 picker 已渲染
+ */
+watch(popupVisible, async (visible) => {
   if (!visible) return
+  await nextTick()
   if (props.modelValue) {
     pickerValue.value = props.modelValue.split('-')
   } else {
@@ -92,8 +97,12 @@ function openPicker() {
   popupVisible.value = true
 }
 
-function onConfirm() {
-  const values = pickerValue.value
+/**
+ * 确认回调 —— 由 van-date-picker 内置工具栏触发
+ * @param {{ selectedValues: string[] }} param
+ */
+function onConfirm({ selectedValues }) {
+  const values = selectedValues || pickerValue.value
   let result
   if (props.precision === 'month') {
     result = values.slice(0, 2).join('-')
@@ -102,6 +111,10 @@ function onConfirm() {
   }
   emit('update:modelValue', result)
   emit('change', result)
+  popupVisible.value = false
+}
+
+function onCancel() {
   popupVisible.value = false
 }
 </script>
@@ -116,6 +129,7 @@ function onConfirm() {
   border-radius: 8px;
   cursor: pointer;
   min-height: 36px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .base-date-picker__trigger:active {
@@ -129,32 +143,5 @@ function onConfirm() {
 
 .base-date-picker__trigger.is-placeholder .base-date-picker__value {
   color: #c0c4cc;
-}
-
-.base-date-picker__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.base-date-picker__cancel {
-  font-size: 14px;
-  color: #64748b;
-  cursor: pointer;
-}
-
-.base-date-picker__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.base-date-picker__confirm {
-  font-size: 14px;
-  color: #0ea5e9;
-  font-weight: 500;
-  cursor: pointer;
 }
 </style>

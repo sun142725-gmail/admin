@@ -38,6 +38,7 @@
 | Files | 公共文件上传 | 🚧In Development | [files](modules/files.md) |
 | Dict | 字典管理 | ✅Stable | [dict](modules/dict.md) |
 | Notification | 通知管理（模板/发布记录） | 🚧In Development | [notification](modules/notification.md) |
+| Family | 移动端家庭协作与家庭大事纪 | ✅Stable | [family](modules/family.md) |
 
 ---
 

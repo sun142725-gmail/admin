@@ -1,20 +1,23 @@
 <template>
-  <self-drawer
+  <base-modal
     v-model="visible"
-    direction="bottom"
     :title="mode === 'create' ? '记录大事纪' : '编辑大事纪'"
+    position="bottom"
+    :round="true"
     :closeable="true"
-    :mask-closable="true"
+    :close-on-click-overlay="true"
+    :show-footer="false"
     max-height="85vh"
   >
     <div class="ms-edit-form">
       <!-- 事件归属 -->
       <div class="ms-edit-field">
         <label class="ms-edit-label">事件归属 <span class="ms-edit-required">*</span></label>
-        <van-radio-group v-model="form.type" direction="horizontal" :disabled="mode === 'edit'">
-          <van-radio name="personal">个人大事纪</van-radio>
-          <van-radio name="family">家庭大事纪</van-radio>
-        </van-radio-group>
+        <base-radio
+          v-model="form.type"
+          :options="typeOptions"
+          :disabled="mode === 'edit'"
+        />
       </div>
 
       <!-- 发生时间 -->
@@ -96,16 +99,15 @@
           active-color="#f59e0b"
         />
       </div>
-    </div>
 
-    <template #footer>
-      <div class="ms-edit-footer">
+      <!-- 保存按钮 -->
+      <div class="ms-edit-submit">
         <base-button block round type="primary" :loading="submitting" @click="handleSubmit">
           保存
         </base-button>
       </div>
-    </template>
-  </self-drawer>
+    </div>
+  </base-modal>
 </template>
 
 <script setup>
@@ -144,6 +146,11 @@ const form = ref({
 })
 
 const maxDate = new Date()
+
+const typeOptions = [
+  { label: '个人大事纪', value: 'personal' },
+  { label: '家庭大事纪', value: 'family' }
+]
 
 const visible = computed({
   get: () => props.show,
@@ -190,8 +197,8 @@ const uploadFn = async (file) => {
 // 初始化表单
 watch(
   () => props.show,
-  (visible) => {
-    if (!visible) return
+  (show) => {
+    if (!show) return
     if (props.mode === 'edit' && props.milestone) {
       form.value = {
         type: props.milestone.type,
@@ -219,7 +226,7 @@ watch(
   { immediate: true }
 )
 
-// 切换日期精度时清空不兼容的值
+// 切换日期精度时兼容已有值
 watch(dateMode, (mode) => {
   if (!form.value.happenDate) return
   if (mode === 'month' && form.value.happenDate.length === 10) {
@@ -341,10 +348,6 @@ async function handleSubmit() {
   border-radius: 8px;
 }
 
-.ms-edit :deep(.van-radio-group) {
-  gap: 16px;
-}
-
 .ms-edit-core {
   display: flex;
   align-items: center;
@@ -374,8 +377,8 @@ async function handleSubmit() {
   color: #94a3b8;
 }
 
-.ms-edit-footer {
-  padding: 8px 16px;
+.ms-edit-submit {
+  padding: 8px 0;
   padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
 }
 </style>

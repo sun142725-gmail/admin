@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../../common/entities/user.entity';
+import { FamilyMember } from '../../common/entities/family-member.entity';
 import { AuditService } from '../audit/audit.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
@@ -13,8 +14,14 @@ export class ProfileService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(FamilyMember)
+    private readonly memberRepo: Repository<FamilyMember>,
     private readonly auditService: AuditService
   ) {}
+
+  private normalizeMemberNickname(user: User) {
+    return (user.nickname || user.username || '家庭成员').trim().slice(0, 20);
+  }
 
   async getProfile(userId: number) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -31,6 +38,9 @@ export class ProfileService {
     }
     Object.assign(user, dto);
     const saved = await this.userRepo.save(user);
+    if (dto.nickname !== undefined) {
+      await this.memberRepo.update({ userId }, { nickname: this.normalizeMemberNickname(saved) });
+    }
     await this.auditService.log('update_profile', 'profile', `更新资料 ${user.username}`, userId);
     return this.format(saved);
   }
