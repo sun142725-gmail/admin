@@ -40,10 +40,10 @@
         <div class="edit-form-row">
           <span class="edit-form-label">邮箱</span>
           <input
-            v-model.trim="form.email"
+            :value="form.email"
             class="edit-form-input"
             type="email"
-            placeholder="请输入邮箱"
+            readonly
           />
         </div>
         <div class="edit-form-row">
@@ -100,13 +100,11 @@ async function onSave() {
   try {
     await updateProfile({
       nickname: form.nickname,
-      email: form.email,
       avatarUrl: form.avatarUrl
     })
     // 同步更新 authStore.profile
     if (authStore.profile) {
       authStore.profile.nickname = form.nickname
-      authStore.profile.email = form.email
       authStore.profile.avatarUrl = form.avatarUrl
     }
     showToast('资料已保存')

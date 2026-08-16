@@ -152,13 +152,13 @@ const minDate = new Date()
 
 const memberColumns = computed(() => {
   return familyStore.members.map((m) => ({
-    text: m.nickname,
-    value: m.userId
+    text: m.nickname || '未设置昵称',
+    value: Number(m.userId)
   }))
 })
 
 const assigneeLabel = computed(() => {
-  const m = familyStore.members.find((m) => m.userId === createForm.value.assigneeId)
+  const m = familyStore.members.find((m) => Number(m.userId) === createForm.value.assigneeId)
   return m?.nickname || ''
 })
 
@@ -181,7 +181,7 @@ async function handleToggle(todo) {
 }
 
 function onPickerConfirm({ selectedValues }) {
-  createForm.value.assigneeId = selectedValues[0]
+  createForm.value.assigneeId = Number(selectedValues[0])
   showPicker.value = false
 }
 

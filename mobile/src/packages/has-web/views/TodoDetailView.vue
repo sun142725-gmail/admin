@@ -122,18 +122,18 @@ const todo = computed(() => todoStore.currentTodo)
 
 const memberColumns = computed(() => {
   return familyStore.members.map((m) => ({
-    text: m.nickname,
-    value: m.userId
+    text: m.nickname || '未设置昵称',
+    value: Number(m.userId)
   }))
 })
 
 const assigneeLabel = computed(() => {
-  const m = familyStore.members.find((m) => m.userId === editForm.assigneeId)
+  const m = familyStore.members.find((m) => Number(m.userId) === editForm.assigneeId)
   return m?.nickname || ''
 })
 
 function onPickerConfirm({ selectedValues }) {
-  editForm.assigneeId = selectedValues[0]
+  editForm.assigneeId = Number(selectedValues[0])
   showPicker.value = false
 }
 
@@ -179,7 +179,7 @@ onMounted(async () => {
   await todoStore.loadTodoDetail(route.params.id)
   if (todo.value) {
     editForm.title = todo.value.title
-    editForm.assigneeId = todo.value.assigneeId
+    editForm.assigneeId = Number(todo.value.assigneeId)
     editForm.dueDate = todo.value.dueDate
   }
 })

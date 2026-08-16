@@ -15,13 +15,15 @@
 | BaseTag | 标签 |
 | BaseImage | 图片 |
 | BaseCard | 卡片 |
+| BaseRadio | 单选（纯 CSS，不依赖 Vant） |
+| BaseDatePicker | 日期选择器（年月日 / 年月） |
 | BaseScroll | BetterScroll 容器 |
 | BaseSwiper | 轮播 |
 | BaseTabs | 标签页 |
-| SelfForm | 自研表单 |
-| SelfFormItem | 表单项 |
-| SelfDrawer | 抽屉 |
-| SelfUpload | 上传 |
+| SelfForm | 自研表单容器（async-validator 校验） |
+| SelfFormItem | 表单项（标签 / 校验 / 错误提示） |
+| SelfDrawer | 抽屉（四向弹出 + 滚动 + 下拉关闭） |
+| SelfUpload | 图片上传（预览 / 重试 / 数量限制） |
 
 ---
 
@@ -169,60 +171,300 @@
 
 ---
 
-## BaseFormItem 表单项
+## BaseRadio 单选
 
-基于 Vant Field 封装，统一输入框样式。
+纯 CSS+HTML 单选组件，不依赖 Vant Radio，避免 shared 目录下的 Vant 组件渲染问题。
 
 ### Props
 
-| 属性         | 类型              | 默认值     | 说明                  |
-|--------------|-------------------|------------|-----------------------|
-| modelValue   | string / number   | ''         | 绑定值                |
-| label        | string            | ''         | 标签                  |
-| placeholder  | string            | 请输入     | 占位符                |
-| type         | string            | text       | 输入类型              |
-| required     | boolean           | false      | 是否必填              |
-| rules        | array             | []         | 校验规则              |
-| readonly     | boolean           | false      | 只读                  |
-| disabled     | boolean           | false      | 禁用                  |
-| clearable    | boolean           | true       | 是否显示清除按钮      |
-| maxlength    | string / number   | ''         | 最大长度              |
-| rows         | string / number   | 1          | 行数                  |
-| autosize     | boolean / object  | false      | 自适应高度            |
-| labelAlign   | string            | left       | 标签对齐              |
-| inputAlign   | string            | right      | 输入框对齐            |
+| 属性        | 类型                                  | 默认值      | 说明                                          |
+|-------------|---------------------------------------|-------------|-----------------------------------------------|
+| modelValue  | string / number / boolean             | ''          | v-model 绑定值                                |
+| options     | array                                 | []          | 选项：`['男', '女']` 或 `[{ label, value, disabled }]` |
+| direction   | string                                | horizontal  | 排列方向：horizontal / vertical               |
+| disabled    | boolean                               | false       | 整组禁用                                      |
+| theme       | string                                | primary     | 颜色主题：primary / success / warning / danger |
 
 ### Events
 
 | 事件                | 说明                     |
 |---------------------|--------------------------|
-| update:modelValue   | 输入事件                 |
-| blur                | 失焦                     |
-| focus               | 聚焦                     |
-
-### Slots
-
-| 插槽名    | 说明                       |
-|-----------|----------------------------|
-| leftIcon  | 左侧图标                   |
-| rightIcon | 右侧图标                   |
-| button    | 输入框尾部按钮             |
+| update:modelValue   | 选中值变化               |
+| change              | 选中值变化，参数为选中值 |
 
 ### 示例
 
 ```vue
-<base-form-item
-  v-model="form.name"
-  label="用户名"
-  placeholder="请输入用户名"
-  :rules="[{ required: true, message: '请填写用户名' }]"
-/>
+<base-radio v-model="form.gender" :options="['男', '女']" />
 
-<base-form-item v-model="form.phone" label="手机号" type="tel">
-  <template #button>
-    <base-button size="small">发送验证码</base-button>
+<base-radio
+  v-model="form.type"
+  :options="[
+    { label: '日常', value: 'daily' },
+    { label: '纪念', value: 'anniversary', disabled: true }
+  ]"
+  direction="vertical"
+  theme="success"
+/>
+```
+
+---
+
+## BaseDatePicker 日期选择器
+
+封装 Vant DatePicker + Popup，支持年月日 / 仅年月两种精度。
+
+### Props
+
+| 属性        | 类型    | 默认值         | 说明                              |
+|-------------|---------|----------------|-----------------------------------|
+| modelValue  | string  | ''             | 绑定值，`YYYY-MM-DD` 或 `YYYY-MM` |
+| precision   | string  | day            | 精度：day=年月日 / month=仅年月   |
+| placeholder | string  | 请选择日期     | 占位文案                          |
+| minDate     | Date    | 1970-01-01     | 最小日期                          |
+| maxDate     | Date    | 今天           | 最大日期                          |
+| title       | string  | ''             | 弹窗标题，默认按精度自动          |
+
+### Events
+
+| 事件                | 说明                                   |
+|---------------------|----------------------------------------|
+| update:modelValue   | 确认选择后更新绑定值                   |
+| change              | 确认选择，参数为结果字符串（同上格式） |
+
+### 示例
+
+```vue
+<base-date-picker v-model="form.date" />
+
+<base-date-picker v-model="form.month" precision="month" title="选择月份" />
+```
+
+---
+
+## SelfForm 表单容器
+
+自研移动端表单核心容器，基于 async-validator 统一校验；通过 provide/inject 与 SelfFormItem 通信，支持实时防抖校验与提交校验失败滚动定位。必须与 `SelfFormItem` 配合使用。
+
+### Props
+
+| 属性            | 类型               | 默认值   | 说明                                          |
+|-----------------|--------------------|----------|-----------------------------------------------|
+| modelValue      | object             | —        | 表单数据对象，支持 `:model` / `v-model` 两种写法 |
+| rules           | object             | {}       | 校验规则，key 对应 model 的字段名             |
+| labelPosition   | string             | top      | 标签位置：top 在上 / left 在左                |
+| labelWidth      | string / number    | auto     | 标签宽度（left 模式生效），数字按 px          |
+| requiredMark    | boolean            | true     | 是否显示必填红星                              |
+| disabled        | boolean            | false    | 整表禁用                                      |
+| showErrorMessage | boolean           | true     | 是否展示错误提示                              |
+| scroller        | object             | null     | BaseScroll 实例，校验失败滚动定位；不传用原生 scrollIntoView 兜底 |
+
+规则项支持 `trigger` 字段区分触发时机：`blur` / `change` / `submit`（change 为输入后 300ms 防抖实时校验，submit 校验全部规则）。
+
+### Events
+
+| 事件               | 说明                                   |
+|--------------------|----------------------------------------|
+| submit             | 全量校验通过后触发                     |
+| validate           | 字段校验完成，参数 (prop, valid, message) |
+
+### Methods
+
+| 方法                                   | 说明                                     |
+|----------------------------------------|------------------------------------------|
+| validate()                             | 全量校验，返回 `{ valid, errors }`，失败滚动到首个错误项 |
+| validateField(prop, trigger?)          | 校验单个字段                             |
+| clearValidate(prop?)                   | 清除校验状态，不传则清除全部             |
+| resetFields(prop?)                     | 重置字段为初始值并清除校验               |
+
+### 内置规则 formRules
+
+从 `@shared/components/SelfForm.vue` 具名导入，便于快速拼装 rules：`formRules.required(msg?)`、`formRules.mobile(msg?)`、`formRules.email(msg?)`、`formRules.number(msg?)`、`formRules.length(min, max, msg?)`。
+
+### 示例
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import { formRules } from '@shared/components/SelfForm.vue'
+
+const formRef = ref()
+const form = ref({ name: '', mobile: '' })
+const rules = {
+  name: [formRules.required('请输入姓名')],
+  mobile: [formRules.required('请输入手机号'), formRules.mobile()]
+}
+
+async function onSubmit() {
+  const { valid } = await formRef.value.validate()
+  if (valid) { /* 提交 */ }
+}
+</script>
+
+<template>
+  <self-form ref="formRef" v-model="form" :rules="rules" @submit="onSubmit">
+    <self-form-item label="姓名" prop="name">
+      <input v-model="form.name" class="input" />
+    </self-form-item>
+    <self-form-item label="手机号" prop="mobile">
+      <input v-model="form.mobile" type="tel" class="input" />
+    </self-form-item>
+    <base-button block @click="onSubmit">提交</base-button>
+  </self-form>
+</template>
+```
+
+---
+
+## SelfFormItem 表单项
+
+单行表单项包装器，渲染标签 / 必填星 / 控件容器 / 错误提示，承接 SelfForm 上下文完成字段级校验。需放在 `SelfForm` 内使用。
+
+### Props
+
+| 属性          | 类型               | 默认值 | 说明                                        |
+|---------------|--------------------|--------|---------------------------------------------|
+| prop          | string             | —      | 字段名，对应 SelfForm model 的 key          |
+| label         | string             | —      | 标签文本                                    |
+| rules         | array              | —      | 当前项校验规则，优先于 SelfForm.rules[prop] |
+| required      | boolean            | false  | 是否必填（仅控制红星展示，实际校验以 rules 为准） |
+| labelPosition | string             | top    | 标签位置，覆盖 SelfForm 的 labelPosition    |
+| labelWidth    | string / number    | —      | 标签宽度，覆盖 SelfForm 的 labelWidth       |
+| error         | string             | ''     | 外部受控错误文案                            |
+| showError     | boolean            | true   | 是否展示该项错误提示                        |
+
+### Slots
+
+| 插槽名  | 说明                                                    |
+|---------|---------------------------------------------------------|
+| default | 控件内容，作用域参数 `{ blur, change, disabled }`        |
+| label   | 自定义标签，作用域参数 `{ label }`                       |
+
+### Methods
+
+| 方法           | 说明               |
+|----------------|--------------------|
+| validate()     | 校验当前字段       |
+| clearValidate() | 清除校验状态     |
+| resetField()   | 重置为初始值       |
+
+### 示例
+
+```vue
+<self-form-item label="备注" prop="remark" :rules="[{ required: true, message: '请输入备注', trigger: 'blur' }]">
+  <textarea v-model="form.remark" rows="3" class="input"></textarea>
+</self-form-item>
+```
+
+---
+
+## SelfDrawer 抽屉
+
+四向弹出抽屉，内部 BaseScroll 滚动 + nestedScroll 联动 + 下拉关闭手势 + 遮罩点击关闭 + 滚动位置记忆。
+
+### Props
+
+| 属性         | 类型     | 默认值 | 说明                                |
+|-------------|----------|--------|-------------------------------------|
+| modelValue  | boolean  | false  | 是否显示                            |
+| direction   | string   | bottom | 弹出方向：bottom / top / left / right |
+| title       | string   | ''     | 标题                                |
+| closeable   | boolean  | true   | 是否显示右上角关闭按钮              |
+| maskClosable | boolean | true   | 点击遮罩是否关闭                    |
+| maxHeight   | string   | 85vh   | 最大高度（bottom / top 生效）       |
+| maxWidth    | string   | 80%    | 最大宽度（left / right 生效）       |
+| pullDistance | number  | 80     | 底部抽屉下拉关闭触发距离 px         |
+
+### Events
+
+| 事件                | 说明         |
+|---------------------|--------------|
+| update:modelValue   | 显示状态变化 |
+| open                | 打开后触发   |
+| close               | 关闭后触发   |
+
+### Slots
+
+| 插槽名  | 说明     |
+|---------|----------|
+| default | 内容     |
+| header  | 自定义头部 |
+| footer  | 底部     |
+
+### Methods
+
+| 方法         | 说明                     |
+|-------------|--------------------------|
+| open()      | 打开抽屉                 |
+| close()     | 关闭抽屉                 |
+| getScroller() | 获取内部 BaseScroll 实例 |
+
+### 示例
+
+```vue
+<self-drawer v-model="visible" title="编辑资料" direction="bottom">
+  <p>抽屉内容</p>
+  <template #footer>
+    <div class="p-16">
+      <base-button block>保存</base-button>
+    </div>
   </template>
-</base-form-item>
+</self-drawer>
+```
+
+---
+
+## SelfUpload 图片上传
+
+自研移动端图片上传，内置文件格式 / 大小校验、预览、删除、数量限制、loading、失败重试。上传逻辑通过 `uploadFn` 注入（与存储服务解耦），不传 `uploadFn` 时降级为本地 base64 预览。
+
+### Props
+
+| 属性      | 类型                          | 默认值  | 说明                                       |
+|--------------|-------------------------------|---------|--------------------------------------------|
+| modelValue | string / string[]             | []      | 绑定值：单图为 url 字符串，多图为 url 数组 |
+| multiple   | boolean                       | false   | 是否多选                                   |
+| max        | number                        | 1       | 最多上传数量（multiple 生效）              |
+| accept     | string                        | image/* | 接受的文件类型                             |
+| maxSize    | number                        | 5       | 单文件大小上限，单位 MB                    |
+| disabled   | boolean                       | false   | 禁用                                       |
+| deletable  | boolean                       | true    | 是否可删除                                 |
+| uploadFn   | (file: File) => Promise<string> | —    | 上传函数，返回资源 url；不传则本地 base64 预览 |
+
+### Events
+
+| 事件                | 说明                     |
+|---------------------|--------------------------|
+| update:modelValue   | 上传成功 / 删除后更新    |
+| change              | 文件列表变化             |
+| error               | 校验失败，参数为错误信息 |
+
+### Methods
+
+| 方法     | 说明           |
+|----------|----------------|
+| trigger() | 手动触发选择文件 |
+
+### 示例
+
+```vue
+<script setup>
+import { uploadFile } from '@/services/files'
+</script>
+
+<template>
+  <!-- 单图 -->
+  <self-upload v-model="form.avatar" :upload-fn="uploadFile" />
+
+  <!-- 多图，最多 9 张，单张不超过 2MB -->
+  <self-upload
+    v-model="form.images"
+    multiple
+    :max="9"
+    :max-size="2"
+    :upload-fn="uploadFile"
+  />
+</template>
 ```
 
 ---
