@@ -1,6 +1,7 @@
 // 主布局提供菜单、头部与内容容器。
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Layout, Menu, Breadcrumb, Dropdown, Space, message, Avatar } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   AppstoreOutlined,
   BookOutlined,
@@ -12,10 +13,13 @@ import {
   SettingOutlined,
   TeamOutlined,
   UserOutlined,
-  IdcardOutlined
+  IdcardOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined
 } from '@ant-design/icons';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMenuTree } from '../api/resources';
+import type { MenuTreeNode } from '../api/resources';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearTokens, setProfile } from '../store/authSlice';
 import { profile as fetchProfile, logout as apiLogout } from '../api/auth';
@@ -23,13 +27,7 @@ import { enqueueLogEvent } from '../utils/logBatcher';
 
 const { Header, Sider, Content } = Layout;
 
-interface MenuItem {
-  id: number;
-  name: string;
-  path?: string;
-  permissionCode?: string;
-  children?: MenuItem[];
-}
+type MenuItem = MenuTreeNode;
 
 const getMenuIcon = (item: MenuItem) => {
   if (item.path) {
@@ -61,16 +59,23 @@ const getMenuIcon = (item: MenuItem) => {
   return nameIconMap[item.name];
 };
 
-const buildMenuItems = (items: MenuItem[], permissions: string[]) => {
+const buildMenuItems = (
+  items: MenuItem[],
+  permissions: string[],
+  includeChildren = true
+): MenuProps['items'] => {
   return items
     .filter((item) => !item.permissionCode || permissions.includes(item.permissionCode))
     .map((item) => {
-      const childrenItems = item.children?.length
-        ? buildMenuItems(item.children, permissions)
-        : undefined;
+      // 折叠态不渲染子菜单，父级退化为普通项：hover 不弹浮层，点击由 onClick 展开侧边栏。
+      const childrenItems =
+        includeChildren && item.children?.length
+          ? buildMenuItems(item.children, permissions)
+          : undefined;
       return {
         key: item.path ?? String(item.id),
         label: item.path ? <Link to={item.path}>{item.name}</Link> : item.name,
+        title: item.name,
         icon: getMenuIcon(item),
         children: childrenItems?.length ? childrenItems : undefined
       };
@@ -100,61 +105,33 @@ export const MainLayout: React.FC = () => {
   const dispatch = useAppDispatch();
   const profile = useAppSelector((state) => state.auth.profile);
   const permissions = profile?.permissions ?? [];
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem('sider-collapsed') === 'true';
+  });
   const [menuTree, setMenuTree] = useState<MenuItem[]>([]);
   const [openKeys, setOpenKeys] = useState<string[]>([]);
-  const enterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const expandMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearHoverTimers = () => {
-    if (enterTimerRef.current) {
-      clearTimeout(enterTimerRef.current);
-      enterTimerRef.current = null;
-    }
-    if (leaveTimerRef.current) {
-      clearTimeout(leaveTimerRef.current);
-      leaveTimerRef.current = null;
-    }
-    if (expandMenuTimerRef.current) {
-      clearTimeout(expandMenuTimerRef.current);
-      expandMenuTimerRef.current = null;
-    }
-  };
+  const toggleCollapsed = () => setCollapsed((v) => !v);
 
-  const handleSiderMouseEnter = () => {
-    if (leaveTimerRef.current) {
-      clearTimeout(leaveTimerRef.current);
-      leaveTimerRef.current = null;
-    }
-    if (!collapsed) {
-      return;
-    }
-    enterTimerRef.current = setTimeout(() => {
-      setCollapsed(false);
-      enterTimerRef.current = null;
-    }, 180);
-  };
+  useEffect(() => {
+    localStorage.setItem('sider-collapsed', String(collapsed));
+  }, [collapsed]);
 
-  const handleSiderMouseLeave = () => {
-    if (enterTimerRef.current) {
-      clearTimeout(enterTimerRef.current);
-      enterTimerRef.current = null;
-    }
-    leaveTimerRef.current = setTimeout(() => {
-      setCollapsed(true);
-      leaveTimerRef.current = null;
-    }, 560);
-  };
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        setCollapsed((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, []);
 
   useEffect(() => {
     fetchProfile().then((data) => dispatch(setProfile(data)));
     fetchMenuTree().then((data) => setMenuTree(data));
   }, [dispatch]);
-
-  useEffect(() => {
-    return () => clearHoverTimers();
-  }, []);
 
   useEffect(() => {
     const pageCode = PAGE_CODE_MAP[location.pathname];
@@ -172,7 +149,10 @@ export const MainLayout: React.FC = () => {
     });
   }, [location.pathname]);
 
-  const items = useMemo(() => buildMenuItems(menuTree, permissions), [menuTree, permissions]);
+  const items = useMemo(
+    () => buildMenuItems(menuTree, permissions, !collapsed),
+    [menuTree, permissions, collapsed]
+  );
 
   const activeParentKeys = useMemo(() => {
     const findParents = (nodes: MenuItem[], targetPath: string, parents: string[] = []): string[] => {
@@ -195,27 +175,7 @@ export const MainLayout: React.FC = () => {
   }, [location.pathname, menuTree]);
 
   useEffect(() => {
-    if (expandMenuTimerRef.current) {
-      clearTimeout(expandMenuTimerRef.current);
-      expandMenuTimerRef.current = null;
-    }
-
-    if (collapsed) {
-      setOpenKeys([]);
-      return;
-    }
-
-    expandMenuTimerRef.current = setTimeout(() => {
-      setOpenKeys(activeParentKeys);
-      expandMenuTimerRef.current = null;
-    }, 360);
-
-    return () => {
-      if (expandMenuTimerRef.current) {
-        clearTimeout(expandMenuTimerRef.current);
-        expandMenuTimerRef.current = null;
-      }
-    };
+    setOpenKeys(collapsed ? [] : activeParentKeys);
   }, [activeParentKeys, collapsed]);
 
   const breadcrumbMap = useMemo(() => {
@@ -266,23 +226,28 @@ export const MainLayout: React.FC = () => {
     navigate('/profile');
   };
 
-  const baseSiderWidth = 72;
+  const siderWidth = collapsed ? 64 : 240;
 
   return (
     <Layout className={`app-shell ${collapsed ? 'is-collapsed' : 'is-expanded'}`}>
       <Sider
-        width={220}
-        collapsedWidth={72}
+        width={240}
+        collapsedWidth={64}
         collapsed={collapsed}
         theme="light"
-        onMouseEnter={handleSiderMouseEnter}
-        onMouseLeave={handleSiderMouseLeave}
+        trigger={null}
         className="app-sider"
       >
         <div className={`app-brand ${collapsed ? 'is-collapsed' : ''}`}>
           <Link
             to="/"
             className="app-brand-link"
+            onClick={(e) => {
+              if (collapsed) {
+                e.preventDefault();
+                setCollapsed(false);
+              }
+            }}
           >
             <span className="app-brand-mark">
               <AppstoreOutlined />
@@ -300,16 +265,27 @@ export const MainLayout: React.FC = () => {
               setOpenKeys(keys as string[]);
             }
           }}
+          onClick={(info) => {
+            if (collapsed) {
+              info.domEvent.preventDefault();
+              info.domEvent.stopPropagation();
+              setCollapsed(false);
+            }
+          }}
           className="app-menu"
         />
+        <div className="app-sider-trigger" onClick={toggleCollapsed}>
+          {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          {!collapsed && <span className="app-sider-trigger-text">收起菜单</span>}
+        </div>
       </Sider>
       <Layout
         className={`app-main ${collapsed ? 'is-collapsed' : 'is-expanded'}`}
-        style={{ marginLeft: baseSiderWidth }}
+        style={{ marginLeft: siderWidth }}
       >
         <Header
           className="app-header"
-          style={{ left: baseSiderWidth, width: `calc(100vw - ${baseSiderWidth}px)` }}
+          style={{ left: siderWidth, width: `calc(100vw - ${siderWidth}px)` }}
         >
           <div className="app-header-left">
             <div className="app-header-title-row">
