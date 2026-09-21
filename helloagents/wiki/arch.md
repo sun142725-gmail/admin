@@ -42,3 +42,4 @@ sequenceDiagram
 | ADR-006 | 通道适配器可插拔方案 | 2026-02-07 | ✅Adopted | notification | [详情](../history/2026-02/202602072234_notification-module/how.md#adr-001-通道适配器可插拔方案) |
 | ADR-202608081814 | 大事纪接口归属 FamilyModule | 2026-08-08 | ✅Adopted | family | [详情](../history/2026-08/202608081814_family_milestone_api/how.md#adr-202608081814-大事纪接口归属-familymodule) |
 | ADR-202609202300 | 卜卦异步解卦与 SSE 流式输出 | 2026-09-20 | ✅Adopted | divination, ai | [详情](../plan/divination_redesign.md) |
+| ADR-202609211200 | AI 适配器架构与模型路由 | 2026-09-21 | ✅Adopted | ai | [详情](../plan/ai_module_design.md) |

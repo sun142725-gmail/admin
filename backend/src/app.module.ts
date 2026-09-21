@@ -47,6 +47,12 @@ import { FamilyTodo } from './common/entities/family-todo.entity';
 import { FamilyAnnouncement } from './common/entities/family-announcement.entity';
 import { FamilyMilestone } from './common/entities/family-milestone.entity';
 import { UserSetting } from './common/entities/user-setting.entity';
+import { AiModel } from './common/entities/ai-model.entity';
+import { AiAgent } from './common/entities/ai-agent.entity';
+import { AiConversation } from './common/entities/ai-conversation.entity';
+import { AiMessage } from './common/entities/ai-message.entity';
+import { AiUsageLog } from './common/entities/ai-usage-log.entity';
+import { AiImage } from './common/entities/ai-image.entity';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -91,7 +97,13 @@ const isTest = process.env.NODE_ENV === 'test';
               FamilyTodo,
               FamilyAnnouncement,
               FamilyMilestone,
-              UserSetting
+              UserSetting,
+              AiModel,
+              AiAgent,
+              AiConversation,
+              AiMessage,
+              AiUsageLog,
+              AiImage
             ],
             synchronize: true
           }
@@ -127,7 +139,13 @@ const isTest = process.env.NODE_ENV === 'test';
               FamilyTodo,
               FamilyAnnouncement,
               FamilyMilestone,
-              UserSetting
+              UserSetting,
+              AiModel,
+              AiAgent,
+              AiConversation,
+              AiMessage,
+              AiUsageLog,
+              AiImage
             ],
             synchronize: process.env.DB_SYNC === 'true'
           }
@@ -162,6 +180,10 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(SseHeadersMiddleware)
-      .forRoutes({ path: 'divinations/:id/interpretation/stream', method: RequestMethod.GET });
+      .forRoutes(
+        { path: 'divinations/:id/interpretation/stream', method: RequestMethod.GET },
+        { path: 'ai/chat/completions', method: RequestMethod.POST },
+        { path: 'ai/chat/stream/:messageId', method: RequestMethod.GET }
+      );
   }
 }

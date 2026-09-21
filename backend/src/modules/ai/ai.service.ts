@@ -1,5 +1,7 @@
 // AI 服务用于调用 DeepSeek/OpenAI 生成解卦文本，支持整段与流式两种输出。
+// 优先走管理端配置的模型路由（渠道/映射），未配置时回落到环境变量直连，最终降级本地文案。
 import { Injectable, Logger } from '@nestjs/common';
+import { ModelRouterService, RoutedCandidate } from './core/model-router.service';
 
 interface LinePayload {
   signStr: string;
@@ -18,6 +20,56 @@ interface HexagramContext {
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
+
+  constructor(private readonly router: ModelRouterService) {}
+
+  /**
+   * 管理端模型路由优先的流式生成；无候选渠道时返回 null（由调用方回落旧逻辑）。
+   * 注意：必须是普通 async 方法（返回生成器或 null），若声明为 async generator，return null 会变成“空流”而非 null。
+   */
+  private async buildRoutedStream(
+    systemPrompt: string,
+    userPrompt: string
+  ): Promise<AsyncGenerator<string> | null> {
+    let candidates: RoutedCandidate[] = [];
+    try {
+      candidates = await this.router.candidatesByCapability('chat');
+    } catch {
+      return null;
+    }
+    if (candidates.length === 0) {
+      return null;
+    }
+    const self = this;
+    async function* run(): AsyncGenerator<string> {
+      for (const candidate of candidates) {
+        let yielded = false;
+        try {
+          for await (const delta of candidate.adapter.chatStream(
+            [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            {},
+            candidate.channel
+          )) {
+            yielded = true;
+            yield delta;
+          }
+          if (yielded) {
+            return;
+          }
+        } catch (error) {
+          self.logger.warn(`管理端模型流式调用失败: ${candidate.channel.label}`);
+          if (yielded) {
+            return; // 部分输出按现有内容收尾。
+          }
+        }
+      }
+      throw new Error('所有管理端渠道均调用失败');
+    }
+    return run();
+  }
 
   async interpret(lines: LinePayload[], topic?: string, hexagram?: HexagramContext) {
     const providers = this.getProviders();
@@ -39,12 +91,25 @@ export class AiService {
     return this.fallbackInterpretation(lines, topic, hexagram);
   }
 
-  // 流式解卦：逐段产出文本，优先尝试各供应商流式接口，失败时降级为分片输出本地文案。
+  // 流式解卦：逐段产出文本，优先管理端路由，其次环境变量直连，失败时降级为分片输出本地文案。
   async *interpretStream(
     lines: LinePayload[],
     topic?: string,
     hexagram?: HexagramContext
   ): AsyncGenerator<string> {
+    const systemPrompt = '你是专业的易经六爻解读助手，输出简洁中文解读。';
+    const userPrompt = this.buildPrompt(lines, topic, hexagram);
+    const routed = await this.buildRoutedStream(systemPrompt, userPrompt);
+    if (routed) {
+      try {
+        yield* routed;
+        return;
+      } catch (error) {
+        this.logger.warn('管理端路由全部失败，回落环境变量直连');
+        // 继续走旧逻辑（含本地兑底）。
+      }
+    }
+
     const providers = this.getProviders();
     if (providers.length === 0) {
       yield* this.fallbackStream(lines, topic, hexagram);

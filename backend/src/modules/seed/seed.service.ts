@@ -45,6 +45,7 @@ export class SeedService implements OnModuleInit {
       await this.ensureNotificationSetup();
       await this.ensureNotificationTemplateCodes();
       await this.ensureMessageChannelSetup();
+      await this.ensureAiSetup();
       return;
     }
 
@@ -56,6 +57,7 @@ export class SeedService implements OnModuleInit {
     await this.ensureNotificationSetup();
     await this.ensureNotificationTemplateCodes();
     await this.ensureMessageChannelSetup();
+    await this.ensureAiSetup();
     this.logger.log('初始化数据已完成');
   }
 
@@ -101,7 +103,12 @@ export class SeedService implements OnModuleInit {
       { name: '通知发布发送', code: 'system:notification:publish:create' },
       { name: '通知发布重试', code: 'system:notification:publish:retry' },
       { name: '站内信收件箱', code: 'system:notification:inbox:list' },
-      { name: '站内信已读', code: 'system:notification:inbox:read' }
+      { name: '站内信已读', code: 'system:notification:inbox:read' },
+      { name: '模型管理', code: 'ai:model:manage' },
+      { name: '智能体管理', code: 'ai:agent:manage' },
+      { name: 'AI 用量', code: 'ai:usage:view' },
+      { name: 'AI 对话', code: 'ai:chat:use' },
+      { name: 'AI 生图', code: 'ai:image:use' }
     ];
     const entities = this.permissionRepo.create(items);
     return this.permissionRepo.save(entities);
@@ -221,7 +228,12 @@ export class SeedService implements OnModuleInit {
       { name: '通知发布发送', code: 'system:notification:publish:create' },
       { name: '通知发布重试', code: 'system:notification:publish:retry' },
       { name: '站内信收件箱', code: 'system:notification:inbox:list' },
-      { name: '站内信已读', code: 'system:notification:inbox:read' }
+      { name: '站内信已读', code: 'system:notification:inbox:read' },
+      { name: '模型管理', code: 'ai:model:manage' },
+      { name: '智能体管理', code: 'ai:agent:manage' },
+      { name: 'AI 用量', code: 'ai:usage:view' },
+      { name: 'AI 对话', code: 'ai:chat:use' },
+      { name: 'AI 生图', code: 'ai:image:use' }
     ];
     for (const item of permissions) {
       const permission = await this.ensurePermissionByCode(item.code, item.name);
@@ -583,6 +595,74 @@ export class SeedService implements OnModuleInit {
           permissionCode: page.permissionCode
         })
       );
+    }
+  }
+
+  // AI 管理菜单与权限（幂等）。
+  private async ensureAiSetup() {
+    const codes: Array<{ code: string; name: string }> = [
+      { code: 'ai:model:manage', name: '模型管理' },
+      { code: 'ai:agent:manage', name: '智能体管理' },
+      { code: 'ai:usage:view', name: 'AI 用量' },
+      { code: 'ai:chat:use', name: 'AI 对话' },
+      { code: 'ai:image:use', name: 'AI 生图' }
+    ];
+    const permissions: Permission[] = [];
+    for (const item of codes) {
+      const permission = await this.ensurePermissionByCode(item.code, item.name);
+      if (permission) {
+        permissions.push(permission);
+      }
+    }
+    // 「AI 中心」菜单：老版本叫「AI 管理」，启动时顺带重命名（幂等）。
+    let aiMenu = await this.resourceRepo.findOne({ where: { name: 'AI 中心', type: 'menu' } });
+    if (!aiMenu) {
+      const legacy = await this.resourceRepo.findOne({ where: { name: 'AI 管理', type: 'menu' } });
+      if (legacy) {
+        legacy.name = 'AI 中心';
+        aiMenu = await this.resourceRepo.save(legacy);
+      }
+    }
+    if (!aiMenu) {
+      aiMenu = await this.resourceRepo.save(
+        this.resourceRepo.create({ name: 'AI 中心', type: 'menu', sortOrder: 5 })
+      );
+    }
+    // 渠道管理已并入模型管理：清理遗留页面资源与旧表。
+    const legacyPage = await this.resourceRepo.findOne({ where: { path: '/ai/providers', type: 'page' } });
+    if (legacyPage) {
+      await this.resourceRepo.remove(legacyPage);
+    }
+    for (const table of ['ai_model_channels', 'ai_providers']) {
+      try {
+        await this.resourceRepo.query(`DROP TABLE IF EXISTS \`${table}\``);
+      } catch {
+        // sqlite 或已清理：忽略。
+      }
+    }
+    const pages: Array<{ path: string; name: string; code?: string }> = [
+      { path: '/ai/models', name: '模型管理', code: 'ai:model:manage' },
+      { path: '/ai/agents', name: '智能体管理', code: 'ai:agent:manage' },
+      { path: '/ai/chat', name: 'AI 对话', code: 'ai:chat:use' },
+      { path: '/ai/images', name: 'AI 生图', code: 'ai:image:use' }
+    ];
+    for (const page of pages) {
+      const pageExists = await this.resourceRepo.findOne({ where: { path: page.path } });
+      if (pageExists) {
+        continue;
+      }
+      await this.resourceRepo.save(
+        this.resourceRepo.create({
+          name: page.name,
+          type: 'page',
+          path: page.path,
+          parentId: aiMenu.id,
+          permissionCode: page.code
+        })
+      );
+    }
+    for (const permission of permissions) {
+      await this.ensureAdminRolePermission(permission);
     }
   }
 

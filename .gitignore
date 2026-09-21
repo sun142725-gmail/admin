@@ -49,8 +49,6 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-# Secrets / env（.env.example 为模板，可保留）
-backend/.env
-backend/.env.development
+# Secrets / env（根目录 .env 不入库；backend/.env 与 backend/.env.development 按需入库）
 backend/.env.local
-.env
+/.env

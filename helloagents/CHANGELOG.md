@@ -3,6 +3,25 @@
 本文件记录项目的重要变更，格式参考 Keep a Changelog 与语义化版本。
 
 ## [未发布]
+### 重构（AI 中心：渠道并入模型）
+- 数据模型简化：渠道字段（协议/请求地址/API Key）直接落到 ai_models，一行模型 = 一个端点；废弃 ai_providers 与 ai_model_channels（seed 启动时自动清理旧表与 /ai/providers 页面资源）
+- 模型去重锚点改为 unique(model_key, base_url)：同地址同模型拒绝重复，不同上游同名模型天然合法，多上游互备（优先级/权重）能力保留
+- Dify 智能体端点与密钥内聚到 ai_agents（kind=dify 自带 baseUrl + API Key），不再依赖渠道
+- 接口变更：移除 /ai/admin/providers* 与渠道映射接口；新增 /ai/admin/models/:id/test 与 /probe-models；ai:provider:manage 权限码停用
+- 前端：删除渠道管理页，模型管理页吸收端点表单（含测试/探测），智能体表单 dify 分支改为端点+密钥
+- 测试 24/24 通过（含多上游同名模型允许、同端点去重 422、dify 缺凭据 422）
+### 调整（AI 中心）
+- 菜单更名「AI 管理」→「AI 中心」并加闪电图标（seed 兼容旧数据自动重命名）；五页 Card 内边距收紧（24→12）
+### 新增（AI 管理模块 P0）
+- 后端：8 张表（providers/models/model_channels/agents/conversations/messages/usage_logs/images）+ 适配器架构（openai-compatible/dify）+ 模型路由（优先级→权重随机→故障转移）+ AES-256-GCM 密钥加密
+- 管理端接口：渠道 CRUD/连通测试/模型探测、模型 CRUD（model_key 唯一去重）+ 渠道映射、智能体 CRUD；权限码 ai:provider:manage / ai:model:manage / ai:agent:manage / ai:usage:view
+- 使用端接口：AI 对话两段式流（POST 提交 + GET SSE 订阅，多会话、重放、部分收尾）、文生图；seed 幂等写入 AI 管理菜单与权限
+- 前端：AI 管理菜单五页（渠道/模型/智能体/AI对话/生图），复用 AppTable/Permission/sse.ts，零新增依赖
+- 占卜桥接：AiService.interpretStream 优先走管理端模型路由，未配置时回落环境变量直连（行为完全兼容）
+- 测试：crypto 单测 4 项 + AI 管理端 e2e 5 项（含去重/越权/SSE 兑底），全量 23/23 通过
+### 文档
+- 新增 AI 管理模块产品文档（helloagents/plan/ai_module_prd.md）：渠道/模型/智能体/AI对话/生图五块，含市场参考与 P0-P2 阶段规划
+- 新增 AI 管理模块技术设计（helloagents/plan/ai_module_design.md）：适配器架构、模型路由、七张表设计、占卜迁移兼容方案
 ### 修复（卜卦页二轮评审）
 - 铜钱阴阳面遵循传统“背为阳、字为阴”：掷正（阳）落泉源背面，掷负（阴）落乾隆通宝字面（后端正=3 分不变）
 - 铜钱重绘为写实乾隆通宝 SVG（金属渐变/双圈轮郭/方孔内影/楷书钱文/包浆），仅点击掷币时转一圈，不再自转或剧透下一爻

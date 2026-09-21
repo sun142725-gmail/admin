@@ -8,6 +8,10 @@ import { RolesPage } from '../pages/roles/RolesPage';
 import { RolePermissionsPage } from '../pages/roles/RolePermissionsPage';
 import { PermissionsPage } from '../pages/permissions/PermissionsPage';
 import { DivinationPage } from '../pages/divination/DivinationPage';
+import { ModelsPage } from '../pages/ai/ModelsPage';
+import { AgentsPage } from '../pages/ai/AgentsPage';
+import { ChatPage } from '../pages/ai/ChatPage';
+import { ImagesPage } from '../pages/ai/ImagesPage';
 import { AuditCenterPage } from '../pages/audit-center/AuditCenterPage';
 import { ProfilePage } from '../pages/profile/ProfilePage';
 import { HomePage } from '../pages/home/HomePage';
@@ -44,6 +48,10 @@ export const router = createBrowserRouter([
       { path: '/audit-center', element: <Navigate to="/logs/audit" replace /> },
       { path: '/logs/:type', element: <AuditCenterPage /> },
       { path: '/dicts', element: <DictPage /> },
+      { path: '/ai/models', element: <ModelsPage /> },
+      { path: '/ai/agents', element: <AgentsPage /> },
+      { path: '/ai/chat', element: <ChatPage /> },
+      { path: '/ai/images', element: <ImagesPage /> },
       { path: '/notifications/templates', element: <TemplatePage /> },
       { path: '/notifications/publish', element: <PublishPage /> },
       { path: '/notifications/publishes', element: <Navigate to="/notifications/publish" replace /> },

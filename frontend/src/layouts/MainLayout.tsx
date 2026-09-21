@@ -15,7 +15,12 @@ import {
   UserOutlined,
   IdcardOutlined,
   MenuFoldOutlined,
-  MenuUnfoldOutlined
+  MenuUnfoldOutlined,
+  ThunderboltOutlined,
+  DatabaseOutlined,
+  MessageOutlined,
+  PictureOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMenuTree } from '../api/resources';
@@ -41,6 +46,10 @@ const getMenuIcon = (item: MenuItem) => {
       '/logs/frontend': <FileSearchOutlined />,
       '/logs/error': <FileSearchOutlined />,
       '/divination': <ExperimentOutlined />,
+      '/ai/models': <DatabaseOutlined />,
+      '/ai/agents': <RobotOutlined />,
+      '/ai/chat': <MessageOutlined />,
+      '/ai/images': <PictureOutlined />,
       '/dicts': <BookOutlined />,
       '/notifications/templates': <BookOutlined />,
       '/notifications/publish': <FileTextOutlined />,
@@ -54,6 +63,7 @@ const getMenuIcon = (item: MenuItem) => {
     系统管理: <SettingOutlined />,
     系统配置: <SettingOutlined />,
     日志管理: <FileSearchOutlined />,
+    'AI 中心': <ThunderboltOutlined />,
     工具: <AppstoreOutlined />
   };
   return nameIconMap[item.name];
@@ -92,6 +102,10 @@ const PAGE_CODE_MAP: Record<string, string> = {
   '/logs/frontend': 'log_frontend',
   '/logs/error': 'log_error',
   '/divination': 'tool_divination',
+  '/ai/models': 'ai_model',
+  '/ai/agents': 'ai_agent',
+  '/ai/chat': 'ai_chat',
+  '/ai/images': 'ai_images',
   '/dicts': 'config_dict',
   '/notifications/templates': 'notification_template',
   '/notifications/publish': 'notification_publish',
