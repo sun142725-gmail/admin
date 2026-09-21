@@ -8,7 +8,9 @@
     "build": "nest build",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
-    "sync:ai": "ts-node scripts/sync-divination-agent.ts"
+    "sync:ai": "ts-node scripts/sync-divination-agent.ts",
+    "sync:ai:gen": "ts-node scripts/generate-ai-publish-sql.ts",
+    "sync:ai:publish": "ts-node scripts/publish-ai-config.ts"
   },
   "dependencies": {
     "@alicloud/dysmsapi20170525": "^4.6.0",
