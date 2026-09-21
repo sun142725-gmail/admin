@@ -20,6 +20,15 @@ import { RequireAuth } from './RequireAuth';
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {
+    // 卜卦页全屏渲染，不套管理台布局。
+    path: '/divination',
+    element: (
+      <RequireAuth>
+        <DivinationPage />
+      </RequireAuth>
+    )
+  },
+  {
     path: '/',
     element: (
       <RequireAuth>
@@ -32,7 +41,6 @@ export const router = createBrowserRouter([
       { path: '/roles', element: <RolesPage /> },
       { path: '/roles/:id/permissions', element: <RolePermissionsPage /> },
       { path: '/permissions', element: <PermissionsPage /> },
-      { path: '/divination', element: <DivinationPage /> },
       { path: '/audit-center', element: <Navigate to="/logs/audit" replace /> },
       { path: '/logs/:type', element: <AuditCenterPage /> },
       { path: '/dicts', element: <DictPage /> },

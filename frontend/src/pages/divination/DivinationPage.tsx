@@ -1,178 +1,107 @@
-// 六爻占卜页面提供主题输入、动画展示与结果解读。
-import React, { useEffect, useState } from 'react';
-import { Button, Card, Descriptions, Form, Input, Space, Typography, message } from 'antd';
-import { createDivination } from '../../api/divination';
-
-const { Title, Paragraph } = Typography;
-
-interface LineResult {
-  lineIndex: number;
-  signStr: string;
-  sum: number;
-  symbol: string;
-  name: string;
-}
-
-interface DivinationResult {
-  id: number;
-  topic: string;
-  interpretation: string;
-  lines: LineResult[];
-}
+// 六爻占卜页：全屏沉浸式三幕场景，流程编排见 useDivinationFlow。
+// 路由位于 MainLayout 之外，独占整个视口。
+import { Button } from 'antd';
+import { Link } from 'react-router-dom';
+import { InkBackground } from './components/InkBackground';
+import { StartPanel } from './components/StartPanel';
+import { CastPanel } from './components/CastPanel';
+import { YaoStack } from './components/YaoStack';
+import { HexagramPanel } from './components/HexagramPanel';
+import { InterpretationPanel } from './components/InterpretationPanel';
+import { useDivinationFlow } from './useDivinationFlow';
+import './divination.css';
 
 export const DivinationPage: React.FC = () => {
-  const labels = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻'];
-  const [form] = Form.useForm();
-  const [result, setResult] = useState<DivinationResult | null>(null);
-  const [displayLines, setDisplayLines] = useState<LineResult[]>([]);
-  const [isAnimating, setIsAnimating] = useState(false);
-
-  const startDivination = async () => {
-    const values = await form.validateFields();
-    setResult(null);
-    setDisplayLines([]);
-    setIsAnimating(true);
-    try {
-      const data = await createDivination(values.topic);
-      setResult(data);
-    } catch (error) {
-      setIsAnimating(false);
-      message.error('占卜失败，请稍后再试');
-    }
-  };
-
-  useEffect(() => {
-    if (!isAnimating || !result) {
-      return;
-    }
-    if (!result.lines || result.lines.length === 0) {
-      setIsAnimating(false);
-      return;
-    }
-    let index = 0;
-    const timer = setInterval(() => {
-      const line = result.lines[index];
-      if (!line) {
-        setIsAnimating(false);
-        clearInterval(timer);
-        return;
-      }
-      setDisplayLines((prev) => [...prev, line]);
-      index += 1;
-      if (index >= result.lines.length) {
-        setIsAnimating(false);
-        clearInterval(timer);
-      }
-    }, 600);
-    return () => clearInterval(timer);
-  }, [isAnimating, result]);
-
-  const resetAll = () => {
-    form.resetFields();
-    setResult(null);
-    setDisplayLines([]);
-    setIsAnimating(false);
-  };
+  const flow = useDivinationFlow();
+  const { stage } = flow;
+  const showResult =
+    stage === 'revealing' ||
+    stage === 'topic' ||
+    stage === 'interpreting' ||
+    stage === 'done' ||
+    stage === 'failed';
+  // 掷币阶段：碗区居中放大；成卦后整体左移，右侧展开解卦。
+  const isCenterMode = stage === 'casting';
 
   return (
-    <div className="app-page-flat">
-      <Card>
-        <Title level={2}>易占 — 六爻占卜</Title>
-        <Paragraph>输入主题后开始占卜，动画结束后展示解卦结果。</Paragraph>
+    <div className="divination-scene divination-fullscreen">
+      <InkBackground />
 
-        <Form layout="vertical" form={form}>
-          <Form.Item
-            label="占卜主题"
-            name="topic"
-            rules={[{ required: true, message: '请填写占卜主题' }]}
+      <Link to="/" className="divination-back">
+        ‹ 返回系统
+      </Link>
+
+      {stage === 'idle' && <StartPanel loading={flow.loading} onStart={flow.start} />}
+
+      {/* 起卦失败（无记录）：单独提示，可重试。 */}
+      {stage === 'failed' && !flow.record && (
+        <div className="wish-panel">
+          <p className="wish-tip">⚠ {flow.streamError ?? '起卦失败，请稍后再试'}</p>
+          <Button type="primary" className="wish-button" loading={flow.loading} onClick={flow.start}>
+            重试起卦
+          </Button>
+        </div>
+      )}
+
+      {stage !== 'idle' && (
+        <div className="divination-stage">
+          <header className="divination-header">
+            <span className="divination-topic">
+              {flow.topic ? `「${flow.topic}」` : '六爻起卦'}
+            </span>
+            {stage === 'casting' && (
+              <span className="divination-count">{flow.revealedCount}/6 爻</span>
+            )}
+            {stage !== 'casting' && (
+              <Button size="small" className="divination-ghost" onClick={flow.reset}>
+                再占一卦
+              </Button>
+            )}
+          </header>
+
+          <div
+            className={`divination-columns ${isCenterMode ? 'is-center-mode' : 'is-result-mode'}`}
           >
-            <Input placeholder="例如：今年事业走向" maxLength={50} />
-          </Form.Item>
-        </Form>
+            <section className="divination-left">
+              {flow.record && (
+                <CastPanel
+                  record={flow.record}
+                  revealedCount={stage === 'casting' ? flow.revealedCount : 6}
+                  tossing={flow.tossing}
+                  onToss={flow.toss}
+                  compact={!isCenterMode}
+                />
+              )}
+              <YaoStack
+                lines={flow.record?.lines}
+                revealedCount={stage === 'casting' ? flow.revealedCount : 6}
+                active={stage === 'casting'}
+              />
+            </section>
 
-        <Space style={{ marginBottom: 16 }}>
-          <Button type="primary" onClick={startDivination} disabled={isAnimating}>
-            {isAnimating ? '占卜中...' : '开始占卜'}
-          </Button>
-          <Button onClick={resetAll} disabled={isAnimating}>
-            重置
-          </Button>
-        </Space>
-
-        <Card type="inner" style={{ marginBottom: 16 }}>
-          <Title level={4}>占卜过程</Title>
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <div
-              style={{
-                width: 120,
-                height: 120,
-                borderRadius: 16,
-                border: '1px dashed #999',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              破碗
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div
-                  key={index}
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: '50%',
-                    border: '1px solid #666',
-                    background: isAnimating ? '#ffe58f' : '#f0f0f0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  铜钱
-                </div>
-              ))}
-            </div>
-            <div>{isAnimating ? '摇卦中...' : '等待开始'}</div>
+            {showResult && flow.record && (
+              <section className="divination-right">
+                <HexagramPanel
+                  record={flow.record}
+                  stage={stage as 'revealing' | 'topic' | 'interpreting' | 'done' | 'failed'}
+                />
+                {/* revealing 阶段只展示卦名浮现，解卦面板等进入 topic 后再出现。 */}
+                {stage !== 'revealing' && (
+                  <InterpretationPanel
+                    record={flow.record}
+                    stage={stage as 'topic' | 'interpreting' | 'done' | 'failed'}
+                    streamText={flow.streamText}
+                    streamError={flow.streamError}
+                    submitting={flow.submitting}
+                    onSubmitTopic={flow.submitTopic}
+                    onRetry={flow.retry}
+                  />
+                )}
+              </section>
+            )}
           </div>
-        </Card>
-
-        <Title level={4}>逐爻结果（{displayLines.length}/6）</Title>
-        {displayLines.filter(Boolean).map((line, index) => (
-          <Card size="small" style={{ marginBottom: 8 }} key={line.lineIndex}>
-            <div>
-              <strong>{labels[index]}:</strong> {line.signStr}（{line.name} {line.symbol}）
-            </div>
-            <div>组合数字: {line.sum}</div>
-          </Card>
-        ))}
-
-        {result && !isAnimating && displayLines.length === 6 && (
-          <div style={{ marginTop: 16 }}>
-            <Title level={4}>本卦汇总</Title>
-            <Descriptions column={1} bordered size="small">
-              <Descriptions.Item label="六爻组合数字数组">
-                {JSON.stringify(result.lines.map((line) => line.sum))}
-              </Descriptions.Item>
-              <Descriptions.Item label="六爻符号数组">
-                {JSON.stringify(result.lines.map((line) => line.symbol))}
-              </Descriptions.Item>
-              <Descriptions.Item label="六爻名称数组">
-                {JSON.stringify(result.lines.map((line) => line.name))}
-              </Descriptions.Item>
-              <Descriptions.Item label="六爻原始符号串（每爻）">
-                {JSON.stringify(result.lines.map((line) => line.signStr))}
-              </Descriptions.Item>
-            </Descriptions>
-
-            <Card type="inner" style={{ marginTop: 16 }}>
-              <Title level={5}>解卦结果</Title>
-              <Paragraph>{result.interpretation}</Paragraph>
-            </Card>
-          </div>
-        )}
-      </Card>
+        </div>
+      )}
     </div>
   );
 };

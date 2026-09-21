@@ -1,5 +1,5 @@
 // 根模块负责加载数据库连接与业务模块。
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -12,6 +12,7 @@ import { ResourcesModule } from './modules/resources/resources.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { SeedModule } from './modules/seed/seed.module';
 import { AiModule } from './modules/ai/ai.module';
+import { SseHeadersMiddleware } from './common/middleware/sse-headers.middleware';
 import { DivinationModule } from './modules/divination/divination.module';
 import { AuditCenterModule } from './modules/audit-center/audit-center.module';
 import { ProfileModule } from './modules/profile/profile.module';
@@ -156,4 +157,11 @@ const isTest = process.env.NODE_ENV === 'test';
     }
   ]
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  // SSE 路由提前设置禁缓冲响应头（拦截器阶段响应头已发出，只能用中间件）。
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(SseHeadersMiddleware)
+      .forRoutes({ path: 'divinations/:id/interpretation/stream', method: RequestMethod.GET });
+  }
+}

@@ -1,0 +1,914 @@
+/* 卜卦模块全部样式与动画。集中管理，便于 C 端（Vue）按相同节奏移植。 */
+
+/* ---------- 场景容器 ---------- */
+.divination-scene {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  min-height: 640px;
+  background: #f7f2e7;
+}
+
+/* 全屏模式：独占整个视口（路由位于 MainLayout 之外）。 */
+.divination-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  border-radius: 0;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+/* 返回链接固定在左下角，避免与右上角的再占一卦重叠。 */
+.divination-back {
+  position: absolute;
+  bottom: 20px;
+  left: 24px;
+  z-index: 3;
+  color: #8a8378;
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-decoration: none;
+  padding: 4px 10px;
+  border: 1px solid rgba(138, 131, 120, 0.4);
+  border-radius: 14px;
+  transition: color 0.3s, border-color 0.3s;
+}
+
+.divination-back:hover {
+  color: #9d2933;
+  border-color: #9d2933;
+}
+
+.ink-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ink-bg-paper {
+  position: absolute;
+  inset: 0;
+  background-image: url('/divination/paper-texture.jpg');
+  background-size: 512px 512px;
+  opacity: 0.9;
+}
+
+.ink-bg-mountains {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent);
+}
+
+.ink-bg-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(63, 58, 52, 0.08) 100%);
+}
+
+/* ---------- 通用墨色 ---------- */
+.divination-scene {
+  color: #3f3a34;
+  font-family: 'Kaiti SC', 'KaiTi', 'STKaiti', 'Noto Serif SC', serif;
+}
+
+/* ---------- 第一幕：祈愿 ---------- */
+.wish-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 96px 24px 64px;
+  text-align: center;
+}
+
+.wish-seal {
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #9d2933;
+  border-radius: 10px;
+  color: #9d2933;
+  font-size: 40px;
+  font-weight: 700;
+  transform: rotate(-6deg);
+  animation: seal-stamp 0.9s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  box-shadow: inset 0 0 0 2px rgba(157, 41, 51, 0.25);
+}
+
+.wish-title {
+  margin: 28px 0 8px;
+  font-size: 34px;
+  letter-spacing: 6px;
+}
+
+.wish-tip {
+  margin: 0 0 36px;
+  color: #8a8378;
+  letter-spacing: 2px;
+}
+
+.wish-input {
+  max-width: 420px;
+  border: none;
+  border-bottom: 1.5px solid #b9b0a1;
+  border-radius: 0;
+  background: transparent;
+  font-size: 18px;
+  padding: 8px 4px;
+  text-align: center;
+  font-family: inherit;
+  transition: border-color 0.3s;
+}
+
+.wish-input:focus {
+  border-bottom-color: #9d2933;
+  box-shadow: none;
+}
+
+.wish-count {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #b0a896;
+  align-self: flex-end;
+  max-width: 420px;
+}
+
+.wish-error {
+  margin-top: 10px;
+  color: #9d2933;
+  font-size: 13px;
+}
+
+.wish-button {
+  margin-top: 32px;
+  min-width: 180px;
+  height: 46px;
+  font-size: 18px;
+  letter-spacing: 8px;
+  background: #9d2933;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(157, 41, 51, 0.3);
+  font-family: inherit;
+}
+
+.wish-button:hover {
+  background: #b03640 !important;
+}
+
+@keyframes seal-stamp {
+  0% {
+    opacity: 0;
+    transform: rotate(-6deg) scale(1.8);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-6deg) scale(1);
+  }
+}
+
+/* ---------- 舞台布局 ---------- */
+.divination-stage {
+  position: relative;
+  z-index: 1;
+  padding: 20px 28px 32px;
+}
+
+.divination-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.divination-topic {
+  font-size: 20px;
+  letter-spacing: 2px;
+}
+
+.divination-ghost {
+  font-family: inherit;
+}
+
+.divination-columns {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+/* 掷币阶段：碗区居中放大，全屏聚焦。 */
+.divination-columns.is-center-mode {
+  justify-content: center;
+}
+
+.divination-columns.is-center-mode .divination-left {
+  flex: 0 0 560px;
+  max-width: 560px;
+  margin-left: 0;
+  transform: scale(1.18);
+  transform-origin: top center;
+}
+
+.divination-columns.is-center-mode .divination-left .yao-stack {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+/* 成卦后：左侧区块从居中平滑左移收拢，右侧展开解卦。 */
+.divination-left {
+  flex: 0 0 320px;
+  transition:
+    flex-basis 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.is-result-mode .divination-right {
+  animation: slide-in-right 0.7s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 紧凑模式下的碗区：缩小不抢戏。 */
+.is-result-mode .cast-bowl {
+  transform: scale(0.78);
+  transform-origin: bottom center;
+  height: 130px;
+  transition: transform 0.7s ease, height 0.7s ease;
+}
+
+.divination-left {
+  flex: 0 0 320px;
+}
+
+.divination-right {
+  flex: 1;
+  min-width: 0;
+  animation: fade-in 0.6s ease both;
+}
+
+@media (max-width: 860px) {
+  .divination-columns {
+    flex-direction: column;
+  }
+  .divination-left {
+    flex: none;
+    width: 100%;
+  }
+  .divination-columns.is-center-mode .divination-left {
+    flex: none;
+    width: 100%;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- 第二幕：摇卦 ---------- */
+.cast-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.cast-bowl {
+  position: relative;
+  width: 240px;
+  height: 170px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* 掷币时碗身轻摇，像被铜钱撞击。 */
+.cast-bowl-shaking .cast-bowl-body {
+  animation: bowl-shake 1.15s ease-in-out both;
+}
+
+.cast-bowl-body {
+  position: absolute;
+  bottom: 10px;
+  width: 200px;
+  height: 84px;
+  border: 2.5px solid #6b6155;
+  border-top: none;
+  border-radius: 0 0 100px 100px;
+  background: linear-gradient(to bottom, #e8dfcc, #d9cdb4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a2967f;
+  font-size: 20px;
+  letter-spacing: 4px;
+  transform-origin: 50% 0;
+}
+
+/* 碗口椭圆，与碗身拼出仰口碗。 */
+.cast-bowl-rim {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 36px;
+  border: 2.5px solid #6b6155;
+  border-radius: 50%;
+  background: linear-gradient(to bottom, #f2e9d6, #ddd1b8);
+}
+
+/* 碗底投影，随掷币轻微缩放。 */
+.cast-bowl-shadow {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 170px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(63, 58, 52, 0.28), transparent 70%);
+  animation: shadow-breathe 3s ease-in-out infinite;
+}
+
+.cast-bowl-shaking ~ .cast-bowl-shadow {
+  animation: none;
+}
+
+.cast-coins {
+  position: absolute;
+  bottom: 58px;
+  z-index: 2;
+  display: flex;
+  gap: 18px;
+  perspective: 600px;
+}
+
+.coin {
+  width: 52px;
+  height: 52px;
+}
+
+.coin-flying {
+  animation: coin-arc 1.15s ease-out both;
+}
+
+.coin-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.85s cubic-bezier(0.25, 0.7, 0.3, 1);
+}
+
+/* ---------- 铜钱（写实乾隆通宝风） ---------- */
+.coin-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 50%;
+}
+
+.coin-face-yin {
+  transform: rotateX(180deg);
+}
+
+.coin-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 2px 3px rgba(40, 26, 4, 0.35));
+}
+
+@keyframes coin-arc {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  38% {
+    transform: translateY(-92px) rotate(14deg) scale(1.08);
+  }
+  72% {
+    transform: translateY(0) rotate(-6deg) scale(1);
+  }
+  84% {
+    transform: translateY(-10px) rotate(3deg) scale(1.02);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+}
+
+/* 掷币时碗身被铜钱撞得摇晃。 */
+@keyframes bowl-shake {
+  0% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-2.4deg);
+  }
+  45% {
+    transform: rotate(2deg);
+  }
+  65% {
+    transform: rotate(-1.4deg);
+  }
+  82% {
+    transform: rotate(0.8deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes shadow-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translateX(-50%) scale(0.94);
+  }
+}
+
+.cast-progress {
+  margin-top: 14px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+}
+
+.cast-step {
+  font-size: 16px;
+  letter-spacing: 2px;
+}
+
+.toss-button {
+  background: #9d2933;
+  border: none;
+  font-family: inherit;
+  letter-spacing: 2px;
+}
+
+.toss-button:hover {
+  background: #b03640 !important;
+}
+
+.cast-progress-bar {
+  height: 3px;
+  max-width: 240px;
+  background: #9d2933;
+  border-radius: 2px;
+  transition: width 0.45s ease;
+  margin-top: 8px;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ---------- 六爻堆叠 ---------- */
+.yao-stack {
+  display: flex;
+  flex-direction: column-reverse; /* 初爻在下 */
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid rgba(107, 97, 85, 0.25);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.yao-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.yao-row-revealed {
+  animation: fade-in 0.4s ease both;
+}
+
+.yao-label {
+  flex: 0 0 84px;
+  font-size: 13px;
+  color: #8a8378;
+  letter-spacing: 1px;
+}
+
+.yao-label-active {
+  color: #9d2933;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.yao-slot {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.yao-slot-pending {
+  height: 24px;
+  border-bottom: 1px dashed rgba(138, 131, 120, 0.4);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.yao-mark {
+  display: block;
+  animation: yao-drop 0.35s ease both;
+}
+
+.yao-line {
+  stroke: #3f3a34;
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: yao-draw 0.5s ease-out 0.05s forwards;
+}
+
+.yao-change {
+  fill: none;
+  stroke: #9d2933;
+  stroke-width: 2.5;
+  opacity: 0;
+  animation: yao-change-in 0.4s ease 0.5s forwards, yao-breath 1.8s ease-in-out 1s infinite;
+}
+
+.yao-change.yao-cross line {
+  stroke: #9d2933;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+@keyframes yao-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes yao-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes yao-change-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes yao-breath {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- 第三幕：成卦 ---------- */
+.hexagram-panel {
+  margin-bottom: 20px;
+}
+
+.hexagram-detail-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  color: #8a8378;
+  letter-spacing: 2px;
+}
+
+.hexagram-caret {
+  display: inline-block;
+  color: #b0a896;
+  font-size: 16px;
+  transform: rotate(90deg);
+  transition: transform 0.3s ease;
+}
+
+.hexagram-caret.is-open {
+  transform: rotate(270deg);
+}
+
+.hexagram-detail-body {
+  animation: fade-in 0.35s ease both;
+}
+
+.hexagram-name {
+  font-size: 42px;
+  letter-spacing: 10px;
+  text-align: center;
+  color: #2f2a24;
+}
+
+.brush-reveal {
+  animation: brush-reveal 1.1s ease both;
+}
+
+.brush-reveal-delay {
+  animation-delay: 0.5s;
+}
+
+@keyframes brush-reveal {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+}
+
+.hexagram-changed {
+  text-align: center;
+  font-size: 17px;
+  color: #9d2933;
+  letter-spacing: 4px;
+  margin-top: 6px;
+}
+
+.hexagram-detail {
+  margin-top: 22px;
+  border: 1px solid rgba(107, 97, 85, 0.25);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.35);
+  padding: 14px 18px;
+}
+
+.hexagram-detail-title {
+  font-size: 14px;
+  color: #8a8378;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.hexagram-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.hexagram-table th {
+  text-align: left;
+  color: #8a8378;
+  font-weight: 400;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(138, 131, 120, 0.3);
+}
+
+.hexagram-table td {
+  padding: 6px 8px;
+  border-bottom: 1px dashed rgba(138, 131, 120, 0.2);
+}
+
+.hexagram-symbol {
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+/* 动爻行高亮与说明。 */
+.hexagram-row-moving td {
+  background: rgba(157, 41, 51, 0.05);
+}
+
+.yao-moving-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #9d2933;
+  color: #f7f2e7;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.hexagram-note {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(138, 131, 120, 0.35);
+  font-size: 13px;
+  color: #8a8378;
+  line-height: 1.9;
+  letter-spacing: 0.5px;
+}
+
+/* ---------- 解卦 ---------- */
+.interp-panel {
+  border: 1px solid rgba(107, 97, 85, 0.25);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.45);
+  padding: 18px 22px;
+  animation: fade-in 0.5s ease both;
+}
+
+/* 补填主题表单。 */
+.topic-form-tip {
+  margin: 0 0 12px;
+  color: #6b6155;
+  letter-spacing: 1px;
+}
+
+.topic-input {
+  border: none;
+  border-bottom: 1.5px solid #b9b0a1;
+  border-radius: 0;
+  background: transparent;
+  font-size: 17px;
+  padding: 8px 4px;
+  font-family: inherit;
+  transition: border-color 0.3s;
+}
+
+.topic-input:focus {
+  border-bottom-color: #9d2933;
+  box-shadow: none;
+}
+
+.topic-form-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.topic-form-foot .wish-count {
+  align-self: auto;
+  max-width: none;
+}
+
+.interp-topic {
+  margin: 0 0 10px;
+  color: #9d2933;
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
+.interp-title {
+  margin-bottom: 12px;
+}
+
+.interp-title-mark {
+  display: inline-block;
+  padding: 2px 12px;
+  border-left: 3px solid #9d2933;
+  font-size: 17px;
+  letter-spacing: 4px;
+}
+
+.interp-body {
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.interp-text {
+  margin: 0;
+  font-size: 16px;
+  line-height: 2;
+  letter-spacing: 1px;
+  white-space: pre-wrap;
+}
+
+.interp-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: #9d2933;
+  animation: caret-blink 0.8s step-end infinite;
+}
+
+@keyframes caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.interp-done-mark {
+  margin-top: 12px;
+  color: #b0a896;
+  font-size: 13px;
+  letter-spacing: 6px;
+  animation: fade-in 0.8s ease both;
+}
+
+.interp-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #9d2933;
+  font-size: 15px;
+}
+
+.interp-retry {
+  font-family: inherit;
+}
+
+/* ---------- 八卦旋转 loader ---------- */
+.bagua-loader {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  margin: 8px auto 14px;
+  animation: bagua-spin 6s linear infinite;
+}
+
+.bagua-loader-item {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -10px 0 0 -10px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: #6b6155;
+}
+
+.bagua-loader-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 26px;
+  color: #9d2933;
+  animation: bagua-spin-reverse 6s linear infinite;
+}
+
+@keyframes bagua-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bagua-spin-reverse {
+  to {
+    transform: translate(-50%, -50%) rotate(-360deg);
+  }
+}

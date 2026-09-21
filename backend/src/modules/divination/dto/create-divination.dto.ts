@@ -1,8 +1,9 @@
-// 新建占卜 DTO 用于校验主题。
-import { IsString, MinLength } from 'class-validator';
+// 新建占卜 DTO：主题改为可选（先摇卦、解卦前补填）。
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateDivinationDto {
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  topic!: string;
+  @MaxLength(50)
+  topic?: string;
 }

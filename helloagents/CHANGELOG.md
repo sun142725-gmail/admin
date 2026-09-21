@@ -3,6 +3,30 @@
 本文件记录项目的重要变更，格式参考 Keep a Changelog 与语义化版本。
 
 ## [未发布]
+### 修复（卜卦页二轮评审）
+- 铜钱阴阳面遵循传统“背为阳、字为阴”：掷正（阳）落泉源背面，掷负（阴）落乾隆通宝字面（后端正=3 分不变）
+- 铜钱重绘为写实乾隆通宝 SVG（金属渐变/双圈轮郭/方孔内影/楷书钱文/包浆），仅点击掷币时转一圈，不再自转或剧透下一爻
+- 阴爻两段等长对称（各 70 单位，缺口对齐阳爻中线）
+- 六爻明细可折叠：默认展开、开始解卦自动收起；动爻行红字高亮并附变卦说明
+- 起卦失败增加可见错误面板与重试入口；未述事记录重试智能回退填主题页（needsTopic）
+- revealing 阶段不再提前展示解卦 loading；空解卦时 loading 不再永转
+- 返回系统链接移至左下角，与右上角“再占一卦”不再重叠
+### 新增
+- 卜卦页三幕式重构（祈愿/摇卦/成卦）：CSS 3D 铜钱动画、SVG 描边爻线、毛笔字卦名浮现与八卦 loading，零新增前端依赖
+- 占卜后端新增 SSE 流式解卦接口 `GET /api/divinations/:id/interpretation/stream`，AI 增量文本实时推送并落库
+- 新增卦名/变卦推算纯函数 `hexagram.util.ts`（64 卦查表）及单元测试
+- 新增占卜历史列表、重新解读、删除接口（按当前用户过滤，预留 C 端复用）
+- 新增基于 fetch 的零依赖 SSE 客户端（支持 Authorization 头）
+- 新增宣纸纹理与水墨远山背景图（public/divination/）
+- AI 解卦 prompt 增加本卦名/变卦名/动爻数上下文，要求先点明卦意再结合动爻论变
+- 新增 SSE 禁缓冲响应头中间件（X-Accel-Buffering: no），规避 Nest 对 @Sse 路由拦截器时序问题，保障 nginx 代理下流式输出
+### 变更
+- 占卜交互改为“先摇卦后述事”：创建不带主题（casting），逐爻点击掷币（碗区居中放大，成卦后左移动画展开解卦区），PATCH topic 补填后进入流式解卦
+### 变更
+- 占卜创建接口改为异步解卦：生成六爻后立即返回，修复前端 axios 10s 超时导致的"假失败"问题
+- divinations 表新增 status / hexagram_name / changed_hexagram_name / error_message 字段（DB_SYNC 自动同步）
+- ResponseInterceptor 支持按路由跳过统一响应包装（SKIP_RESPONSE_WRAP_KEY，用于 SSE）
+- 服务启动时自动将遗留"解卦中"记录标记为失败，支持重新解读
 ### 新增
 - 新增家庭大事纪服务端接口，覆盖列表、详情、创建、更新、删除、核心标记和碑文汇总
 - 移动端 `has-doc` 与 `has-web` 接入发布平台，新增 `mobile-has-doc`、`mobile-has-web` 构建服务与 `/has-doc/`、`/has-web/` Nginx 路由

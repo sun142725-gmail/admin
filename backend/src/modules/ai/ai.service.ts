@@ -1,4 +1,4 @@
-// AI 服务用于调用 DeepSeek/OpenAI 生成解卦文本。
+// AI 服务用于调用 DeepSeek/OpenAI 生成解卦文本，支持整段与流式两种输出。
 import { Injectable, Logger } from '@nestjs/common';
 
 interface LinePayload {
@@ -8,19 +8,26 @@ interface LinePayload {
   sum?: number;
 }
 
+const STREAM_TIMEOUT_MS = 60000;
+
+interface HexagramContext {
+  hexagramName?: string | null;
+  changedHexagramName?: string | null;
+}
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
 
-  async interpret(lines: LinePayload[], topic?: string) {
+  async interpret(lines: LinePayload[], topic?: string, hexagram?: HexagramContext) {
     const providers = this.getProviders();
     if (providers.length === 0) {
-      return this.fallbackInterpretation(lines, topic);
+      return this.fallbackInterpretation(lines, topic, hexagram);
     }
 
     for (const provider of providers) {
       try {
-        const content = await this.request(provider, lines, topic);
+        const content = await this.request(provider, lines, topic, hexagram);
         if (content) {
           return content;
         }
@@ -29,7 +36,41 @@ export class AiService {
       }
     }
 
-    return this.fallbackInterpretation(lines, topic);
+    return this.fallbackInterpretation(lines, topic, hexagram);
+  }
+
+  // 流式解卦：逐段产出文本，优先尝试各供应商流式接口，失败时降级为分片输出本地文案。
+  async *interpretStream(
+    lines: LinePayload[],
+    topic?: string,
+    hexagram?: HexagramContext
+  ): AsyncGenerator<string> {
+    const providers = this.getProviders();
+    if (providers.length === 0) {
+      yield* this.fallbackStream(lines, topic, hexagram);
+      return;
+    }
+
+    for (const provider of providers) {
+      let yielded = false;
+      try {
+        for await (const chunk of this.requestStream(provider, lines, topic, hexagram)) {
+          yielded = true;
+          yield chunk;
+        }
+        if (yielded) {
+          return;
+        }
+      } catch (error) {
+        this.logger.warn(`AI 流式调用失败: ${provider.name}`);
+        if (yielded) {
+          // 已产出部分内容，交由上层按现有内容收尾。
+          return;
+        }
+      }
+    }
+
+    yield* this.fallbackStream(lines, topic, hexagram);
   }
 
   private getProviders() {
@@ -56,9 +97,10 @@ export class AiService {
   private async request(
     provider: { name: string; baseUrl: string; apiKey: string; model: string },
     lines: LinePayload[],
-    topic?: string
+    topic?: string,
+    hexagram?: HexagramContext
   ) {
-    const prompt = this.buildPrompt(lines, topic);
+    const prompt = this.buildPrompt(lines, topic, hexagram);
     const response = await fetch(`${provider.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -86,14 +128,114 @@ export class AiService {
     return data.choices?.[0]?.message?.content?.trim();
   }
 
-  private buildPrompt(lines: LinePayload[], topic?: string) {
+  private async *requestStream(
+    provider: { name: string; baseUrl: string; apiKey: string; model: string },
+    lines: LinePayload[],
+    topic?: string,
+    hexagram?: HexagramContext
+  ): AsyncGenerator<string> {
+    const prompt = this.buildPrompt(lines, topic, hexagram);
+    const response = await fetch(`${provider.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${provider.apiKey}`
+      },
+      body: JSON.stringify({
+        model: provider.model,
+        messages: [
+          {
+            role: 'system',
+            content: '你是专业的易经六爻解读助手，输出简洁中文解读。'
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        stream: true
+      }),
+      signal: AbortSignal.timeout(STREAM_TIMEOUT_MS)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`AI 请求失败: ${response.status} ${errorText}`);
+    }
+    if (!response.body) {
+      throw new Error('AI 响应缺少流内容');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n');
+      buffer = parts.pop() ?? '';
+      for (const rawLine of parts) {
+        const line = rawLine.trim();
+        if (!line.startsWith('data:')) {
+          continue;
+        }
+        const payload = line.slice(5).trim();
+        if (!payload || payload === '[DONE]') {
+          continue;
+        }
+        try {
+          const parsed = JSON.parse(payload) as {
+            choices?: Array<{ delta?: { content?: string } }>;
+          };
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            yield delta;
+          }
+        } catch {
+          // 忽略无法解析的片段。
+        }
+      }
+    }
+  }
+
+  private async *fallbackStream(
+    lines: LinePayload[],
+    topic?: string,
+    hexagram?: HexagramContext
+  ): AsyncGenerator<string> {
+    const text = this.fallbackInterpretation(lines, topic, hexagram);
+    for (let index = 0; index < text.length; index += 12) {
+      yield text.slice(index, index + 12);
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+  }
+
+  private buildPrompt(lines: LinePayload[], topic?: string, hexagram?: HexagramContext) {
     const linesText = lines
       .map((line, index) => `第${index + 1}爻：${line.name} ${line.symbol} ${line.signStr}`)
       .join('\n');
-    return `占卜主题：${topic ?? '未提供'}\n${linesText}\n请给出简短解卦建议（2-4 句）。`;
+    const movingCount = lines.filter((line) => line.symbol === 'O' || line.symbol === '×').length;
+    const hexText = hexagram?.hexagramName
+      ? `本卦：${hexagram.hexagramName}\n变卦：${
+          hexagram.changedHexagramName ?? '无（六爻安静）'
+        }\n动爻数：${movingCount}\n`
+      : '';
+    const hexHint = hexagram?.hexagramName
+      ? `请先点明${hexagram.hexagramName}卦意${
+          hexagram.changedHexagramName
+            ? `，再结合动爻说明向${hexagram.changedHexagramName}的转变`
+            : ''
+        }`
+      : '请给出简短解读';
+    return `占卜主题：${topic ?? '未提供'}\n${hexText}${linesText}\n${hexHint}，给出简短解卦建议（2-4 句）。`;
   }
 
-  private fallbackInterpretation(lines: LinePayload[], topic?: string) {
+  private fallbackInterpretation(
+    lines: LinePayload[],
+    topic?: string,
+    hexagram?: HexagramContext
+  ) {
     const counts: Record<string, number> = { 老阳: 0, 老阴: 0, 少阳: 0, 少阴: 0 };
     lines.forEach((line) => {
       if (counts[line.name] !== undefined) {
@@ -103,6 +245,7 @@ export class AiService {
     const dominant = Object.keys(counts).reduce((a, b) =>
       counts[a] >= counts[b] ? a : b
     );
-    return `占卜主题：${topic ?? '未提供'}。六爻以“${dominant}”为主，建议保持平衡心态，顺势而为。`;
+    const hexText = hexagram?.hexagramName ? `本卦${hexagram.hexagramName}，` : '';
+    return `占卜主题：${topic ?? '未提供'}。${hexText}六爻以“${dominant}”为主，建议保持平衡心态，顺势而为。`;
   }
 }
