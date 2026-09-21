@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -141,6 +142,13 @@ export class CreateAgentDto {
   @IsIn(['native', 'dify'])
   kind!: string;
 
+  // 业务编码：业务模块对接锚点，如 divination。
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-z][a-z0-9_-]*$/, { message: '业务编码须以小写字母开头，仅含小写字母/数字/中划线/下划线' })
+  @MaxLength(64)
+  code?: string;
+
   @IsOptional()
   @IsInt()
   modelId?: number;
@@ -212,6 +220,13 @@ export class UpdateAgentDto {
   @IsOptional()
   @IsIn(['native', 'dify'])
   kind?: string;
+
+  // 业务编码：业务模块对接锚点，如 divination。
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-z][a-z0-9_-]*$/, { message: '业务编码须以小写字母开头，仅含小写字母/数字/中划线/下划线' })
+  @MaxLength(64)
+  code?: string;
 
   @IsOptional()
   @IsInt()

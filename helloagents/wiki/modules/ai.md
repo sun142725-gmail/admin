@@ -16,6 +16,9 @@
 ### 模型路由
 `model_key` 相同的启用行组成候选集（优先级 DESC + 同级按权重随机）→ 逐个故障转移（已产出部分内容则按现有内容收尾，不切换）。去重锚点：`unique(model_key, base_url)`——同地址同模型不允许重复，不同上游的同名模型天然合法。
 
+### 业务编码（code）
+`ai_agents.code`：业务模块对接锚点（自增 id 不跨模块引用），全局唯一可空。约定：`divination`=六爻解卦。占卜模块解卦时优先取该编码的启用智能体——使用其系统提示词、采样参数与绑定模型（同 key 多行互备），无配置时逐级回落。
+
 ### 密钥安全
 模型与 Dify 智能体的 API Key 均经 AES-256-GCM 加密落库（`AI_ENCRYPTION_KEY` 环境变量），接口只回 `mask`（sk-****abcd），更新传空不改密钥。
 
@@ -40,7 +43,7 @@
 | GET | `/api/ai/images` | 生图历史 |
 
 ## Data Models
-`ai_models`（model_key + type + base_url + api_key_cipher，unique: model_key+base_url）/ `ai_agents`（native 绑 modelId；dify 自带 base_url + api_key_cipher）/ `ai_conversations` / `ai_messages`（含 model_id/tokens/延迟）/ `ai_usage_logs` / `ai_images`。字段详见 `helloagents/plan/ai_module_design.md` §2（实施时已将渠道并入模型，废弃 ai_providers / ai_model_channels）。
+`ai_models`（model_key + type + base_url + api_key_cipher，unique: model_key+base_url）/ `ai_agents`（native 绑 modelId；dify 自带 base_url + api_key_cipher；code 业务对接编码）/ `ai_conversations` / `ai_messages`（含 model_id/tokens/延迟）/ `ai_usage_logs` / `ai_images`。字段详见 `helloagents/plan/ai_module_design.md` §2（实施时已将渠道并入模型，废弃 ai_providers / ai_model_channels）。
 
 ## Dependencies
 - files（预留）、auth（JWT + PermissionsGuard）、占卜模块（经 AiService 统一入口调用模型路由）

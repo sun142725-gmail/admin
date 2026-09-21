@@ -1,4 +1,5 @@
 // AI 智能体实体：native=内置提示词编排（绑模型）；dify=远程 Dify 应用（自带端点与密钥）。
+// code 为业务对接锚点（如 divination=六爻解卦），业务模块按 code 查找，不依赖自增 id。
 import { Column, Entity } from 'typeorm';
 import { BaseEntity } from './base.entity';
 
@@ -12,6 +13,10 @@ export class AiAgent extends BaseEntity {
 
   @Column({ length: 16, default: 'native' })
   kind!: string;
+
+  // 业务编码：业务模块对接锚点（如 divination=六爻解卦）。唯一、可空（通用对话智能体可不填）。
+  @Column({ length: 64, nullable: true, unique: true })
+  code?: string;
 
   // native 必填：绑定的模型。
   @Column({ name: 'model_id', nullable: true })

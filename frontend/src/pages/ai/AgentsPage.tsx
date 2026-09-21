@@ -22,6 +22,7 @@ interface AgentFormValues {
   name: string;
   description?: string;
   kind: 'native' | 'dify';
+  code?: string;
   modelId?: number;
   baseUrl?: string;
   apiKey?: string;
@@ -73,6 +74,7 @@ export const AgentsPage: React.FC = () => {
         name: record.name,
         description: record.description,
         kind: record.kind,
+        code: record.code,
         modelId: record.modelId,
         baseUrl: record.baseUrl,
         systemPrompt: record.systemPrompt,
@@ -114,7 +116,13 @@ export const AgentsPage: React.FC = () => {
         dataIndex: 'kind',
         key: 'kind',
         width: 100,
-        render: (kind: string) => (kind === 'dify' ? <Tag color="purple">Dify 应用</Tag> : <Tag>内置编排</Tag>)
+        render: (kind: string, record: AiAgent) => (
+          <Space size={4}>
+            {kind === 'dify' ? <Tag color="purple">Dify 应用</Tag> : <Tag>内置编排</Tag>}
+            {record.code === 'divination' && <Tag color="gold">六爻解卦</Tag>}
+            {record.code && record.code !== 'divination' && <Tag>{record.code}</Tag>}
+          </Space>
+        )
       },
       {
         title: '提示词摘要',
@@ -213,6 +221,19 @@ export const AgentsPage: React.FC = () => {
                 { value: 'dify', label: 'Dify 远程应用' }
               ]}
             />
+          </Form.Item>
+          <Form.Item
+            name="code"
+            label="业务编码"
+            rules={[
+              {
+                pattern: /^[a-z][a-z0-9_-]*$/,
+                message: '小写字母开头，仅含小写字母/数字/中划线/下划线'
+              }
+            ]}
+            extra="业务模块对接锚点，全局唯一；六爻解卦请填 divination"
+          >
+            <Input maxLength={64} placeholder="divination" allowClear />
           </Form.Item>
           {kind === 'native' ? (
             <Form.Item name="modelId" label="绑定模型" rules={[{ required: true, message: '请选择模型' }]}>

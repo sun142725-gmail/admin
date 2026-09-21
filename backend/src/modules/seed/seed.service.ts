@@ -10,6 +10,7 @@ import { Resource } from '../../common/entities/resource.entity';
 import { NotificationTemplate } from '../../common/entities/notification-template.entity';
 import { Dict } from '../../common/entities/dict.entity';
 import { DictItem } from '../../common/entities/dict-item.entity';
+import { AiAgent } from '../../common/entities/ai-agent.entity';
 
 @Injectable()
 export class SeedService implements OnModuleInit {
@@ -28,6 +29,8 @@ export class SeedService implements OnModuleInit {
     private readonly templateRepo: Repository<NotificationTemplate>,
     @InjectRepository(Dict)
     private readonly dictRepo: Repository<Dict>,
+    @InjectRepository(AiAgent)
+    private readonly agentRepo: Repository<AiAgent>,
     @InjectRepository(DictItem)
     private readonly dictItemRepo: Repository<DictItem>
   ) {}
@@ -632,6 +635,19 @@ export class SeedService implements OnModuleInit {
     const legacyPage = await this.resourceRepo.findOne({ where: { path: '/ai/providers', type: 'page' } });
     if (legacyPage) {
       await this.resourceRepo.remove(legacyPage);
+    }
+    // 六爻解卦对接：若已存在同名智能体且业务编码 divination 未被占用，自动补上（历史 scene 数据随列删除，按名称迁移）。
+    try {
+      const codeTaken = await this.agentRepo.findOne({ where: { code: 'divination' } });
+      if (!codeTaken) {
+        const named = await this.agentRepo.findOne({ where: { name: '六爻解卦' } });
+        if (named && !named.code) {
+          named.code = 'divination';
+          await this.agentRepo.save(named);
+        }
+      }
+    } catch {
+      // AI 表未就绪时忽略（synchronize 完成后才跑 seed，正常不会走到）。
     }
     for (const table of ['ai_model_channels', 'ai_providers']) {
       try {

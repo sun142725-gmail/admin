@@ -8,10 +8,11 @@ import { Resource } from '../../common/entities/resource.entity';
 import { NotificationTemplate } from '../../common/entities/notification-template.entity';
 import { Dict } from '../../common/entities/dict.entity';
 import { DictItem } from '../../common/entities/dict-item.entity';
+import { AiAgent } from '../../common/entities/ai-agent.entity';
 import { SeedService } from './seed.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Role, Permission, Resource, NotificationTemplate, Dict, DictItem])],
+  imports: [TypeOrmModule.forFeature([User, Role, Permission, Resource, NotificationTemplate, Dict, DictItem, AiAgent])],
   providers: [SeedService]
 })
 export class SeedModule {}

@@ -52,3 +52,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Secrets / env（根目录 .env 不入库；backend/.env 与 backend/.env.development 按需入库）
 backend/.env.local
 /.env
+deploy/.env.production

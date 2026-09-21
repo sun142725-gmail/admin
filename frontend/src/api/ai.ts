@@ -25,6 +25,7 @@ export interface AiAgent {
   name: string;
   description?: string;
   kind: 'native' | 'dify';
+  code?: string;
   modelId?: number;
   baseUrl?: string;
   apiKeyMask?: string;

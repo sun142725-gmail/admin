@@ -42,6 +42,7 @@ export class AiAgentsService {
       name: dto.name.trim(),
       description: dto.description,
       kind: dto.kind,
+      code: await this.normalizeCode(dto.code),
       modelId: dto.kind === 'native' ? dto.modelId : undefined,
       systemPrompt: dto.systemPrompt,
       temperature: String(dto.temperature ?? 0.7),
@@ -66,6 +67,7 @@ export class AiAgentsService {
     if (dto.name !== undefined) record.name = dto.name.trim();
     if (dto.description !== undefined) record.description = dto.description;
     if (dto.kind !== undefined) record.kind = dto.kind;
+    if (dto.code !== undefined) record.code = await this.normalizeCode(dto.code, record.id);
     if (dto.modelId !== undefined) record.modelId = kind === 'native' ? dto.modelId : undefined;
     if (dto.systemPrompt !== undefined) record.systemPrompt = dto.systemPrompt;
     if (dto.temperature !== undefined) record.temperature = String(dto.temperature);
@@ -101,6 +103,19 @@ export class AiAgentsService {
     }
     await this.agentRepo.remove(record);
     return { success: true };
+  }
+
+  /** 规范化业务编码：去空白；非空时校验全局唯一。 */
+  private async normalizeCode(code?: string, excludeId?: number): Promise<string | undefined> {
+    const trimmed = code?.trim() || undefined;
+    if (!trimmed) {
+      return undefined;
+    }
+    const exists = await this.agentRepo.findOne({ where: { code: trimmed } });
+    if (exists && exists.id !== excludeId) {
+      throw new BadRequestException(`业务编码 ${trimmed} 已被智能体「${exists.name}」占用`);
+    }
+    return trimmed;
   }
 
   private applyDifyCredentials(
@@ -150,6 +165,7 @@ export class AiAgentsService {
       name: item.name,
       description: item.description,
       kind: item.kind,
+      code: item.code,
       modelId: item.modelId,
       baseUrl: item.baseUrl,
       apiKeyMask: item.apiKeyMask,

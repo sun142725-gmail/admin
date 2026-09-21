@@ -4,6 +4,8 @@
 六爻占卜流程与结果管理
 
 ## Module Overview
+
+- 解卦生成：优先走 AI 中心业务编码为 `divination` 的智能体（系统提示词/采样参数/绑定模型在「AI 中心 → 智能体管理」配置），未配置时回落环境变量直连，最终本地兜底文案。
 - **Responsibility:** 占卜主题记录、六爻生成、结果查询
 - **Status:** ✅Stable
 - **Last Updated:** 2026-01-25

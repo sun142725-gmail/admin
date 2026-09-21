@@ -7,7 +7,8 @@
     "start:dev": "cross-env NODE_ENV=development nest start --watch",
     "build": "nest build",
     "test": "jest --runInBand",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "sync:ai": "ts-node scripts/sync-divination-agent.ts"
   },
   "dependencies": {
     "@alicloud/dysmsapi20170525": "^4.6.0",

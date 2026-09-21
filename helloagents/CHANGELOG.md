@@ -3,6 +3,11 @@
 本文件记录项目的重要变更，格式参考 Keep a Changelog 与语义化版本。
 
 ## [未发布]
+### 新增（六爻对接 AI 模块）
+- 上线准备目录 deploy/：README（准备事项+脚本执行顺序）、env.production.example 模板、编号脚本（01-sync-ai.sh 智能体同步 / 02-smoke-test.sh 冒烟验证）；docker-compose 补透传 AI_ENCRYPTION_KEY；底层脚本 backend/scripts/sync-divination-agent.ts（npm run sync:ai）
+- ai_agents 新增 code 业务编码字段（唯一可空），业务模块按 code 对接、不依赖自增 id；智能体管理页支持填写
+- 解卦链路改为：code=divination 的智能体（其系统提示词/采样参数/绑定模型路由）> 任意 chat 模型路由 > 环境变量直连 > 本地兜底
+- seed 幂等迁移：已存在名为「六爻解卦」的智能体自动补上 code=divination
 ### 重构（AI 中心：渠道并入模型）
 - 数据模型简化：渠道字段（协议/请求地址/API Key）直接落到 ai_models，一行模型 = 一个端点；废弃 ai_providers 与 ai_model_channels（seed 启动时自动清理旧表与 /ai/providers 页面资源）
 - 模型去重锚点改为 unique(model_key, base_url)：同地址同模型拒绝重复，不同上游同名模型天然合法，多上游互备（优先级/权重）能力保留
