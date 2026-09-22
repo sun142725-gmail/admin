@@ -54,3 +54,4 @@ backend/.env.local
 /.env
 deploy/.env.production
 deploy/generated/
+backend/uploads/

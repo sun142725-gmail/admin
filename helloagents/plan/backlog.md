@@ -4,6 +4,30 @@
 
 ---
 
+## P1 · 全局 review 登记项（2026-09-21 识别，决策：暂不处理）
+
+1. **种子管理员弱密码**：`seed.service.ts` 固定 `password`。非阻塞；上线后应立即修改 admin 密码（或届时改从 `ADMIN_INIT_PASSWORD` 读取）
+2. **backend/.env 与 .env.development 被 git 跟踪且含真实密钥**（DEEPSEEK_API_KEY / AI_ENCRYPTION_KEY / JWT secret / DB 密码）：用户知情保留；若仓库转公开必须撤出跟踪并轮换全部密钥（AI_ENCRYPTION_KEY 上线后不可更换）
+3. **/uploads 静态目录公开无鉴权**：`main.ts` 直接 `express.static`，文件名仅时间戳。当前内容为公共图片可接受；后续若存私有文件，需改为带鉴权的 Controller 流式返回
+
+---
+
+## P2 · 存量测试与类型债（2026-09-21 提交前 review 识别，非本次改动引入）
+
+1. **后端 5 套件 7 用例存量失败**：dict/auth(code 流程)/log-center/notification 各 spec 报"POST 得 404"同一模式，最后触碰为「邮箱验证码登录」提交；用 git stash 基线对比确认与近期改动无关。需排期修复测试可信度
+2. **前端 36 个 TS 类型错误**（`npx tsc --noEmit`）：全部为老页面对 http.ts 解包响应的类型声明缺失（运行时正确，vite build 不受影响）。修法：为 http 实例声明泛型解包类型（如 `http.get<T>(): Promise<T>`）后逐页清理
+
+---
+
+## P1 · 账号生命周期管理
+
+## P2 · 存量测试与类型债（2026-09-21 提交前 review 识别，非本次改动引入）
+
+1. **后端 5 套件 7 用例存量失败**：dict/auth(code 流程)/log-center/notification 各 spec 报"POST 得 404"同一模式，最后触碰为「邮箱验证码登录」提交；用 git stash 基线对比确认与近期改动无关。需排期修复测试可信度
+2. **前端 36 个 TS 类型错误**（`npx tsc --noEmit`）：全部为老页面对 http.ts 解包响应的类型声明缺失（运行时正确，vite build 不受影响）。修法：为 http 实例声明泛型解包类型（如 `http.get<T>(): Promise<T>`）后逐页清理
+
+---
+
 ## P1 · 账号生命周期管理
 
 **状态:** 📋 待实施（2026-01-25 识别）

@@ -3,6 +3,13 @@
 本文件记录项目的重要变更，格式参考 Keep a Changelog 与语义化版本。
 
 ## [未发布]
+### 安全加固（全局 review P0/P1，2026-09-21）
+- 文件上传 bizType 白名单枚举（common/avatar/divination/chat/notification），multer 落盘阶段格式校验防路径穿越
+- 登录/验证码端点加严限流（login/code 10 次/分、发码 5 次/分）；AI 对话/解卦/生图端点 20 次/分兜底，防 LLM 余额被刷
+- 修正全局限流默认值：throttler v5 的 ttl 单位为毫秒，原默认 60（=60ms 窗口）形同虚设 → 60000ms；.env.development 与 deploy 模板同步修正；NODE_ENV=test 不注册限流守卫避免测试 429
+- 日志上报加上限：单批 ≤50 条、payload ≤4000 字符、字符串字段 MaxLength
+- 占卜创建事务化（卦主体+六爻原子写入）；用户管理禁止自操作与停用/删除最后一名可用管理员
+- 新增 helmet 安全响应头（CSP 关闭以兼容 Swagger UI 与图片外链，CORP=cross-origin）；生产环境关闭 Swagger（NODE_ENV=production 时 /api/docs 404）
 ### 新增（六爻对接 AI 模块）
 - 上线准备目录 deploy/：README（准备事项+脚本执行顺序）、env.production.example 模板、编号脚本（01-sync-ai.sh 引导同步 / 02-generate-ai-sql.sh 拉取开发库 AI 配置生成线上 INSERT IGNORE SQL（线上自添数据不受影响、密钥重加密、按 model_key+base_url 回填模型绑定、强制显式 SOURCE_DB_* 防误连；底层脚本 generate-ai-publish-sql.ts，npm run sync:ai:gen）/ 03-smoke-test.sh 冒烟验证）；docker-compose 补透传 AI_ENCRYPTION_KEY；底层脚本 backend/scripts/sync-divination-agent.ts（npm run sync:ai）与 publish-ai-config.ts（npm run sync:ai:publish）
 - ai_agents 新增 code 业务编码字段（唯一可空），业务模块按 code 对接、不依赖自增 id；智能体管理页支持填写

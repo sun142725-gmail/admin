@@ -1,5 +1,5 @@
 // 日志中心服务负责写入与查询多类型日志。
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, FindOptionsWhere, Like, Repository } from 'typeorm';
 import { TrackLog } from '../../common/entities/track-log.entity';
@@ -28,6 +28,13 @@ export class LogCenterService {
     const source = payload.source;
     const sessionId = payload.sessionId;
     const events = payload.events ?? [];
+
+    // 单条日志负载兜底（payload 为对象无法在 DTO 限制大小，在服务层校验）
+    for (const event of events) {
+      if (JSON.stringify(event.payload ?? {}).length > 4000) {
+        throw new BadRequestException('单条日志 payload 过大');
+      }
+    }
 
     const trackLogs: TrackLog[] = [];
     const frontendLogs: FrontendLog[] = [];

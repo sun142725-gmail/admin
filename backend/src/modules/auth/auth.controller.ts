@@ -2,6 +2,7 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
@@ -17,21 +18,26 @@ import { RequestUser } from '../../common/interfaces/auth.interface';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.authService.login(dto.account ?? dto.username, dto.password, req.ip);
   }
 
+  // 发码接口更严：防短信/邮件轰炸
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('code/send')
   async sendCode(@Body() dto: SendCodeDto, @Req() req: Request) {
     return this.authService.sendCode(dto.scene, dto.channel, dto.target, req.ip);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('code/login')
   async codeLogin(@Body() dto: CodeLoginDto, @Req() req: Request) {
     return this.authService.codeLogin(dto.channel, dto.target, dto.code, req.ip);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('code/reset-password')
   async codeResetPassword(@Body() dto: CodeResetPasswordDto, @Req() req: Request) {
     return this.authService.codeResetPassword(dto.channel, dto.target, dto.code, dto.newPassword, req.ip);

@@ -61,7 +61,8 @@ const isTest = process.env.NODE_ENV === 'test';
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          ttl: Number(process.env.RATE_LIMIT_TTL ?? 60),
+          // throttler v5 的 ttl 单位为毫秒；默认全局 60 秒 60 次
+          ttl: Number(process.env.RATE_LIMIT_TTL ?? 60000),
           limit: Number(process.env.RATE_LIMIT_LIMIT ?? 60)
         }
       ]
@@ -168,11 +169,16 @@ const isTest = process.env.NODE_ENV === 'test';
     DashboardModule,
     FamilyModule
   ],
+  // 测试环境不注册限流守卫：测试用例会在同一 IP 上发起大量请求，避免被 429 干扰
   providers: [
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard
-    }
+    ...(isTest
+      ? []
+      : [
+          {
+            provide: APP_GUARD,
+            useClass: ThrottlerGuard
+          }
+        ])
   ]
 })
 export class AppModule implements NestModule {

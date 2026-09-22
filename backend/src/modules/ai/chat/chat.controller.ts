@@ -1,5 +1,6 @@
 // AI 对话控制器：两段式流（POST 预启动 / GET SSE 订阅）。
 import { Body, Controller, Delete, Get, MessageEvent, Param, ParseIntPipe, Post, Put, Query, Sse, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { SetMetadata } from '@nestjs/common';
@@ -53,6 +54,8 @@ export class AiChatController {
 
   // ---------- 对话 ----------
   // 第一步：提交内容，立即返回 conversationId + messageId。
+  // LLM 调用成本兜底：每 IP 每分钟 20 次（全局限流之上加严）
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('completions')
   async submit(@CurrentUser() user: RequestUser, @Body() dto: ChatRequestDto) {
     return this.chatService.submit(user.id, dto);

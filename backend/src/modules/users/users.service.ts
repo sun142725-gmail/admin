@@ -26,6 +26,26 @@ export class UsersService {
     return rest;
   }
 
+  /** 禁止操作自己；禁止停用/删除最后一名可用管理员（避免误操作锁死系统）。 */
+  private async assertNotSelfAndLastAdmin(target: User, operatorId?: number) {
+    if (operatorId != null && target.id === operatorId) {
+      throw new BadRequestException('不能对自己执行该操作');
+    }
+    const isAdmin = (target.roles ?? []).some((role) => role.code === 'admin');
+    if (!isAdmin) {
+      return;
+    }
+    const activeAdmins = await this.userRepo
+      .createQueryBuilder('u')
+      .innerJoin('u.roles', 'r')
+      .where('r.code = :code', { code: 'admin' })
+      .andWhere('u.status = 1')
+      .getCount();
+    if (activeAdmins <= 1) {
+      throw new BadRequestException('不能停用或删除最后一名可用管理员');
+    }
+  }
+
   async list(page = 1, pageSize = 20) {
     const [items, total] = await this.userRepo.findAndCount({
       relations: ['roles'],
@@ -66,10 +86,11 @@ export class UsersService {
   }
 
   async disable(id: number, operatorId?: number, ip?: string) {
-    const user = await this.userRepo.findOne({ where: { id } });
+    const user = await this.userRepo.findOne({ where: { id }, relations: ['roles'] });
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
+    await this.assertNotSelfAndLastAdmin(user, operatorId);
     user.status = 0;
     await this.userRepo.save(user);
     await this.auditService.log('disable', 'users', `禁用用户 ${user.username}`, operatorId, ip);
@@ -77,10 +98,11 @@ export class UsersService {
   }
 
   async remove(id: number, operatorId?: number, ip?: string) {
-    const user = await this.userRepo.findOne({ where: { id } });
+    const user = await this.userRepo.findOne({ where: { id }, relations: ['roles'] });
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
+    await this.assertNotSelfAndLastAdmin(user, operatorId);
     await this.userRepo.remove(user);
     await this.auditService.log('delete', 'users', `删除用户 ${user.username}`, operatorId, ip);
     return { success: true };

@@ -45,29 +45,32 @@ export class DivinationService implements OnModuleInit {
     const { hexagramName, changedHexagramName } = getHexagramNames(symbols);
     const resolvedTopic = typeof topic === 'string' ? topic.trim().slice(0, 50) : '';
 
-    const divination = await this.divinationRepo.save(
-      this.divinationRepo.create({
-        topic: resolvedTopic,
-        userId,
-        status: resolvedTopic ? 'interpreting' : 'casting',
-        hexagramName,
-        changedHexagramName: changedHexagramName ?? null
-      })
-    );
-
-    const lineEntities = generated.map((line, index) =>
-      this.lineRepo.create({
-        lineIndex: index,
-        signStr: line.signStr,
-        sum: line.sum,
-        symbol: line.symbol,
-        name: line.name,
-        divinationId: divination.id,
-        divination
-      })
-    );
-    await this.lineRepo.save(lineEntities);
-    divination.lines = lineEntities;
+    // 卦主体与六爻原子写入，避免爻行落库失败留下脏数据
+    const divination = await this.divinationRepo.manager.transaction(async (em) => {
+      const created = await em.save(
+        this.divinationRepo.create({
+          topic: resolvedTopic,
+          userId,
+          status: resolvedTopic ? 'interpreting' : 'casting',
+          hexagramName,
+          changedHexagramName: changedHexagramName ?? null
+        })
+      );
+      const lineEntities = generated.map((line, index) =>
+        this.lineRepo.create({
+          lineIndex: index,
+          signStr: line.signStr,
+          sum: line.sum,
+          symbol: line.symbol,
+          name: line.name,
+          divinationId: created.id,
+          divination: created
+        })
+      );
+      await em.save(lineEntities);
+      created.lines = lineEntities;
+      return created;
+    });
     return this.format(divination);
   }
 

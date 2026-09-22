@@ -69,3 +69,10 @@
 - [202601251700_dict_management](../../history/2026-01/202601251700_dict_management/) - 新增字典管理页面
 - [202601251753_form_messages](../../history/2026-01/202601251753_form_messages/) - 表单提示文案统一
 - [frontend-visual](../frontend-visual.md) - 后台视觉规范与布局统一约定
+
+## 已知安全备注
+
+### 通知内容渲染存在 XSS 面（登记于 2026-09-21 全局 review）
+- `pages/notification/InboxPage.tsx`、`TemplatePage.tsx`、`PublishPage.tsx` 使用 `dangerouslySetInnerHTML` 直接渲染模板/消息内容，未做 sanitize
+- 注入来源为具备 `system:notification:template:*` 权限的管理员（低概率但真实存在），被注入脚本可窃取 localStorage 中的 token
+- 处置建议：引入 DOMPurify 包一层（`DOMPurify.sanitize(content)`），或改为纯文本渲染 + 代码块样式
