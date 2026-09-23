@@ -1,5 +1,5 @@
 // 资源服务负责菜单树与资源管理。
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Resource } from '../../common/entities/resource.entity';
@@ -62,6 +62,10 @@ export class ResourcesService {
     const resource = await this.resourceRepo.findOne({ where: { id } });
     if (!resource) {
       throw new NotFoundException('资源不存在');
+    }
+    const childCount = await this.resourceRepo.count({ where: { parentId: id } });
+    if (childCount > 0) {
+      throw new BadRequestException(`资源下仍有 ${childCount} 个子资源，请先删除子资源`);
     }
     await this.resourceRepo.remove(resource);
     await this.auditService.log('delete', 'resources', `删除资源 ${resource.name}`, operatorId, ip);

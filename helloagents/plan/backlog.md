@@ -12,18 +12,10 @@
 
 ---
 
-## P2 · 存量测试与类型债（2026-09-21 提交前 review 识别，非本次改动引入）
-
-1. **后端 5 套件 7 用例存量失败**：dict/auth(code 流程)/log-center/notification 各 spec 报"POST 得 404"同一模式，最后触碰为「邮箱验证码登录」提交；用 git stash 基线对比确认与近期改动无关。需排期修复测试可信度
-2. **前端 36 个 TS 类型错误**（`npx tsc --noEmit`）：全部为老页面对 http.ts 解包响应的类型声明缺失（运行时正确，vite build 不受影响）。修法：为 http 实例声明泛型解包类型（如 `http.get<T>(): Promise<T>`）后逐页清理
-
----
-
-## P1 · 账号生命周期管理
 
 ## P2 · 存量测试与类型债（2026-09-21 提交前 review 识别，非本次改动引入）
 
-1. **后端 5 套件 7 用例存量失败**：dict/auth(code 流程)/log-center/notification 各 spec 报"POST 得 404"同一模式，最后触碰为「邮箱验证码登录」提交；用 git stash 基线对比确认与近期改动无关。需排期修复测试可信度
+1. **后端 5 套件 7 用例存量失败**（根因已实锤，2026-09-23）：e2e 用 `createNestApplication()` 手动建 app 时**未调用 `app.setGlobalPrefix('api')`**，且未注册全局 ResponseInterceptor（响应是扁平结构而非 `{code,data}` 解包结构）——与 spec 里的 `/api/xxx` 请求路径和 `res.body.data` 取值双重不匹配 → 404/undefined。修法：各 e2e 的 beforeAll 统一 `app.setGlobalPrefix('api')` + 注册 ResponseInterceptor，或改用与 main.ts 一致的 bootstrap 辅助函数；最后触碰为「邮箱验证码登录」提交，git stash 基线确认与近期改动无关
 2. **前端 36 个 TS 类型错误**（`npx tsc --noEmit`）：全部为老页面对 http.ts 解包响应的类型声明缺失（运行时正确，vite build 不受影响）。修法：为 http 实例声明泛型解包类型（如 `http.get<T>(): Promise<T>`）后逐页清理
 
 ---

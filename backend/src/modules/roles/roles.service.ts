@@ -59,6 +59,17 @@ export class RolesService {
     if (!role) {
       throw new NotFoundException('角色不存在');
     }
+    if (role.code === 'admin') {
+      throw new BadRequestException('内置管理员角色不可删除');
+    }
+    const inUse = await this.userRepo
+      .createQueryBuilder('u')
+      .innerJoin('u.roles', 'r')
+      .where('r.id = :id', { id })
+      .getCount();
+    if (inUse > 0) {
+      throw new BadRequestException(`角色仍有 ${inUse} 个用户使用，请先移除关联`);
+    }
     await this.roleRepo.remove(role);
     await this.auditService.log('delete', 'roles', `删除角色 ${role.name}`, operatorId, ip);
     return { success: true };

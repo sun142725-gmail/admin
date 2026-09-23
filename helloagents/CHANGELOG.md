@@ -10,6 +10,11 @@
 - 日志上报加上限：单批 ≤50 条、payload ≤4000 字符、字符串字段 MaxLength
 - 占卜创建事务化（卦主体+六爻原子写入）；用户管理禁止自操作与停用/删除最后一名可用管理员
 - 新增 helmet 安全响应头（CSP 关闭以兼容 Swagger UI 与图片外链，CORP=cross-origin）；生产环境关闭 Swagger（NODE_ENV=production 时 /api/docs 404）
+### 数据完整性加固（补充 review，2026-09-23）
+- 角色删除保护：内置 admin 角色不可删；仍有用户挂载的角色拒绝删除并提示数量
+- 权限删除引用检查：仍被角色引用时拒绝；资源删除引用检查：存在子资源时拒绝
+- 审计日志写入降级：log() 失败只告警不阻断业务（避免"业务已成功但响应 500"）
+- 字典 Redis 缓存读写删全命令 try-catch 降级：缓存故障穿透到 DB，不再 500
 ### 新增（六爻对接 AI 模块）
 - 上线准备目录 deploy/：README（准备事项+脚本执行顺序）、env.production.example 模板、编号脚本（01-sync-ai.sh 引导同步 / 02-generate-ai-sql.sh 拉取开发库 AI 配置生成线上 INSERT IGNORE SQL（线上自添数据不受影响、密钥重加密、按 model_key+base_url 回填模型绑定、强制显式 SOURCE_DB_* 防误连；底层脚本 generate-ai-publish-sql.ts，npm run sync:ai:gen）/ 03-smoke-test.sh 冒烟验证）；docker-compose 补透传 AI_ENCRYPTION_KEY；底层脚本 backend/scripts/sync-divination-agent.ts（npm run sync:ai）与 publish-ai-config.ts（npm run sync:ai:publish）
 - ai_agents 新增 code 业务编码字段（唯一可空），业务模块按 code 对接、不依赖自增 id；智能体管理页支持填写

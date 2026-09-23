@@ -47,9 +47,14 @@ export class PermissionsService {
   }
 
   async remove(id: number, operatorId?: number, ip?: string) {
-    const permission = await this.permissionRepo.findOne({ where: { id } });
+    const permission = await this.permissionRepo.findOne({ where: { id }, relations: ['roles'] });
     if (!permission) {
       throw new NotFoundException('权限不存在');
+    }
+    if ((permission.roles ?? []).length > 0) {
+      throw new BadRequestException(
+        `权限仍被 ${permission.roles.length} 个角色引用，请先解除关联`
+      );
     }
     await this.permissionRepo.remove(permission);
     await this.auditService.log('delete', 'permissions', `删除权限 ${permission.code}`, operatorId, ip);
