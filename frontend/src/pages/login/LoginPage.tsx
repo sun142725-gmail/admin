@@ -54,6 +54,7 @@ export const LoginPage: React.FC = () => {
       <div className="login-panel">
         <Card
           className="login-card"
+          style={{ borderRadius: 28, boxShadow: '0 24px 60px rgba(15, 23, 42, 0.18)' }}
           title={
             <div>
               <div className="login-card-title">

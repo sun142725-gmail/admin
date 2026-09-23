@@ -10,6 +10,10 @@
 - 日志上报加上限：单批 ≤50 条、payload ≤4000 字符、字符串字段 MaxLength
 - 占卜创建事务化（卦主体+六爻原子写入）；用户管理禁止自操作与停用/删除最后一名可用管理员
 - 新增 helmet 安全响应头（CSP 关闭以兼容 Swagger UI 与图片外链，CORP=cross-origin）；生产环境关闭 Swagger（NODE_ENV=production 时 /api/docs 404）
+### UI 规范化：Tailwind v4 引入 + antd5 主题 Token 化（2026-09-23，方案见 plan/ui_tailwind_refactor.md）
+- 基建：新增 tailwindcss@4 + @tailwindcss/vite（devDeps）；global.css 只引入 theme+utilities 两层并跳过 preflight（防 reset 破坏 antd）；@theme 定义 token（主色/文字/圆角，值与旧 CSS 变量一致）
+- antd5 规范落地：ConfigProvider 配置 theme token/components，替代 global.css 中全部 antd !important 全局覆写（卡片 20/表格 18/输入与按钮 12 圆角、表头 #f7faff、hover 行背景、主按钮阴影）；顺带修复按钮圆角 6px 与输入框 12px 的不一致（原按钮覆写已被 antd 压制失效）
+- 通用布局类（page-toolbar/actions/breadcrumb/content-inner/role-permissions 居中）改用 @apply 工具类实现，值逐项对齐；复杂渐变/阴影类保留原生 CSS；JSX className 零改动、业务逻辑零改动
 ### 数据完整性加固（补充 review，2026-09-23）
 - 角色删除保护：内置 admin 角色不可删；仍有用户挂载的角色拒绝删除并提示数量
 - 权限删除引用检查：仍被角色引用时拒绝；资源删除引用检查：存在子资源时拒绝
