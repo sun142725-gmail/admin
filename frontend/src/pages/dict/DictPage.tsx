@@ -351,7 +351,7 @@ export const DictPage: React.FC = () => {
         onClose={() => setDrawerOpen(false)}
         width={720}
       >
-        <Space style={{ marginBottom: 16 }}>
+        <Space className="mb-4">
           <Permission code="system:dict:update" mode="disable">
             <Button type="primary" onClick={() => openItemModal()}>
               新增字典项
@@ -382,7 +382,7 @@ export const DictPage: React.FC = () => {
             <Input.TextArea placeholder='例如 {"en-US":"Enabled","ja-JP":"有効"}' />
           </Form.Item>
           <Form.Item label="排序" name="sortOrder">
-            <InputNumber min={0} style={{ width: '100%' }} />
+            <InputNumber min={0} className="w-full" />
           </Form.Item>
           <Form.Item label="状态" name="status" valuePropName="checked" initialValue={true}>
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />

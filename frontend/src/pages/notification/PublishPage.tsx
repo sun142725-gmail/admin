@@ -324,11 +324,11 @@ export const PublishPage: React.FC = () => {
 
   return (
     <div>
-      <Form form={queryForm} layout="inline" style={{ marginBottom: 16, rowGap: 12 }}>
+      <Form form={queryForm} layout="inline" className="mb-4 gap-y-3">
         <Form.Item name="templateId" label="模板">
           <Select
             allowClear
-            style={{ width: 180 }}
+            className="w-[180px]"
             placeholder="请选择模板"
             options={templates.map((item) => ({ value: item.id, label: item.name }))}
           />
@@ -336,7 +336,7 @@ export const PublishPage: React.FC = () => {
         <Form.Item name="channelType" label="通道">
           <Select
             allowClear
-            style={{ width: 140 }}
+            className="w-[140px]"
             placeholder="全部通道"
             options={(channelItems.length ? channelItems : DEFAULT_CHANNEL_OPTIONS).map((item) => ({
               ...item,
@@ -345,10 +345,10 @@ export const PublishPage: React.FC = () => {
           />
         </Form.Item>
         <Form.Item name="status" label="状态">
-          <Select allowClear style={{ width: 140 }} placeholder="全部状态" options={STATUS_OPTIONS} />
+          <Select allowClear className="w-[140px]" placeholder="全部状态" options={STATUS_OPTIONS} />
         </Form.Item>
         <Form.Item name="keyword" label="关键词">
-          <Input style={{ width: 220 }} placeholder="模板名/失败原因" />
+          <Input className="w-[220px]" placeholder="模板名/失败原因" />
         </Form.Item>
         <Form.Item>
           <Space>
@@ -360,7 +360,7 @@ export const PublishPage: React.FC = () => {
         </Form.Item>
       </Form>
 
-      <Space style={{ marginBottom: 16 }}>
+      <Space className="mb-4">
         <Permission code="system:notification:publish:create" mode="disable">
           <Button type="primary" onClick={onCreate}>
             发布通知
@@ -418,7 +418,7 @@ export const PublishPage: React.FC = () => {
 
           {selectedTemplate?.variables?.length ? (
             <>
-              <Form.Item label="模板变量" style={{ marginBottom: 0 }}>
+              <Form.Item label="模板变量" className="!mb-0">
                 <Space wrap>
                   {selectedTemplate.variables.map((item) => (
                     <Tag key={item.key} color={item.required ? 'red' : 'default'}>
@@ -431,7 +431,7 @@ export const PublishPage: React.FC = () => {
                 <Alert
                   type="info"
                   showIcon
-                  style={{ marginBottom: 12 }}
+                  className="mb-3"
                   message="站内信模式下 userNickname 可留空，系统会按收件人昵称自动填充。"
                 />
               ) : null}
@@ -469,7 +469,7 @@ export const PublishPage: React.FC = () => {
         ) : !detail ? (
           <div>暂无数据</div>
         ) : (
-          <Space direction="vertical" style={{ width: '100%' }} size={16}>
+          <Space direction="vertical" className="w-full" size={16}>
             <Descriptions size="small" bordered column={2}>
               <Descriptions.Item label="发布ID">{detail.id}</Descriptions.Item>
               <Descriptions.Item label="模板">{detail.template?.name ?? '-'}</Descriptions.Item>
@@ -485,14 +485,14 @@ export const PublishPage: React.FC = () => {
               <Descriptions.Item label="创建时间">{detail.createdAt ?? '-'}</Descriptions.Item>
             </Descriptions>
 
-            <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 12 }}>
+            <div className="preview-card">
               <Typography.Text strong>变量映射</Typography.Text>
               {Object.keys(detail.payload?.variables ?? {}).length ? (
                 <AppTable
                   rowKey="key"
                   size="small"
                   pagination={false}
-                  style={{ marginTop: 8 }}
+                  className="mt-2"
                   dataSource={Object.entries(detail.payload?.variables ?? {}).map(([key, value]) => ({
                     key,
                     value
@@ -503,23 +503,23 @@ export const PublishPage: React.FC = () => {
                   ]}
                 />
               ) : (
-                <div style={{ marginTop: 8, color: '#999' }}>无变量</div>
+                <div className="mt-2 text-[#999]">无变量</div>
               )}
             </div>
 
-            <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 12 }}>
+            <div className="preview-card">
               <Typography.Text strong>消息预览</Typography.Text>
               <Descriptions
                 size="small"
                 column={1}
-                style={{ marginTop: 8 }}
+                className="mt-2"
                 items={[
                   {
                     key: 'raw-template',
                     label: '原始模板',
                     children: (
                       <div
-                        style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 10 }}
+                        className="preview-card-sm"
                         dangerouslySetInnerHTML={{ __html: detail.template?.content ?? '-' }}
                       />
                     )
@@ -529,7 +529,7 @@ export const PublishPage: React.FC = () => {
                     label: '渲染后内容',
                     children: (
                       <div
-                        style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 10 }}
+                        className="preview-card-sm"
                         dangerouslySetInnerHTML={{
                           __html: renderContent(detail.template?.content, detail.payload?.variables)
                         }}
@@ -541,12 +541,12 @@ export const PublishPage: React.FC = () => {
             </div>
 
             {detail.messages?.length ? (
-              <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 12 }}>
+              <div className="preview-card">
                 <Typography.Text strong>站内信发送明细</Typography.Text>
                 <AppTable
                   rowKey="id"
                   size="small"
-                  style={{ marginTop: 8 }}
+                  className="mt-2"
                   pagination={false}
                   dataSource={detail.messages}
                   columns={[

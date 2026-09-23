@@ -299,7 +299,7 @@ export const TemplatePage: React.FC = () => {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16 }}>
+      <Space className="mb-4">
         <Permission code="system:notification:template:create" mode="disable">
           <Button type="primary" onClick={onCreate}>
             新增模板
@@ -325,10 +325,10 @@ export const TemplatePage: React.FC = () => {
         }
       >
         <Form layout="vertical" form={form}>
-          <div style={{ display: 'grid', gap: 16 }}>
+          <div className="grid gap-4">
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>基础设置</div>
-              <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <div className="text-sm font-semibold mb-3">基础设置</div>
+              <Space direction="vertical" size={12} className="w-full">
                 <Form.Item
                   label="模板编码"
                   name="code"
@@ -354,7 +354,7 @@ export const TemplatePage: React.FC = () => {
             </div>
 
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>变量设置</div>
+              <div className="text-sm font-semibold mb-3">变量设置</div>
               <Form.Item label="变量标签（点击插入）">
                 <Space wrap>
                   {variableList.map((item) => {
@@ -363,7 +363,8 @@ export const TemplatePage: React.FC = () => {
                       <Tag
                         key={`${item.source}-${item.key}-${item.label}`}
                         color={item.required ? 'red' : 'default'}
-                        style={{ cursor: 'pointer', backgroundColor: style.bgColor, color: style.color }}
+                        className="cursor-pointer"
+                        style={{ backgroundColor: style.bgColor, color: style.color }}
                         onClick={() => insertVariable(item.key)}
                       >
                         {item.label}({item.key})
@@ -376,14 +377,14 @@ export const TemplatePage: React.FC = () => {
               <Form.List name="customVariables">
                 {(fields, { add, remove }) => (
                   <div>
-                    <Space style={{ marginBottom: 8 }}>
+                    <Space className="mb-2">
                       <span>自定义变量</span>
                       <Button size="small" onClick={() => add()}>
                         新增变量
                       </Button>
                     </Space>
                     {fields.map(({ key, name, ...restField }) => (
-                      <Space key={key} align="baseline" style={{ display: 'flex', marginBottom: 8 }}>
+                      <Space key={key} align="baseline" className="!flex mb-2">
                         <Form.Item
                           {...restField}
                           name={[name, 'key']}
@@ -415,7 +416,7 @@ export const TemplatePage: React.FC = () => {
             </div>
 
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>模板内容</div>
+              <div className="text-sm font-semibold mb-3">模板内容</div>
               <Form.Item name="content" rules={[{ required: true, message: '请填写模板内容' }]}>
                 <ReactQuill
                   ref={quillRef}
@@ -452,12 +453,7 @@ export const TemplatePage: React.FC = () => {
 
               <Form.Item label="变量预览">
                 <div
-                  style={{
-                    border: '1px solid #f0f0f0',
-                    borderRadius: 6,
-                    padding: 12,
-                    minHeight: 56
-                  }}
+                  className="preview-box"
                   dangerouslySetInnerHTML={{ __html: highlightedPreview }}
                 />
               </Form.Item>

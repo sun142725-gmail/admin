@@ -58,7 +58,7 @@ export const LoginPage: React.FC = () => {
           title={
             <div>
               <div className="login-card-title">
-                <AppstoreOutlined style={{ marginRight: 8, color: '#1677ff' }} />
+                <AppstoreOutlined className="mr-2 !text-primary" />
                 RBAC 管理后台
               </div>
               <div className="login-card-subtitle">请输入账号密码进入控制台</div>

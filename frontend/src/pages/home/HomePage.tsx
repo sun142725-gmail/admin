@@ -73,8 +73,8 @@ export const HomePage: React.FC = () => {
 
   return (
     <div>
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
-        <Title level={3} style={{ marginBottom: 0 }}>
+      <Space className="w-full justify-between mb-2">
+        <Title level={3} className="!mb-0">
           系统资源总览--------
         </Title>
         <Space>
@@ -83,7 +83,7 @@ export const HomePage: React.FC = () => {
               <div>
                 <div>内存口径: 使用率 = (total - available) / total</div>
                 <div>说明: available 包含可回收缓存，更接近 free -h 的可用内存。</div>
-                <div style={{ marginTop: 8 }}>
+                <div className="mt-2">
                   原始值:
                   <br />
                   total: {formatBytes(data?.memory.totalBytes ?? 0)}
@@ -95,7 +95,7 @@ export const HomePage: React.FC = () => {
               </div>
             }
           >
-            <QuestionCircleOutlined style={{ color: '#1677ff', fontSize: 16 }} />
+            <QuestionCircleOutlined className="!text-primary !text-base" />
           </Tooltip>
           <Tag color="blue">{dayjs().format('YYYY-MM-DD HH:mm:ss')}</Tag>
           <Button onClick={() => loadData()} loading={loading}>
@@ -103,11 +103,11 @@ export const HomePage: React.FC = () => {
           </Button>
         </Space>
       </Space>
-      <Paragraph style={{ marginBottom: 16 }}>展示服务器资源、Node 进程状态与进程占用 TOP，自动每 15 秒刷新。</Paragraph>
+      <Paragraph className="!mb-4">展示服务器资源、Node 进程状态与进程占用 TOP，自动每 15 秒刷新。</Paragraph>
 
       {!data && !loading && (
         <Alert
-          style={{ marginBottom: 16 }}
+          className="mb-4"
           type="warning"
           showIcon
           message="暂无监控数据"
@@ -119,24 +119,24 @@ export const HomePage: React.FC = () => {
         <Col xs={24} md={8}>
           <Card bordered={false}>
             <Statistic title="CPU 使用率" value={data?.cpu.usagePercent ?? 0} suffix="%" precision={2} />
-            <Progress style={{ marginTop: 12 }} percent={data?.cpu.usagePercent ?? 0} showInfo={false} />
+            <Progress className="mt-3" percent={data?.cpu.usagePercent ?? 0} showInfo={false} />
           </Card>
         </Col>
         <Col xs={24} md={8}>
           <Card bordered={false}>
             <Statistic title="内存使用率" value={data?.memory.usagePercent ?? 0} suffix="%" precision={2} />
-            <Progress style={{ marginTop: 12 }} percent={data?.memory.usagePercent ?? 0} showInfo={false} />
+            <Progress className="mt-3" percent={data?.memory.usagePercent ?? 0} showInfo={false} />
           </Card>
         </Col>
         <Col xs={24} md={8}>
           <Card bordered={false}>
             <Statistic title="磁盘使用率" value={data?.disk?.usagePercent ?? 0} suffix="%" precision={2} />
-            <Progress style={{ marginTop: 12 }} percent={data?.disk?.usagePercent ?? 0} showInfo={false} />
+            <Progress className="mt-3" percent={data?.disk?.usagePercent ?? 0} showInfo={false} />
           </Card>
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: 4 }}>
+      <Row gutter={[16, 16]} className="mt-1">
         <Col xs={24} md={12}>
           <Card
             title="服务器信息"
@@ -167,11 +167,11 @@ export const HomePage: React.FC = () => {
 
       <Card
         title="进程占用 TOP（按 CPU）"
-        style={{ marginTop: 16 }}
+        className="mt-4"
         bordered={false}
-        extra={<span style={{ color: '#6b7280' }}>用于快速定位异常进程占用</span>}
+        extra={<span className="text-gray-500">用于快速定位异常进程占用</span>}
       >
-        <Divider style={{ marginTop: 0 }} />
+        <Divider className="!mt-0" />
         <Table
           rowKey="pid"
           loading={loading}

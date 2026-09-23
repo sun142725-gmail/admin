@@ -259,11 +259,11 @@ export const ChatPage: React.FC = () => {
 
 
   return (
-    <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 140px)' }}>
+    <div className="flex gap-4 h-[calc(100vh-140px)]">
       {/* 会话列表 */}
       <Card
         title="会话"
-        style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column' }}
+        className="w-[280px] shrink-0 flex flex-col"
         styles={{
           header: { padding: '8px 12px', minHeight: 'auto' },
           body: { flex: 1, overflow: 'auto', padding: '8px 4px' }
@@ -281,12 +281,8 @@ export const ChatPage: React.FC = () => {
             dataSource={conversations}
             renderItem={(item) => (
               <List.Item
-                style={{
-                  cursor: 'pointer',
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  background: activeId === item.id ? 'rgba(22,119,255,0.08)' : undefined
-                }}
+                className="cursor-pointer !px-3 !py-2 rounded-lg"
+                style={{ background: activeId === item.id ? 'rgba(22,119,255,0.08)' : undefined }}
                 onClick={() => void openConversation(item)}
                 actions={[
                   <Tooltip key="edit" title="重命名">
@@ -319,7 +315,7 @@ export const ChatPage: React.FC = () => {
                   </Popconfirm>
                 ]}
               >
-                <Typography.Text ellipsis style={{ maxWidth: 140 }}>
+                <Typography.Text ellipsis className="max-w-[140px]">
                   {item.title}
                 </Typography.Text>
               </List.Item>
@@ -330,11 +326,11 @@ export const ChatPage: React.FC = () => {
 
       {/* 聊天区 */}
       <Card
-        style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+        className="flex-1 flex flex-col"
         styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: '12px 16px' } }}
       >
         <Select
-          style={{ width: 300 }}
+          className="w-[300px]"
           placeholder="默认路由（可选智能体或模型）"
           allowClear
           showSearch
@@ -344,22 +340,18 @@ export const ChatPage: React.FC = () => {
           onChange={(value) => setTarget(value)}
         />
 
-        <div ref={listBodyRef} style={{ flex: 1, overflow: 'auto', padding: '4px 8px' }}>
+        <div ref={listBodyRef} className="flex-1 overflow-auto px-2 py-1">
           {bubbles.length === 0 ? (
-            <Empty description={selectedAgent?.openingLine ?? WELCOME_HINT} imageStyle={{ height: 60 }} style={{ marginTop: 80 }} />
+            <Empty description={selectedAgent?.openingLine ?? WELCOME_HINT} imageStyle={{ height: 60 }} className="mt-20" />
           ) : (
             bubbles.map((bubble, index) => (
               <div
                 key={index}
-                style={{ display: 'flex', justifyContent: bubble.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 12 }}
+                className={`flex mb-3 ${bubble.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
+                  className="max-w-[78%] px-3.5 py-2.5 rounded-xl whitespace-pre-wrap break-words"
                   style={{
-                    maxWidth: '78%',
-                    padding: '10px 14px',
-                    borderRadius: 12,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
                     background: bubble.role === 'user' ? '#e6f4ff' : '#f5f5f5',
                     border: bubble.status === 'failed' ? '1px solid #ffa39e' : undefined
                   }}
@@ -372,8 +364,8 @@ export const ChatPage: React.FC = () => {
           )}
         </div>
 
-        <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
-          <Space.Compact style={{ width: '100%' }}>
+        <div className="border-t border-[#f0f0f0] pt-2">
+          <Space.Compact className="w-full">
             <Input
               placeholder="输入消息，Enter 发送"
               value={input}
@@ -393,7 +385,7 @@ export const ChatPage: React.FC = () => {
             )}
           </Space.Compact>
           {bubbles.length > 1 && !generating && (
-            <Button type="link" size="small" style={{ marginTop: 4 }} onClick={regenerate}>
+            <Button type="link" size="small" className="mt-1" onClick={regenerate}>
               重新生成
             </Button>
           )}

@@ -113,12 +113,12 @@ export const InboxPage: React.FC = () => {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16 }}>
+      <Space className="mb-4">
         <Select
           value={status}
           onChange={setStatus}
           options={STATUS_OPTIONS}
-          style={{ width: 140 }}
+          className="w-[140px]"
           placeholder="筛选状态"
         />
         <Tag color="red">未读 {unreadCount}</Tag>

@@ -278,22 +278,22 @@ export const AgentsPage: React.FC = () => {
               rows={8}
               maxLength={8000}
               showCount
-              style={{ fontFamily: 'monospace' }}
+              className="font-mono"
               placeholder="你是…（角色、规则、知识、输出格式）"
             />
           </Form.Item>
           <Space size="large" wrap>
             <Form.Item name="temperature" label="Temperature">
-              <InputNumber min={0} max={2} step={0.1} style={{ width: 110 }} />
+              <InputNumber min={0} max={2} step={0.1} className="w-[110px]" />
             </Form.Item>
             <Form.Item name="topP" label="Top P">
-              <InputNumber min={0} max={1} step={0.1} style={{ width: 110 }} />
+              <InputNumber min={0} max={1} step={0.1} className="w-[110px]" />
             </Form.Item>
             <Form.Item name="maxTokens" label="最大输出">
-              <InputNumber min={64} style={{ width: 110 }} />
+              <InputNumber min={64} className="w-[110px]" />
             </Form.Item>
             <Form.Item name="sort" label="排序">
-              <InputNumber min={0} style={{ width: 110 }} />
+              <InputNumber min={0} className="w-[110px]" />
             </Form.Item>
           </Space>
           <Form.Item name="openingLine" label="开场白">

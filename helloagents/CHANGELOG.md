@@ -14,6 +14,11 @@
 - 基建：新增 tailwindcss@4 + @tailwindcss/vite（devDeps）；global.css 只引入 theme+utilities 两层并跳过 preflight（防 reset 破坏 antd）；@theme 定义 token（主色/文字/圆角，值与旧 CSS 变量一致）
 - antd5 规范落地：ConfigProvider 配置 theme token/components，替代 global.css 中全部 antd !important 全局覆写（卡片 20/表格 18/输入与按钮 12 圆角、表头 #f7faff、hover 行背景、主按钮阴影）；顺带修复按钮圆角 6px 与输入框 12px 的不一致（原按钮覆写已被 antd 压制失效）
 - 通用布局类（page-toolbar/actions/breadcrumb/content-inner/role-permissions 居中）改用 @apply 工具类实现，值逐项对齐；复杂渐变/阴影类保留原生 CSS；JSX className 零改动、业务逻辑零改动
+### 内联样式清理：54 处静态 style 迁 Tailwind 工具类（2026-09-23，第二批次）
+- HomePage 13 / PublishPage 18 / ChatPage 13 / TemplatePage 10 / Images 7 / Agents 5 / 其余 7 处全部清零
+- 动态绑定样式（会话高亮、气泡配色、Tag 动态色等）按方案保留 style；ChatPage 气泡对齐改为条件 className
+- 层叠规则落地：antd 自带 margin 的组件（Title/Divider/Form.Item）用 Tailwind ! 修饰符（单点受控），无冲突属性用普通工具类
+- 提取语义类 preview-card / preview-card-sm / preview-box（通知预览小卡，消除 5 处重复）
 ### 数据完整性加固（补充 review，2026-09-23）
 - 角色删除保护：内置 admin 角色不可删；仍有用户挂载的角色拒绝删除并提示数量
 - 权限删除引用检查：仍被角色引用时拒绝；资源删除引用检查：存在子资源时拒绝

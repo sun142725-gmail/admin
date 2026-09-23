@@ -640,6 +640,19 @@ a {
   line-height: 1.6;
 }
 
+/* 通知发布详情：变量映射/消息预览小卡（原内联样式提取） */
+.preview-card {
+  @apply border border-[#f0f0f0] rounded-lg p-3;
+}
+
+.preview-card-sm {
+  @apply border border-[#f0f0f0] rounded-lg p-2.5;
+}
+
+.preview-box {
+  @apply border border-[#f0f0f0] rounded-md p-3 min-h-[56px];
+}
+
 /* 抽屉顶部单侧圆角：形状特殊，token 无法表达，保留 */
 .ant-drawer .ant-drawer-content {
   border-radius: 24px 24px 0 0;

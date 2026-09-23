@@ -56,8 +56,8 @@ export const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: 24 }}>
-      <Card style={{ marginBottom: 24 }}>
+    <div className="p-6">
+      <Card className="mb-6">
         <Title level={4}>个人资料</Title>
         <Form layout="vertical" form={profileForm}>
           <Form.Item label="头像" name="avatarUrl">

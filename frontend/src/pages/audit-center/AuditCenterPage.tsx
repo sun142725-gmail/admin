@@ -247,7 +247,7 @@ export const AuditCenterPage: React.FC = () => {
         <Form
           layout="inline"
           form={form}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}
+          className="flex flex-wrap gap-4"
         >
           <Form.Item label="用户ID" name="userId">
             <Input placeholder="用户ID" />
@@ -280,7 +280,7 @@ export const AuditCenterPage: React.FC = () => {
           <Form.Item label="时间范围" name="range">
             <DatePicker.RangePicker showTime />
           </Form.Item>
-          <Form.Item style={{ width: '100%', marginBottom: 0, textAlign: 'center' }}>
+          <Form.Item className="w-full !mb-0 text-center">
             <Space>
               <Button type="primary" onClick={onSearch}>
                 查询

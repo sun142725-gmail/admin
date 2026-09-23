@@ -55,7 +55,7 @@ export const ImagesPage: React.FC = () => {
         width: 120,
         render: (url: string) => (
           <a href={url} target="_blank" rel="noreferrer">
-            <img src={url} alt="generated" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
+            <img src={url} alt="generated" className="w-20 h-20 object-cover rounded-lg" />
           </a>
         )
       },
@@ -65,12 +65,12 @@ export const ImagesPage: React.FC = () => {
   );
 
   return (
-    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+    <Space direction="vertical" size={12} className="w-full">
       <Card title="文生图" styles={{ body: { padding: 12 } }}>
         {imageModels.length === 0 ? (
           <Empty description="暂无 image 能力模型，请先在模型管理里注册并挂载生图渠道" imageStyle={{ height: 48 }} />
         ) : (
-          <Form form={form} layout="vertical" initialValues={{ size: '1024x1024', count: 1 }} style={{ maxWidth: 720 }}>
+          <Form form={form} layout="vertical" initialValues={{ size: '1024x1024', count: 1 }} className="max-w-[720px]">
             <Form.Item name="modelId" label="模型（留空用第一个可用生图模型）">
               <Select
                 allowClear
@@ -84,7 +84,7 @@ export const ImagesPage: React.FC = () => {
             <Space size="large">
               <Form.Item name="size" label="尺寸">
                 <Select
-                  style={{ width: 150 }}
+                  className="w-[150px]"
                   options={[
                     { value: '1024x1024', label: '1024×1024 方图' },
                     { value: '1792x1024', label: '1792×1024 横图' },
@@ -94,7 +94,7 @@ export const ImagesPage: React.FC = () => {
                 />
               </Form.Item>
               <Form.Item name="count" label="数量">
-                <InputNumber min={1} max={4} style={{ width: 100 }} />
+                <InputNumber min={1} max={4} className="w-[100px]" />
               </Form.Item>
               <Form.Item label=" ">
                 <Button type="primary" icon={<PictureOutlined />} loading={generating} onClick={() => void submit()}>
@@ -108,13 +108,13 @@ export const ImagesPage: React.FC = () => {
 
       {lastImages.length > 0 && (
         <Card title="本次结果" styles={{ body: { padding: 12 } }}>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div className="flex gap-3 flex-wrap">
             {lastImages.map((image) => (
               <a key={image.id} href={image.url} target="_blank" rel="noreferrer">
                 <img
                   src={image.url}
                   alt={image.prompt}
-                  style={{ width: 220, borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
+                  className="w-[220px] rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
                 />
               </a>
             ))}

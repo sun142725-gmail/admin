@@ -294,10 +294,10 @@ export const ModelsPage: React.FC = () => {
           </Form.Item>
           <Space size="large" wrap>
             <Form.Item name="contextLength" label="上下文长度">
-              <InputNumber min={512} style={{ width: 120 }} />
+              <InputNumber min={512} className="w-[120px]" />
             </Form.Item>
             <Form.Item name="maxOutput" label="最大输出">
-              <InputNumber min={64} style={{ width: 120 }} />
+              <InputNumber min={64} className="w-[120px]" />
             </Form.Item>
           </Space>
           <Form.Item name="remark" label="备注">
