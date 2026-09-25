@@ -19,7 +19,6 @@ src/shared/
 ├── composables/   # 全局可复用的 Vue 组合式函数
 ├── constants/     # 全局常量 / 枚举配置
 ├── hooks/         # 与业务逻辑相关的复用 hooks（非 Vue 生命周期类）
-├── locales/       # vue-i18n 多语言配置（zh-CN / en-US）
 └── utils/         # 全局通用工具函数
 ```
 
@@ -69,18 +68,6 @@ import { useXXX } from '@shared/hooks'
 ```js
 import { XXX } from '@shared/constants'
 ```
-
-### locales 多语言
-
-基于 vue-i18n，入口应用 `main.js` 中 `app.use(i18n)` 后即可使用 `$t` / `useI18n`。
-
-```js
-import i18n from '@shared/locales'
-
-app.use(i18n)
-```
-
-语言文件：`zh-CN.json`（默认语言）、`en-US.json`。新增文案时两个文件需同步维护。
 
 ### utils 工具函数
 

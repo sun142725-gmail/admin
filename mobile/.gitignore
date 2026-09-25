@@ -39,3 +39,4 @@ coverage
 # Trae skill cache
 .agents/
 skills-lock.json
+*.timestamp-*.mjs

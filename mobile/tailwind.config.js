@@ -1,15 +1,16 @@
 import { resolve } from 'path'
 
 /** @type {import('tailwindcss').Config} */
+// 注意：spacing/height/minHeight/boxShadow/borderRadius 必须写进 extend，
+// 直接写在 theme 上会"替换"默认刻度，导致 rounded/shadow/h-full/h-screen 等默认工具类静默失效。
 export default {
   content: [
     resolve(__dirname, 'src/packages/*/index.html'),
     resolve(__dirname, 'src/packages/**/*.{vue,js,ts,jsx,tsx}'),
-    resolve(__dirname, 'src/components/**/*.{vue,js,ts,jsx,tsx}'),
-    resolve(__dirname, 'src/locales/**/*.{js,ts}')
+    resolve(__dirname, 'src/shared/**/*.{vue,js,ts,jsx,tsx}')
   ],
   theme: {
-    // 1. 全局颜色规范（主色/辅助/中性/状态色，全项目统一）
+    // 1. 全局颜色规范（主色/辅助/中性/状态色，全项目统一；替换默认，代码内只用这套色）
     colors: {
       primary: {
         50: '#f0f9ff',
@@ -44,7 +45,7 @@ export default {
       black: '#000000',
     },
 
-    // 2. 移动端统一字号（px，适配手机阅读）
+    // 2. 移动端统一字号（px，适配手机阅读；替换默认，代码内只用这套字号）
     fontSize: {
       xs: '10px',
       sm: '12px',
@@ -56,51 +57,53 @@ export default {
       '3xl': '28px',
     },
 
-    // 3. 间距统一规范（margin/padding gap）
-    spacing: {
-      0: '0px',
-      2: '2px',
-      4: '4px',
-      6: '6px',
-      8: '8px',
-      10: '10px',
-      12: '12px',
-      16: '16px',
-      20: '20px',
-      24: '24px',
-      28: '28px',
-      32: '32px',
-    },
-
-    // 4. 圆角统一（移动端柔和规范，禁止随意写圆角）
-    borderRadius: {
-      none: '0px',
-      sm: '4px',
-      md: '8px',
-      lg: '12px',
-      xl: '16px',
-      full: '9999px',
-    },
-
-    // 5. 阴影层级规范（卡片/弹窗/浮层区分）
-    boxShadow: {
-      card: '0 1px 6px rgba(0,0,0,0.06)',
-      popover: '0 2px 12px rgba(0,0,0,0.12)',
-      modal: '0 4px 20px rgba(0,0,0,0.16)',
-    },
-
-    // 6. 移动端最小触控尺寸（按钮统一高度）
-    height: {
-      btn_sm: '32px',
-      btn_md: '40px',
-      btn_lg: '48px',
-    },
-    minHeight: {
-      touch: '44px', // ios标准最小触控区域
-    },
-
-    // 7. 自定义移动端安全区、底部tab高度
+    // 3. 间距统一规范（margin/padding/gap；extend 追加，同名键覆盖默认值）
     extend: {
+      spacing: {
+        0: '0px',
+        2: '2px',
+        4: '4px',
+        6: '6px',
+        8: '8px',
+        10: '10px',
+        12: '12px',
+        16: '16px',
+        20: '20px',
+        24: '24px',
+        28: '28px',
+        32: '32px',
+      },
+
+      // 4. 圆角统一（移动端柔和规范；DEFAULT 供裸 rounded 使用）
+      borderRadius: {
+        DEFAULT: '4px',
+        sm: '4px',
+        md: '8px',
+        lg: '12px',
+        xl: '16px',
+        full: '9999px',
+      },
+
+      // 5. 阴影层级规范（卡片/弹窗/浮层区分；追加默认层级供裸 shadow 使用）
+      boxShadow: {
+        card: '0 1px 6px rgba(0,0,0,0.06)',
+        popover: '0 2px 12px rgba(0,0,0,0.12)',
+        modal: '0 4px 20px rgba(0,0,0,0.16)',
+      },
+
+      // 6. 移动端按钮高度 / 触控高度（追加默认 h-* 刻度）
+      height: {
+        btn_sm: '32px',
+        btn_md: '40px',
+        btn_lg: '48px',
+        touch: '44px', // ios标准最小触控区域
+        tab_bar: '50px',
+      },
+      minHeight: {
+        touch: '44px', // ios标准最小触控区域
+      },
+
+      // 7. 自定义移动端安全区
       padding: {
         // 约束规定：16px 基础留白 + 系统手势条高度
         'safe-bottom': 'calc(1rem + env(safe-area-inset-bottom, 0))',
@@ -109,9 +112,6 @@ export default {
         // 兼容旧用法（无 1rem 基础留白）
         safe_bottom: 'env(safe-area-inset-bottom)',
         safe_top: 'env(safe-area-inset-top)',
-      },
-      height: {
-        tab_bar: '50px',
       },
       zIndex: {
         dialog: 999,

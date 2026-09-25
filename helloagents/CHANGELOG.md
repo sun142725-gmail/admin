@@ -14,6 +14,11 @@
 - 基建：新增 tailwindcss@4 + @tailwindcss/vite（devDeps）；global.css 只引入 theme+utilities 两层并跳过 preflight（防 reset 破坏 antd）；@theme 定义 token（主色/文字/圆角，值与旧 CSS 变量一致）
 - antd5 规范落地：ConfigProvider 配置 theme token/components，替代 global.css 中全部 antd !important 全局覆写（卡片 20/表格 18/输入与按钮 12 圆角、表头 #f7faff、hover 行背景、主按钮阴影）；顺带修复按钮圆角 6px 与输入框 12px 的不一致（原按钮覆写已被 antd 压制失效）
 - 通用布局类（page-toolbar/actions/breadcrumb/content-inner/role-permissions 居中）改用 @apply 工具类实现，值逐项对齐；复杂渐变/阴影类保留原生 CSS；JSX className 零改动、业务逻辑零改动
+### 移动端整体 review + Tailwind 配置修复（2026-09-23）
+- **P0 修复**：tailwind.config.js content 幽灵路径（src/components→src/shared），此前 shared 组件独有类生产构建被 purge 丢失；height/minHeight/spacing/boxShadow 四块从 theme 替换改为 extend 追加——原配置导致 h-full/h-screen/h-16/min-h-0 等默认工具类静默失效
+- **P1**：vue-i18n 死代码移除（两入口引入但 0 处 $t 调用、语言包空壳）；vite.config.js.timestamp-*.mjs 临时文件出库 + .gitignore 规则
+- **P2**：demo 页 console.log ×2 清理；shared/README.md locales 段落同步
+- 验证：双应用构建通过；47 个源码 Tailwind 类产物全量核对 0 真实缺失
 ### 内联样式清理：54 处静态 style 迁 Tailwind 工具类（2026-09-23，第二批次）
 - HomePage 13 / PublishPage 18 / ChatPage 13 / TemplatePage 10 / Images 7 / Agents 5 / 其余 7 处全部清零
 - 动态绑定样式（会话高亮、气泡配色、Tag 动态色等）按方案保留 style；ChatPage 气泡对齐改为条件 className

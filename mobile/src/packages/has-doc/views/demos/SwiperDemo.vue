@@ -64,7 +64,6 @@ const bannerList = ref([
 const colorList = ref(['#f53f3f', '#0ea5e9', '#00b42a', '#ff7d00'])
 
 function onChange(index) {
-  console.log('当前索引：', index)
 }
 
 function onClick(index, item) {

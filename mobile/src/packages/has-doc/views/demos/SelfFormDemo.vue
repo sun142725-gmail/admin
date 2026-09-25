@@ -118,7 +118,6 @@ function mockUpload(file: File): Promise<string> {
 function onSubmit() {
   showToast('校验通过，提交成功')
   // eslint-disable-next-line no-console
-  console.log('表单数据：', form.value)
 }
 
 /** 提交按钮在 self-form 外部，手动触发校验后再提交 */
