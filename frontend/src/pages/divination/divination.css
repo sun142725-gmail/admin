@@ -21,7 +21,8 @@
 
 /* 返回链接固定在左下角，避免与右上角的再占一卦重叠。 */
 .divination-back {
-  position: absolute;
+  /* 同 ink-bg：内部滚动容器里 absolute 会随内容滚走，fixed 才是真正的"固定左下角"。 */
+  position: fixed;
   bottom: 20px;
   left: 24px;
   z-index: 3;
@@ -41,7 +42,9 @@
 }
 
 .ink-bg {
-  position: absolute;
+  /* 容器是内部滚动（fixed + overflow-y:auto），absolute 会随内容滚走，
+     纸纹只有一屏高、滚后露出底色形成横向色差线；fixed 钉住视口不随滚动。 */
+  position: fixed;
   inset: 0;
   pointer-events: none;
 }
@@ -910,5 +913,25 @@
 @keyframes bagua-spin-reverse {
   to {
     transform: translate(-50%, -50%) rotate(-360deg);
+  }
+}
+
+/* —— 推演等待反馈（thinking 心跳驱动）—— */
+.interp-waiting-tip {
+  margin: 14px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(41, 32, 24, 0.55);
+  text-align: center;
+  animation: interp-tip-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes interp-tip-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
   }
 }

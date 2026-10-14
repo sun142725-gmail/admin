@@ -32,6 +32,8 @@ export interface InterpretationStreamHandlers {
   onChunk?: (text: string) => void;
   onDone?: () => void;
   onError?: (message: string) => void;
+  /** AI 推演中无内容分片时的心跳（告知连接存活、驱动等待反馈）。 */
+  onThinking?: () => void;
   onFatal?: (error: unknown) => void;
 }
 
@@ -51,6 +53,8 @@ export const streamInterpretation = (
         handlers.onDone?.();
       } else if (type === 'error') {
         handlers.onError?.(payload.message ?? '解读暂不可用');
+      } else if (type === 'thinking') {
+        handlers.onThinking?.();
       }
     },
     onError: (error) => handlers.onFatal?.(error)

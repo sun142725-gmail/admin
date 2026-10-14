@@ -10,7 +10,7 @@ interface HexagramPanelProps {
 const YAO_LABELS = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻'];
 
 export const HexagramPanel: React.FC<HexagramPanelProps> = ({ record, stage }) => {
-  // 默认展开；开始解卦（topic → interpreting）时自动收起，也可手动开合。
+  // 默认展开；开始解卦（topic → interpreting）时自动收起，之后仅手动开合。
   const [expanded, setExpanded] = useState(true);
   const prevStage = useRef(stage);
   useEffect(() => {

@@ -113,7 +113,10 @@ export class DivinationService implements OnModuleInit {
     if (!trimmed) {
       throw new BadRequestException('请填写所问之事');
     }
-    const record = await this.divinationRepo.findOne({ where: { id } });
+    const record = await this.divinationRepo.findOne({
+      where: { id },
+      relations: ['lines']
+    });
     if (!record) {
       throw new NotFoundException('占卜记录不存在');
     }
@@ -212,16 +215,28 @@ export class DivinationService implements OnModuleInit {
       };
 
       let full = '';
+      // 思考期心跳：推理模型思考阶段可能长达 1~3 分钟且无内容分片，
+      // 定期下发 thinking 事件驱动前端反馈，并防止网关按空闲连接掐断 SSE。
+      const startedAt = Date.now();
+      const heartbeat = setInterval(() => {
+        subject.next({ type: 'thinking', data: { elapsedMs: Date.now() - startedAt } });
+      }, 3000);
       try {
         for await (const delta of this.aiService.interpretStream(lines, record.topic, hexagram)) {
           full += delta;
+          if (full === delta) {
+            clearInterval(heartbeat);
+          }
           subject.next({ type: 'chunk', data: { text: delta } });
         }
       } catch (error) {
         if (!full) {
+          clearInterval(heartbeat);
           throw error;
         }
         // 已输出部分内容则按现有内容收尾。
+      } finally {
+        clearInterval(heartbeat);
       }
       if (!full) {
         throw new Error('解卦内容为空');

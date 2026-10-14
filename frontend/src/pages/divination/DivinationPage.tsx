@@ -92,6 +92,7 @@ export const DivinationPage: React.FC = () => {
                     stage={stage as 'topic' | 'interpreting' | 'done' | 'failed'}
                     streamText={flow.streamText}
                     streamError={flow.streamError}
+                    thinking={flow.thinking}
                     submitting={flow.submitting}
                     onSubmitTopic={flow.submitTopic}
                     onRetry={flow.retry}

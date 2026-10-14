@@ -14,6 +14,17 @@
 - 基建：新增 tailwindcss@4 + @tailwindcss/vite（devDeps）；global.css 只引入 theme+utilities 两层并跳过 preflight（防 reset 破坏 antd）；@theme 定义 token（主色/文字/圆角，值与旧 CSS 变量一致）
 - antd5 规范落地：ConfigProvider 配置 theme token/components，替代 global.css 中全部 antd !important 全局覆写（卡片 20/表格 18/输入与按钮 12 圆角、表头 #f7faff、hover 行背景、主按钮阴影）；顺带修复按钮圆角 6px 与输入框 12px 的不一致（原按钮覆写已被 antd 压制失效）
 - 通用布局类（page-toolbar/actions/breadcrumb/content-inner/role-permissions 居中）改用 @apply 工具类实现，值逐项对齐；复杂渐变/阴影类保留原生 CSS；JSX className 零改动、业务逻辑零改动
+### 六爻页面滚动背景样式修复（2026-09-23）
+- 根因：.divination-fullscreen 为内部滚动容器（fixed + overflow-y:auto），但 .ink-bg 与 .divination-back 用 absolute——内容一滚，纸纹背景（仅一屏高）跟滚露出底色形成横向色差线，返回链接漂到页面中部
+- 修复：两者改 position:fixed 钉住视口；按用户要求撤销 HexagramPanel done 阶段自动展开（明细数据不丢，仅默认收起）
+### 六爻解卦完成后六爻明细丢失修复（2026-09-23）
+- 根因：setTopic 的 findOne 漏 relations:['lines']，PATCH 响应 lines 恒为空数组，前端 setRecord 将起卦时的爻数据覆盖为空 → 解卦后明细空表
+- 修复：setTopic 补 relations；HexagramPanel 增加 interpreting→done 自动重新展开六爻明细
+- 实测：PATCH 响应 6 爻完整；tsc/测试/build 全绿
+### 六爻解卦思考期心跳（2026-09-23）
+- 问题：grok-4.6 为推理模型，思考期（实测 48s~3min）只吐 reasoning_content，adapter 只读 content → SSE 长时间零数据，前端只见转圈且易被网关空闲超时掐断（nginx 默认 60s）
+- 修复：divination.service 实跑流每 3s 下发 thinking 心跳（首个分片后停止）；前端 api/flow/Panel 三层接线，等待态显示"大师推演中 · 连接正常 · 已等待 Ns"
+- 附带发现：dev 库 deepseek 渠道 key 401 失效（需在管理端更换；grok 为当前唯一可用渠道）
 ### 移动端整体 review + Tailwind 配置修复（2026-09-23）
 - **P0 修复**：tailwind.config.js content 幽灵路径（src/components→src/shared），此前 shared 组件独有类生产构建被 purge 丢失；height/minHeight/spacing/boxShadow 四块从 theme 替换改为 extend 追加——原配置导致 h-full/h-screen/h-16/min-h-0 等默认工具类静默失效
 - **P1**：vue-i18n 死代码移除（两入口引入但 0 处 $t 调用、语言包空壳）；vite.config.js.timestamp-*.mjs 临时文件出库 + .gitignore 规则

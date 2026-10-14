@@ -1,6 +1,6 @@
 // 解卦面板：先补填所问之事（解卦时再写），提交后 SSE 实时逐字输出；失败可重试。
 import { Button, Input } from 'antd';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { DivinationRecord } from '../types';
 
 const TRIGRAMS = ['☰', '☱', '☲', '☳', '☴', '☵', '☶', '☷'];
@@ -11,6 +11,8 @@ interface InterpretationPanelProps {
   streamText: string;
   streamError: string | null;
   submitting: boolean;
+  /** 已收到 thinking 心跳：AI 推演中、连接存活。 */
+  thinking?: boolean;
   onSubmitTopic: (topic: string) => void;
   onRetry: () => void;
 }
@@ -21,6 +23,7 @@ export const InterpretationPanel: React.FC<InterpretationPanelProps> = ({
   streamText,
   streamError,
   submitting,
+  thinking = false,
   onSubmitTopic,
   onRetry
 }) => {
@@ -39,6 +42,17 @@ export const InterpretationPanel: React.FC<InterpretationPanelProps> = ({
 
   // 仅在解卦中且尚无内容时展示加载动画（done 后不再转圈）。
   const waiting = stage === 'interpreting' && !streamText && !streamError;
+
+  // 推演等待计时：推理模型思考期可达 1~3 分钟，给用户进度反馈。
+  const [waitingSeconds, setWaitingSeconds] = useState(0);
+  useEffect(() => {
+    if (!waiting) {
+      setWaitingSeconds(0);
+      return;
+    }
+    const timer = window.setInterval(() => setWaitingSeconds((s) => s + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [waiting]);
 
   return (
     <div className="interp-panel">
@@ -102,6 +116,12 @@ export const InterpretationPanel: React.FC<InterpretationPanelProps> = ({
                   ))}
                   <span className="bagua-loader-core">☯</span>
                 </div>
+              )}
+              {waiting && (
+                <p className="interp-waiting-tip">
+                  {thinking ? '大师推演中 · 连接正常' : '正在连结卦象…'}
+                  {waitingSeconds >= 5 && <span> · 已等待 {waitingSeconds}s</span>}
+                </p>
               )}
               {record.topic && <p className="interp-topic">所问：「{record.topic}」</p>}
               <p className="interp-text">

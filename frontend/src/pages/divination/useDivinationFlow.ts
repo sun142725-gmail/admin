@@ -37,6 +37,8 @@ export function useDivinationFlow() {
   const [streamText, setStreamText] = useState('');
   const [streamError, setStreamError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  /** AI 推演中（已收到 thinking 心跳、尚无内容分片）。 */
+  const [thinking, setThinking] = useState(false);
 
   const timersRef = useRef<number[]>([]);
   const abortRef = useRef<AbortController | null>(null);
@@ -60,6 +62,7 @@ export function useDivinationFlow() {
     setTossing(false);
     setStreamText('');
     setStreamError(null);
+    setThinking(false);
     setLoading(true);
     try {
       const data = await createDivination();
@@ -102,6 +105,7 @@ export function useDivinationFlow() {
     setTossing(false);
     setStreamText('');
     setStreamError(null);
+    setThinking(false);
   }, [clearTimers]);
 
   // 补填主题：填完才进入解卦（心诚后问，卦方有验）。
@@ -158,19 +162,26 @@ export function useDivinationFlow() {
     let finished = false;
     streamInterpretation(record.id, controller.signal, {
       onChunk: (text) => {
+        setThinking(false);
         setStreamText((prev) => prev + text);
       },
       onDone: () => {
         finished = true;
+        setThinking(false);
         setStage('done');
       },
       onError: (message) => {
         finished = true;
+        setThinking(false);
         setStreamError(message);
         setStage('failed');
       },
+      onThinking: () => {
+        setThinking(true);
+      },
       onFatal: () => {
         if (!finished) {
+          setThinking(false);
           setStreamError('解卦连接中断');
           setStage('failed');
         }
@@ -193,6 +204,7 @@ export function useDivinationFlow() {
     submitting,
     streamText,
     streamError,
+    thinking,
     start,
     toss,
     reset,
