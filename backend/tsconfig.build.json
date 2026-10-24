@@ -1,4 +1,10 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  "compilerOptions": {
+    // 固定源码根目录：否则 backend 根目录出现非 src 的 .ts（如 scripts/、临时调试文件）时，
+    // tsc 会把 rootDir 推断为 backend/，产物变成 dist/src/main.js，导致 node dist/main.js 找不到入口。
+    "rootDir": "./src"
+  },
+  // scripts/ 下的脚本用 ts-node 直接运行（见 package.json 的 sync:ai*），不参与 nest build 编译。
+  "exclude": ["node_modules", "test", "dist", "scripts", "**/*spec.ts"]
 }

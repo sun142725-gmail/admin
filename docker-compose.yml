@@ -7,7 +7,9 @@ services:
       MYSQL_USER: rbac
       MYSQL_PASSWORD: rbac
     ports:
-      - "3306:3306"
+      # 宿主机用 3307，避免与其它项目（如 nest-first 的 mysql_db）占用 3306 冲突；
+      # 容器之间仍走 3306（DB_HOST=mysql 时不受影响）。
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
 
