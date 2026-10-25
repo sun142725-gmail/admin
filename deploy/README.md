@@ -13,7 +13,8 @@ deploy/
 └── scripts/
     ├── 01-sync-ai.sh          # 步骤 1：引导同步「六爻解卦」智能体（幂等，首次部署用）
     ├── 02-generate-ai-sql.sh  # 步骤 2：拉取开发库 AI 配置，生成线上 INSERT SQL（日常更新用）
-    └── 03-smoke-test.sh       # 步骤 3：上线冒烟验证
+    ├── 03-smoke-test.sh       # 步骤 3：上线冒烟验证
+    └── 04-sync-stock-agents.sh # 步骤 4：同步「股市圆桌」六位智能体（幂等）
 ```
 
 ## 上线准备事项（Checklist）

@@ -55,3 +55,6 @@ backend/.env.local
 deploy/.env.production
 deploy/generated/
 backend/uploads/
+
+# TypeScript incremental build cache
+*.tsbuildinfo

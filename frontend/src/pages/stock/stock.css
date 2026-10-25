@@ -1,0 +1,288 @@
+/* 股市圆桌页面样式：圆桌座次、专家卡片、投票条、纪要排版与动画。
+   复用全局设计 token（--text-sub 等），动画沿用纯 CSS keyframes 手法。 */
+
+/* ---------- 圆桌座次 ---------- */
+.rt-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px) minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  gap: 16px;
+  align-items: stretch;
+  padding: 8px 4px 16px;
+}
+
+.rt-seat-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rt-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 20px 16px;
+  border-radius: 999px;
+  border: 1px dashed var(--panel-border, #ebebeb);
+  background: radial-gradient(circle at 50% 30%, rgba(22, 119, 255, 0.06), rgba(255, 255, 255, 0) 70%);
+  text-align: center;
+}
+
+.rt-center-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  font-size: 28px;
+}
+
+.rt-conclusion-seal {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 14px;
+  border: 2px solid currentColor;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  transform: rotate(-6deg);
+  animation: seal-stamp 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes seal-stamp {
+  0% {
+    opacity: 0;
+    transform: rotate(-6deg) scale(2.4);
+  }
+  60% {
+    opacity: 1;
+    transform: rotate(-6deg) scale(0.92);
+  }
+  100% {
+    transform: rotate(-6deg) scale(1);
+  }
+}
+
+/* 小屏：圆桌退化为纵向排列（主席在顶部）。 */
+@media (max-width: 900px) {
+  .rt-table {
+    display: flex;
+    flex-direction: column;
+  }
+  .rt-seat-center {
+    order: -1;
+  }
+  .rt-center {
+    border-radius: var(--radius-card, 20px);
+  }
+}
+
+/* ---------- 专家卡片 ---------- */
+.expert-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--panel-border, #ebebeb);
+  border-radius: var(--radius-card, 20px);
+  background: var(--panel-bg, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+
+.expert-card-speaking {
+  animation: card-pulse 1.6s ease-in-out infinite;
+  transform: translateY(-2px);
+}
+
+@keyframes card-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(22, 119, 255, 0.16), 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(22, 119, 255, 0.05), 0 4px 14px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.expert-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  font-size: 20px;
+  flex: none;
+}
+
+.expert-content {
+  flex: 1;
+  min-height: 96px;
+  max-height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--app-bg, #f5f5f5);
+  line-height: 1.65;
+}
+
+.caret-blink {
+  animation: caret-blink 0.9s steps(1) infinite;
+  color: var(--brand-primary, #1677ff);
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---------- 投票条 ---------- */
+.vote-segment {
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.vote-bar {
+  animation: vote-rise 0.5s ease both;
+}
+
+@keyframes vote-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- 会议纪要 ---------- */
+.report-body {
+  white-space: pre-wrap;
+}
+
+.report-heading {
+  position: relative;
+  margin: 18px 0 6px;
+  padding-left: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-main, #1a1a1a);
+  border-left: 3px solid var(--brand-primary, #1677ff);
+}
+
+.report-heading:first-child {
+  margin-top: 0;
+}
+
+.report-conclusion-line {
+  display: inline-block;
+  margin: 6px 0;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: rgba(22, 119, 255, 0.08);
+  font-weight: 600;
+}
+
+.report-quote {
+  margin: 6px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--app-bg, #f5f5f5);
+  color: var(--text-sub, #737373);
+  font-size: 13px;
+}
+
+/* 步骤条窄屏压缩。 */
+.rt-steps {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ---------- 讨论过程时间线 ---------- */
+.timeline-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.timeline-group-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: rgba(22, 119, 255, 0.1);
+  color: var(--brand-primary, #1677ff);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.timeline-group-line {
+  flex: 1;
+  height: 1px;
+  background: var(--panel-border, #ebebeb);
+}
+
+.timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--panel-border, #ebebeb);
+  border-radius: 14px;
+  background: var(--panel-bg, #fff);
+}
+
+.timeline-item-speaking {
+  border-color: rgba(22, 119, 255, 0.45);
+  animation: card-pulse 1.6s ease-in-out infinite;
+}
+
+.timeline-marker {
+  flex: none;
+  width: 4px;
+  border-radius: 4px;
+  opacity: 0.75;
+}
+
+.timeline-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timeline-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-main, #1a1a1a);
+}
+
+.mention-highlight {
+  color: var(--brand-primary, #1677ff);
+  font-weight: 600;
+  background: rgba(22, 119, 255, 0.08);
+  border-radius: 4px;
+  padding: 0 3px;
+}

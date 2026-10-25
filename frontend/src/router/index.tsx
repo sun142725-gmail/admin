@@ -19,6 +19,7 @@ import { DictPage } from '../pages/dict/DictPage';
 import { TemplatePage } from '../pages/notification/TemplatePage';
 import { PublishPage } from '../pages/notification/PublishPage';
 import { InboxPage } from '../pages/notification/InboxPage';
+import { StockPage } from '../pages/stock/StockPage';
 import { RequireAuth } from './RequireAuth';
 
 export const router = createBrowserRouter([
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
       { path: '/ai/agents', element: <AgentsPage /> },
       { path: '/ai/chat', element: <ChatPage /> },
       { path: '/ai/images', element: <ImagesPage /> },
+      { path: '/stock', element: <StockPage /> },
       { path: '/notifications/templates', element: <TemplatePage /> },
       { path: '/notifications/publish', element: <PublishPage /> },
       { path: '/notifications/publishes', element: <Navigate to="/notifications/publish" replace /> },

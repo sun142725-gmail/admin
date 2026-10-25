@@ -49,6 +49,7 @@ export class SeedService implements OnModuleInit {
       await this.ensureNotificationTemplateCodes();
       await this.ensureMessageChannelSetup();
       await this.ensureAiSetup();
+      await this.ensureStockSetup();
       return;
     }
 
@@ -61,6 +62,7 @@ export class SeedService implements OnModuleInit {
     await this.ensureNotificationTemplateCodes();
     await this.ensureMessageChannelSetup();
     await this.ensureAiSetup();
+    await this.ensureStockSetup();
     this.logger.log('初始化数据已完成');
   }
 
@@ -111,7 +113,8 @@ export class SeedService implements OnModuleInit {
       { name: '智能体管理', code: 'ai:agent:manage' },
       { name: 'AI 用量', code: 'ai:usage:view' },
       { name: 'AI 对话', code: 'ai:chat:use' },
-      { name: 'AI 生图', code: 'ai:image:use' }
+      { name: 'AI 生图', code: 'ai:image:use' },
+      { name: '股市圆桌', code: 'stock:roundtable:use' }
     ];
     const entities = this.permissionRepo.create(items);
     return this.permissionRepo.save(entities);
@@ -678,6 +681,47 @@ export class SeedService implements OnModuleInit {
       );
     }
     for (const permission of permissions) {
+      await this.ensureAdminRolePermission(permission);
+    }
+  }
+
+  // 股市圆桌菜单与权限（幂等）：挂在「AI 中心」菜单下，菜单缺失时建独立顶级菜单兜底。
+  private async ensureStockSetup() {
+    const permission = await this.ensurePermissionByCode('stock:roundtable:use', '股市圆桌');
+
+    let parent = await this.resourceRepo.findOne({ where: { name: 'AI 中心', type: 'menu' } });
+    if (!parent) {
+      const existingPage = await this.resourceRepo.findOne({ where: { path: '/stock', type: 'page' } });
+      if (existingPage?.parentId) {
+        parent = await this.resourceRepo.findOne({ where: { id: existingPage.parentId } });
+      }
+    }
+    if (!parent) {
+      parent = await this.resourceRepo.save(
+        this.resourceRepo.create({ name: '股市圆桌', type: 'menu', sortOrder: 6 })
+      );
+    }
+
+    const exists = await this.resourceRepo.findOne({ where: { path: '/stock' } });
+    if (exists) {
+      if (exists.parentId !== parent.id || exists.permissionCode !== 'stock:roundtable:use') {
+        await this.resourceRepo.update(
+          { id: exists.id },
+          { name: '股市圆桌', parentId: parent.id, permissionCode: 'stock:roundtable:use' }
+        );
+      }
+    } else {
+      await this.resourceRepo.save(
+        this.resourceRepo.create({
+          name: '股市圆桌',
+          type: 'page',
+          path: '/stock',
+          parentId: parent.id,
+          permissionCode: 'stock:roundtable:use'
+        })
+      );
+    }
+    if (permission) {
       await this.ensureAdminRolePermission(permission);
     }
   }

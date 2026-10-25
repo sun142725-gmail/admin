@@ -46,6 +46,7 @@ import { AiImageController } from './image/image.controller';
     AiImageService
   ],
   controllers: [AiController, AiAdminController, AiChatController, AiImageController],
-  exports: [AiService]
+  // ModelRouterService / UsageLogService 供 stock 等业务模块复用模型路由与用量记录。
+  exports: [AiService, ModelRouterService, UsageLogService]
 })
 export class AiModule {}

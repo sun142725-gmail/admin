@@ -21,6 +21,7 @@ import {
   MessageOutlined,
   PictureOutlined,
   RobotOutlined,
+  StockOutlined,
 } from '@ant-design/icons';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMenuTree } from '../api/resources';
@@ -50,6 +51,7 @@ const getMenuIcon = (item: MenuItem) => {
       '/ai/agents': <RobotOutlined />,
       '/ai/chat': <MessageOutlined />,
       '/ai/images': <PictureOutlined />,
+      '/stock': <StockOutlined />,
       '/dicts': <BookOutlined />,
       '/notifications/templates': <BookOutlined />,
       '/notifications/publish': <FileTextOutlined />,
@@ -106,6 +108,7 @@ const PAGE_CODE_MAP: Record<string, string> = {
   '/ai/agents': 'ai_agent',
   '/ai/chat': 'ai_chat',
   '/ai/images': 'ai_images',
+  '/stock': 'stock_roundtable',
   '/dicts': 'config_dict',
   '/notifications/templates': 'notification_template',
   '/notifications/publish': 'notification_publish',

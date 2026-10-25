@@ -24,6 +24,7 @@
 - Resources：菜单树、资源 CRUD
 - Audit：审计日志查询
 - Notification：模板管理、通知发布、发送记录、站内信收件箱
+- Stock：股市圆桌（行情快照/K线+指标/板块 + 五专家圆桌会议 SSE 流式分析）
 - 接口文档：`/api/docs`
 
 ## 4. 前端路由与页面
@@ -37,6 +38,7 @@
 - 通知模板 `/notifications/templates`
 - 通知发布 `/notifications/publish`
 - 站内信 `/notifications/inbox`
+- 股市圆桌 `/stock`
 - 个人中心 `/profile`
 
 ## 5. C 端移动端项目
@@ -155,6 +157,7 @@ docker-compose up -d --build frontend nginx
 - system:audit:center
 - system:profile:view / update / password / avatar
 - system:divination:use
+- stock:roundtable:use
 - system:notification:template:list / create / update / delete
 - system:notification:publish:list / create / retry
 - system:notification:inbox:list / read
@@ -164,3 +167,11 @@ docker-compose up -d --build frontend nginx
 - refreshToken 仅用于刷新（tokenVersion 策略）
 - 密码使用 bcrypt 加密
 - 飞书机器人地址通过环境变量 `FEISHU_BOT_WEBHOOK` 配置
+
+## 股市圆桌模块（stock）
+- 五位专家智能体（趋势/动量/量价/价值/风控）+ 会议主席，对大盘/指数/板块/个股做圆桌分析：
+  第一轮并行独立分析 → 辩论轮串行互相质疑 → 主席总结纪要，全程 SSE 流式（`POST /api/stock/roundtable` + `GET /api/stock/roundtable/:id/stream`）。
+- 行情来自免费公开接口：腾讯快照（新浪备用）+ 东财 K线/板块（腾讯/新浪 K 线备用），指标（MA/MACD/KDJ/RSI/BOLL/ATR/OBV 等）后端计算。
+- 智能体同步：`cd backend && npm run sync:stock`（按 code 幂等；未同步时自动回落内置人设；无模型渠道时五位专家走本地规则兜底，会议仍可完整进行）。
+- 会议模式：quick（独立+总结）/ standard（+1轮辩论）/ deep（+2轮辩论）。
+- ⚠️ 分析结果仅供学习研究参考，不构成投资建议。

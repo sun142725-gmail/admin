@@ -22,6 +22,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { FilesModule } from './modules/files/files.module';
 import { FamilyModule } from './modules/family/family.module';
+import { StockModule } from './modules/stock/stock.module';
 import { User } from './common/entities/user.entity';
 import { Role } from './common/entities/role.entity';
 import { Permission } from './common/entities/permission.entity';
@@ -53,6 +54,8 @@ import { AiConversation } from './common/entities/ai-conversation.entity';
 import { AiMessage } from './common/entities/ai-message.entity';
 import { AiUsageLog } from './common/entities/ai-usage-log.entity';
 import { AiImage } from './common/entities/ai-image.entity';
+import { StockRoundtable } from './common/entities/stock-roundtable.entity';
+import { StockRoundtableTurn } from './common/entities/stock-roundtable-turn.entity';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -104,7 +107,9 @@ const isTest = process.env.NODE_ENV === 'test';
               AiConversation,
               AiMessage,
               AiUsageLog,
-              AiImage
+              AiImage,
+              StockRoundtable,
+              StockRoundtableTurn
             ],
             synchronize: true
           }
@@ -146,7 +151,9 @@ const isTest = process.env.NODE_ENV === 'test';
               AiConversation,
               AiMessage,
               AiUsageLog,
-              AiImage
+              AiImage,
+              StockRoundtable,
+              StockRoundtableTurn
             ],
             synchronize: process.env.DB_SYNC === 'true'
           }
@@ -167,7 +174,8 @@ const isTest = process.env.NODE_ENV === 'test';
     DictModule,
     NotificationModule,
     DashboardModule,
-    FamilyModule
+    FamilyModule,
+    StockModule
   ],
   // 测试环境不注册限流守卫：测试用例会在同一 IP 上发起大量请求，避免被 429 干扰
   providers: [
@@ -189,7 +197,8 @@ export class AppModule implements NestModule {
       .forRoutes(
         { path: 'divinations/:id/interpretation/stream', method: RequestMethod.GET },
         { path: 'ai/chat/completions', method: RequestMethod.POST },
-        { path: 'ai/chat/stream/:messageId', method: RequestMethod.GET }
+        { path: 'ai/chat/stream/:messageId', method: RequestMethod.GET },
+        { path: 'stock/roundtable/:id/stream', method: RequestMethod.GET }
       );
   }
 }
