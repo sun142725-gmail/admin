@@ -32,14 +32,14 @@ const VoteBar: React.FC<{ session: RoundtableSession }> = ({ session }) => {
   return (
     <div className="w-full">
       <div className="flex h-3 rounded-full overflow-hidden bg-[#f0f0f0] vote-bar">
-        <div className="vote-segment" style={{ width: pct(votes.bull), background: '#f5222d' }} />
-        <div className="vote-segment" style={{ width: pct(votes.neutral), background: '#bfbfbf' }} />
-        <div className="vote-segment" style={{ width: pct(votes.bear), background: '#16a34a' }} />
+        <div className="vote-segment bg-stock-up" style={{ width: pct(votes.bull) }} />
+        <div className="vote-segment bg-text-sub" style={{ width: pct(votes.neutral) }} />
+        <div className="vote-segment bg-stock-down" style={{ width: pct(votes.bear) }} />
       </div>
       <div className="flex justify-between text-xs mt-1">
-        <span style={{ color: '#f5222d' }}>看多 {votes.bull}</span>
+        <span className="text-stock-up">看多 {votes.bull}</span>
         <span className="text-text-sub">中性 {votes.neutral}</span>
-        <span style={{ color: '#16a34a' }}>看空 {votes.bear}</span>
+        <span className="text-stock-down">看空 {votes.bear}</span>
       </div>
     </div>
   );

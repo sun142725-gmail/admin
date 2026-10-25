@@ -503,7 +503,7 @@ export const PublishPage: React.FC = () => {
                   ]}
                 />
               ) : (
-                <div className="mt-2 text-[#999]">无变量</div>
+                <div className="mt-2 text-text-sub">无变量</div>
               )}
             </div>
 

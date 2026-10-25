@@ -871,7 +871,7 @@ const FlowEditorInner: React.FC = () => {
             open={Boolean(selected)}
             onClose={onPaneClick}
             styles={{ body: { padding: 0 } }}
-            destroyOnClose
+            destroyOnHidden
           >
             {configPanelElement}
           </Drawer>
@@ -898,7 +898,7 @@ const FlowEditorInner: React.FC = () => {
         onCancel={() => setRunModalOpen(false)}
         okText="开始运行"
         forceRender
-        destroyOnClose
+        destroyOnHidden
       >
         {startVariables.length === 0 ? (
           <Alert type="info" message="开始节点未定义变量，将直接执行。" />
@@ -929,7 +929,7 @@ const FlowEditorInner: React.FC = () => {
         onClose={() => setTrialTarget(null)}
         width={460}
         forceRender
-        destroyOnClose
+        destroyOnHidden
         footer={
           <Space style={{ float: 'right' }}>
             <Button onClick={() => setTrialTarget(null)}>取消</Button>

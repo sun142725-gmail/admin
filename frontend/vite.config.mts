@@ -8,7 +8,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:3000'
+      '/api': 'http://localhost:3000',
+      // 小说流水线产物（图片/视频片段/成片）走后端静态目录。
+      '/uploads': 'http://localhost:3000'
     }
   }
 });

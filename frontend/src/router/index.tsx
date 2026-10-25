@@ -22,6 +22,7 @@ import { InboxPage } from '../pages/notification/InboxPage';
 import { StockPage } from '../pages/stock/StockPage';
 import { FlowsPage } from '../pages/flow/FlowsPage';
 import { FlowRunsPage } from '../pages/flow/FlowRunsPage';
+import { NovelVideoPage } from '../pages/flow/NovelVideoPage';
 import { RequireAuth } from './RequireAuth';
 
 // 画布编辑器较重（React Flow），按需加载不进首屏包。
@@ -75,6 +76,7 @@ export const router = createBrowserRouter([
       { path: '/stock', element: <StockPage /> },
       { path: '/flow', element: <FlowsPage /> },
       { path: '/flow/runs', element: <FlowRunsPage /> },
+      { path: '/flow/novel', element: <NovelVideoPage /> },
       { path: '/notifications/templates', element: <TemplatePage /> },
       { path: '/notifications/publish', element: <PublishPage /> },
       { path: '/notifications/publishes', element: <Navigate to="/notifications/publish" replace /> },

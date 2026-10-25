@@ -233,7 +233,11 @@ export const FlowsPage: React.FC = () => {
                 <div className="flow-card-actions" onClick={(event) => event.stopPropagation()}>
                   <Space size={4} wrap>
                     <Permission code="flow:define:manage">
-                      <Button size="small" icon={<EditOutlined />}>
+                      <Button
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={() => navigate(`/flow/editor/${flow.id}`)}
+                      >
                         编辑
                       </Button>
                     </Permission>
@@ -274,7 +278,7 @@ export const FlowsPage: React.FC = () => {
         onCancel={() => setCreateOpen(false)}
         okText="创建并编辑"
         confirmLoading={creating}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" initialValues={{ icon: '🎬' }}>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>

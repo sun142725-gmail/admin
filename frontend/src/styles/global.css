@@ -13,6 +13,9 @@
   --color-line: #ebebeb;
   --radius-btn: 12px;
   --radius-card: 20px;
+  /* A 股语义色：红涨绿跌（生成 text-stock-up / text-stock-down 等工具类） */
+  --color-stock-up: #f5222d;
+  --color-stock-down: #16a34a;
 }
 
 :root {
@@ -388,6 +391,11 @@ a {
 }
 
 /* Tailwind 规范：纯布局/间距/字号用工具类（@apply）；复杂渐变/阴影视觉保留原生 CSS */
+/* Tag 去默认右间距（行内多标签并排场景） */
+.ant-tag.tag-flat {
+  margin-inline-end: 0;
+}
+
 .page-toolbar {
   @apply flex items-center justify-between gap-3 mb-[18px];
 }
@@ -795,7 +803,8 @@ a {
   font-weight: 700;
 }
 
-@media (max-width: 992px) {
+/* 登录页窄屏塌缩（断点统一到 Tailwind lg=1024） */
+@media (max-width: 1024px) {
   .login-shell {
     grid-template-columns: 1fr;
     background: linear-gradient(180deg, #16284c 0%, #eef3f8 42%);

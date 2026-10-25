@@ -81,7 +81,7 @@ export const HistoryTable: React.FC<Props> = ({ onReplay, refreshKey }) => {
       render: (_: unknown, record: RoundtableListItem) =>
         record.consensus ? (
           <span className="flex items-center gap-1">
-            <span style={{ color: conclusionColor(record.consensus.conclusion), fontWeight: 600 }}>
+            <span style={{ color: conclusionColor(record.consensus.conclusion) }} className="font-semibold">
               {record.consensus.conclusionLabel}
             </span>
             {record.consensus.engine?.degraded && <Tag color="warning">规则</Tag>}
@@ -101,9 +101,9 @@ export const HistoryTable: React.FC<Props> = ({ onReplay, refreshKey }) => {
         }
         return (
           <span className="text-xs">
-            <span style={{ color: '#f5222d' }}>多{votes.bull}</span>
+            <span className="text-stock-up">多{votes.bull}</span>
             <span className="text-text-sub"> / </span>
-            <span style={{ color: '#16a34a' }}>空{votes.bear}</span>
+            <span className="text-stock-down">空{votes.bear}</span>
             <span className="text-text-sub"> / 中{votes.neutral}</span>
           </span>
         );

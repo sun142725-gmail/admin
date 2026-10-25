@@ -59,6 +59,9 @@ import { StockRoundtableTurn } from './common/entities/stock-roundtable-turn.ent
 import { FlowDefinition } from './common/entities/flow-definition.entity';
 import { FlowRun } from './common/entities/flow-run.entity';
 import { FlowRunNode } from './common/entities/flow-run-node.entity';
+import { NovelProject } from './common/entities/novel-project.entity';
+import { NovelChapter } from './common/entities/novel-chapter.entity';
+import { NovelShot } from './common/entities/novel-shot.entity';
 import { FlowModule } from './modules/flow/flow.module';
 
 const isTest = process.env.NODE_ENV === 'test';
@@ -116,7 +119,10 @@ const isTest = process.env.NODE_ENV === 'test';
               StockRoundtableTurn,
               FlowDefinition,
               FlowRun,
-              FlowRunNode
+              FlowRunNode,
+              NovelProject,
+              NovelChapter,
+              NovelShot
             ],
             synchronize: true
           }
@@ -163,7 +169,10 @@ const isTest = process.env.NODE_ENV === 'test';
               StockRoundtableTurn,
               FlowDefinition,
               FlowRun,
-              FlowRunNode
+              FlowRunNode,
+              NovelProject,
+              NovelChapter,
+              NovelShot
             ],
             synchronize: process.env.DB_SYNC === 'true'
           }

@@ -211,10 +211,10 @@ export const SubjectPicker: React.FC<Props> = ({ value, onChange, disabled }) =>
               {snapshot.name}
               <span className="text-text-sub text-xs ml-1">{snapshot.symbol}</span>
             </span>
-            <span className="text-xl font-semibold" style={{ color: up ? '#f5222d' : '#16a34a' }}>
+            <span className="text-xl font-semibold" style={{ color: up ? 'var(--color-stock-up)' : 'var(--color-stock-down)' }}>
               {snapshot.price.toFixed(2)}
             </span>
-            <span style={{ color: up ? '#f5222d' : '#16a34a' }}>
+            <span style={{ color: up ? 'var(--color-stock-up)' : 'var(--color-stock-down)' }}>
               {up ? '+' : ''}
               {snapshot.change?.toFixed(2)}（{up ? '+' : ''}
               {snapshot.changePct?.toFixed(2)}%）

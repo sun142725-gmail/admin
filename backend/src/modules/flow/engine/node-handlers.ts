@@ -42,7 +42,7 @@ const num = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
 /** 提取 LLM 回复中的 JSON 块（容忍 ```json 围栏与前后说明文字）。 */
-const parseJsonBlock = (text: string): unknown => {
+export const parseJsonBlock = (text: string): unknown => {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const candidate = fenced ? fenced[1] : text;
   const start = candidate.indexOf('{');
@@ -56,6 +56,64 @@ const parseJsonBlock = (text: string): unknown => {
     return undefined;
   }
 };
+
+/**
+ * 通用 LLM 调用（流式聚合为完整回复，多候选故障转移）。
+ * 供 llm 节点与小说流水线等业务方共用。
+ */
+export async function runLlm(
+  deps: NodeHandlerDependencies,
+  messages: ChatMessagePayload[],
+  options: ChatRequestOptions & { modelId?: number; userId?: number }
+): Promise<{ text: string; modelId?: number }> {
+  const candidates = options.modelId
+    ? await deps.router.candidatesByModel(options.modelId)
+    : await deps.router.candidatesByCapability('chat');
+  const usable = candidates.filter((candidate) => candidate.adapter.chatStream);
+  if (usable.length === 0) {
+    throw new Error('没有可用的对话模型，请在 AI 模型管理里配置 chat 能力模型');
+  }
+  const startedAt = Date.now();
+  let lastError: Error | null = null;
+  for (const candidate of usable) {
+    try {
+      let text = '';
+      const generator = candidate.adapter.chatStream(messages, options, candidate.channel);
+      const deadline = Date.now() + CHAT_DEADLINE_MS;
+      for (;;) {
+        const next = await Promise.race([
+          generator.next(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('生成超时')), Math.max(1, deadline - Date.now()))
+          )
+        ]);
+        if (next.done) {
+          break;
+        }
+        text += next.value;
+      }
+      deps.usageLog.record({
+        userId: options.userId ?? 0,
+        modelId: candidate.model.id,
+        kind: 'chat',
+        latencyMs: Date.now() - startedAt,
+        status: 'ok'
+      });
+      return { text, modelId: candidate.model.id };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      deps.usageLog.record({
+        userId: options.userId ?? 0,
+        modelId: candidate.model.id,
+        kind: 'chat',
+        latencyMs: Date.now() - startedAt,
+        status: 'failed',
+        errorMessage: lastError.message
+      });
+    }
+  }
+  throw lastError ?? new Error('生成失败');
+}
 
 // ---------- start：输出 = 开始变量（入参或缺省值） ----------
 const startHandler = async (input: NodeExecInput): Promise<NodeExecResult> => {

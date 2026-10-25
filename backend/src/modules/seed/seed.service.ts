@@ -753,7 +753,8 @@ export class SeedService implements OnModuleInit {
     }
     const pages: Array<{ path: string; name: string; code: string }> = [
       { path: '/flow', name: '流程管理', code: 'flow:define:manage' },
-      { path: '/flow/runs', name: '运行历史', code: 'flow:run:view' }
+      { path: '/flow/runs', name: '运行历史', code: 'flow:run:view' },
+      { path: '/flow/novel', name: '小说转视频', code: 'flow:run:view' }
     ];
     for (const page of pages) {
       const exists = await this.resourceRepo.findOne({ where: { path: page.path } });

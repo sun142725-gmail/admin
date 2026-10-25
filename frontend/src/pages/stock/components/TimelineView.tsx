@@ -70,17 +70,17 @@ const TimelineEntry: React.FC<{ item: TimelineItem }> = ({ item }) => {
           {stance ? (
             <Tag
               color={stance.direction === 'bull' ? 'red' : stance.direction === 'bear' ? 'green' : 'default'}
-              style={{ marginInlineEnd: 0 }}
+              className="tag-flat"
             >
               {STANCE_LABEL[stance.direction]} · {stance.confidence}
             </Tag>
           ) : item.failed ? (
-            <Tag color="error" style={{ marginInlineEnd: 0 }}>
+            <Tag color="error" className="tag-flat">
               离线
             </Tag>
           ) : (
             item.speaking && (
-              <Tag color="processing" style={{ marginInlineEnd: 0 }}>
+              <Tag color="processing" className="tag-flat">
                 发言中…
               </Tag>
             )

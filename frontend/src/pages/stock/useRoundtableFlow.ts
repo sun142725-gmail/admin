@@ -311,4 +311,8 @@ export const useRoundtableFlow = () => {
 };
 
 export const conclusionColor = (conclusion: ConclusionDirection | undefined): string =>
-  conclusion === 'bull' ? '#f5222d' : conclusion === 'bear' ? '#16a34a' : '#737373';
+  conclusion === 'bull'
+    ? 'var(--color-stock-up)'
+    : conclusion === 'bear'
+      ? 'var(--color-stock-down)'
+      : 'var(--color-text-sub)';

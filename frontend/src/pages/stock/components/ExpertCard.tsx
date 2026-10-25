@@ -48,12 +48,12 @@ export const ExpertCard: React.FC<Props> = ({ runtime, activeRound }) => {
             {fallbackStance ? (
               <Tag
                 color={fallbackStance.direction === 'bull' ? 'red' : fallbackStance.direction === 'bear' ? 'green' : 'default'}
-                style={{ marginInlineEnd: 0 }}
+                className="tag-flat"
               >
                 {STANCE_LABEL[fallbackStance.direction]}
               </Tag>
             ) : (
-              <Tag style={{ marginInlineEnd: 0 }}>{runtime.failed ? '离线' : '待发言'}</Tag>
+              <Tag className="tag-flat">{runtime.failed ? '离线' : '待发言'}</Tag>
             )}
             {fallbackStance && (
               <Tooltip title={`置信度 ${fallbackStance.confidence}`}>

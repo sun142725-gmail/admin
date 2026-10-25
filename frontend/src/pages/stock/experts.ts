@@ -36,9 +36,9 @@ export const expertOf = (code: string): ExpertMeta =>
 
 // A 股惯例：红涨绿跌。
 export const STANCE_COLOR: Record<StanceDirection, string> = {
-  bull: '#f5222d',
-  bear: '#16a34a',
-  neutral: '#737373'
+  bull: 'var(--color-stock-up)',
+  bear: 'var(--color-stock-down)',
+  neutral: 'var(--color-text-sub)'
 };
 
 export const STANCE_LABEL: Record<StanceDirection, string> = {
