@@ -3,42 +3,45 @@
     <!-- 时间轴节点 -->
     <div class="ms-card-dot" :class="milestone.isCore ? 'ms-card-dot--core' : ''"></div>
 
-    <div class="ms-card-body">
+    <div class="ms-card-body press">
       <!-- 顶部：时间 + 星标 -->
-      <div class="ms-card-header">
-        <span class="ms-card-date">{{ formatHappenDateShort(milestone.happenDate) }}</span>
-        <div class="ms-card-badges">
-          <span v-if="milestone.isCore" class="ms-card-star">
-            <van-icon name="star" size="14" color="#f59e0b" />
+      <div class="flex items-center justify-between mb-6">
+        <span class="text-sm text-gray-500 font-mono font-medium">{{ formatHappenDateShort(milestone.happenDate) }}</span>
+        <div class="flex items-center gap-6">
+          <span v-if="milestone.isCore" class="flex items-center">
+            <van-icon name="star" size="14" color="#ff7d00" />
           </span>
-          <span class="ms-card-type" :class="milestone.type === 'personal' ? 'ms-card-type--personal' : 'ms-card-type--family'">
+          <span
+            class="text-xs px-6 py-1 rounded font-medium"
+            :class="milestone.type === 'personal' ? 'bg-primary-100 text-primary-500' : 'bg-chip-green-bg text-chip-green-fg'"
+          >
             {{ milestone.type === 'personal' ? '个人' : '家庭' }}
           </span>
         </div>
       </div>
 
       <!-- 标题 -->
-      <h4 class="ms-card-title">{{ milestone.title }}</h4>
+      <h4 class="text-base font-semibold text-gray-800 leading-normal">{{ milestone.title }}</h4>
 
       <!-- 详情 -->
-      <p v-if="milestone.desc" class="ms-card-desc">{{ milestone.desc }}</p>
+      <p v-if="milestone.desc" class="text-sm text-gray-500 leading-relaxed mt-4 text-ellipsis-2">{{ milestone.desc }}</p>
 
       <!-- 配图 -->
-      <div v-if="milestone.imageList?.length" class="ms-card-images">
+      <div v-if="milestone.imageList?.length" class="flex gap-6 mt-8 overflow-x-auto">
         <div
           v-for="(img, i) in milestone.imageList"
           :key="i"
-          class="ms-card-img-wrap"
+          class="w-64 h-64 rounded-md overflow-hidden flex-shrink-0"
           @click.stop="onPreview(milestone.imageList, i)"
         >
-          <img :src="img" class="ms-card-img" />
+          <img :src="img" class="w-full h-full object-cover" alt="大事纪配图" />
         </div>
       </div>
 
       <!-- 底部操作栏 -->
-      <div class="ms-card-footer">
-        <span class="ms-card-creator">{{ milestone.creatorName }}</span>
-        <div class="ms-card-actions" @click.stop>
+      <div class="flex items-center justify-between mt-10 pt-8 border-t border-gray-50">
+        <span class="text-xs text-gray-400">{{ milestone.creatorName }}</span>
+        <div class="flex items-center gap-12" @click.stop>
           <!-- 核心标记切换 -->
           <span
             v-if="canToggleCore"
@@ -98,7 +101,7 @@ function onPreview(images, start) {
   top: 0;
   bottom: -4px;
   width: 2px;
-  background: #e2e8f0;
+  background: theme('colors.gray.200');
 }
 
 .ms-card:last-child::before {
@@ -114,135 +117,36 @@ function onPreview(images, start) {
   height: 12px;
   border-radius: 50%;
   background: #fff;
-  border: 2px solid #cbd5e1;
+  border: 2px solid theme('colors.gray.300');
   z-index: 1;
 }
 
 .ms-card-dot--core {
-  background: #f59e0b;
-  border-color: #f59e0b;
+  background: theme('colors.warning');
+  border-color: theme('colors.warning');
 }
 
 .ms-card-body {
   background: #fff;
-  border-radius: 12px;
+  border-radius: theme('borderRadius.lg');
   padding: 14px;
   margin-bottom: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  box-shadow: theme('boxShadow.card');
 }
 
 .ms-card--core .ms-card-body {
-  background: #fffbeb;
-  box-shadow: 0 2px 12px rgba(245, 158, 11, 0.08);
-}
-
-.ms-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.ms-card-date {
-  font-size: 12px;
-  color: #64748b;
-  font-family: monospace;
-  font-weight: 500;
-}
-
-.ms-card-badges {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ms-card-star {
-  display: flex;
-  align-items: center;
-}
-
-.ms-card-type {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.ms-card-type--personal {
-  background: #e0f2fe;
-  color: #0ea5e9;
-}
-
-.ms-card-type--family {
-  background: #f0fdf4;
-  color: #16a34a;
-}
-
-.ms-card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1e293b;
-  line-height: 1.4;
-}
-
-.ms-card-desc {
-  font-size: 13px;
-  color: #64748b;
-  line-height: 1.5;
-  margin-top: 4px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.ms-card-images {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.ms-card-img-wrap {
-  width: 64px;
-  height: 64px;
-  border-radius: 8px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.ms-card-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.ms-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid #f1f5f9;
-}
-
-.ms-card-creator {
-  font-size: 11px;
-  color: #94a3b8;
-}
-
-.ms-card-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  background: theme('colors.chip.orange.bg');
+  box-shadow: 0 2px 12px rgba(255, 125, 0, 0.08); /* warning 投影 */
 }
 
 .ms-card-action {
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 11px;
-  color: #64748b;
+  font-size: theme('fontSize.xs');
+  color: theme('colors.gray.500');
   cursor: pointer;
+  padding: 4px 0;
 }
 
 .ms-card-action:active {
@@ -250,11 +154,11 @@ function onPreview(images, start) {
 }
 
 .ms-card-action--active {
-  color: #f59e0b;
+  color: theme('colors.warning');
   font-weight: 500;
 }
 
 .ms-card-action--danger {
-  color: #ef4444;
+  color: theme('colors.danger');
 }
 </style>

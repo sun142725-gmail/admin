@@ -62,7 +62,7 @@
 
         <!-- 嵌套次级滚动：验证 nested-scroll 联动 -->
         <self-form-item label="兴趣标签（嵌套滚动）">
-          <div class="h-[120px] rounded-md border border-gray-200 overflow-hidden">
+          <div class="h-120 rounded-md border border-gray-200 overflow-hidden">
             <base-scroll :nested-scroll="true">
               <div class="p-12">
                 <div

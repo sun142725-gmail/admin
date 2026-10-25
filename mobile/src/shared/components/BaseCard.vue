@@ -2,7 +2,7 @@
   <div class="base-card bg-white rounded-lg overflow-hidden" :class="{ 'shadow-card': shadow, 'p-16': padding }">
     <div v-if="title || $slots.header" class="card-header flex-between px-16 py-12 border-b border-gray-100">
       <div class="flex items-center">
-        <div v-if="icon" class="w-[4px] h-16 bg-primary-500 rounded-full mr-8" />
+        <div v-if="icon" class="w-4 h-16 bg-primary-500 rounded-full mr-8" />
         <span class="text-base font-bold text-gray-800">{{ title }}</span>
       </div>
       <slot name="header" />

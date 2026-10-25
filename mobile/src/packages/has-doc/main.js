@@ -4,6 +4,7 @@ import router from './router'
 import { createPinia } from 'pinia'
 import GlobalComponents from '@shared/components'
 import 'amfe-flexible'
+import '@shared/styles/base.css'
 import './styles/index.css'
 
 const app = createApp(App)

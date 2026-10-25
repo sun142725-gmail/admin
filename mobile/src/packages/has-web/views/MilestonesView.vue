@@ -1,5 +1,5 @@
 <template>
-  <div class="ms-screen">
+  <div class="page-screen">
     <!-- 顶部导航 -->
     <van-nav-bar
       title="家庭大事纪"
@@ -9,7 +9,7 @@
       placeholder
     >
       <template #right>
-        <span class="ms-nav-action" @click="goSummary">碑文汇总</span>
+        <span class="text-sm text-primary-500 font-medium press" @click="goSummary">碑文汇总</span>
       </template>
     </van-nav-bar>
 
@@ -22,7 +22,7 @@
     <!-- 列表区 -->
     <van-pull-refresh v-model="refreshing" @refresh="onRefresh" class="ms-list-wrap">
       <!-- 加载中 -->
-      <div v-if="milestoneStore.loading && !currentList.length" class="ms-loading">
+      <div v-if="milestoneStore.loading && !currentList.length" class="flex justify-center py-64">
         <van-loading size="24" color="#0ea5e9">加载中...</van-loading>
       </div>
 
@@ -31,7 +31,7 @@
         v-else-if="!currentList.length"
         icon="medal-o"
         :icon-size="56"
-        icon-color="#cbd5e1"
+        icon-color="#a9b1bf"
         :description="activeTabName === 'personal' ? '还没有人生里程碑，记录下你的重要时刻吧' : '还没有家庭大事纪，记录家庭的珍贵瞬间'"
         :show-button="true"
         button-text="记录大事纪"
@@ -39,7 +39,7 @@
       />
 
       <!-- 时间轴列表 -->
-      <div v-else class="ms-timeline">
+      <div v-else class="px-16 pt-12 pb-80">
         <MilestoneCard
           v-for="item in currentList"
           :key="item.id"
@@ -55,7 +55,12 @@
     </van-pull-refresh>
 
     <!-- 悬浮新增按钮 -->
-    <div class="ms-fab" @click="openCreate">
+    <div
+      class="ms-fab fab-right press"
+      role="button"
+      aria-label="新增大事纪"
+      @click="openCreate"
+    >
       <van-icon name="plus" size="24" color="#fff" />
     </div>
 
@@ -153,45 +158,24 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.ms-screen {
-  min-height: 100vh;
-  background: #f8fafc;
-}
-
-.ms-nav-action {
-  font-size: 13px;
-  color: #0ea5e9;
-  font-weight: 500;
-}
-
 .ms-list-wrap {
   min-height: calc(100vh - 90px);
 }
 
-.ms-loading {
-  display: flex;
-  justify-content: center;
-  padding: 60px 0;
-}
-
-.ms-timeline {
-  padding: 12px 16px 80px;
-}
-
+/* 悬浮按钮：高度避让 tabbar + 手势条；宽屏时由 shell 的 .fab-right 约束到列内 */
 .ms-fab {
   position: fixed;
   right: 20px;
-  bottom: 80px;
-  width: 52px;
-  height: 52px;
+  bottom: calc(var(--van-tabbar-height, 56px) + env(safe-area-inset-bottom, 0px) + 16px);
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  background: linear-gradient(135deg, theme('colors.primary.500'), theme('colors.primary.600'));
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.4);
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.4); /* primary 投影 */
   z-index: 10;
-  cursor: pointer;
 }
 
 .ms-fab:active {

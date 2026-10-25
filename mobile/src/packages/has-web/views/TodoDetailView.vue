@@ -1,10 +1,10 @@
 <template>
-  <div class="detail-screen">
+  <div class="page-screen">
     <van-nav-bar title="待办详情" left-arrow @click-left="$router.back()" :border="false" />
 
-    <div v-if="todo" class="detail-content">
+    <div v-if="todo" class="p-12 px-16">
       <!-- 标题 -->
-      <div class="detail-card">
+      <div class="screen-card mb-12">
         <van-field
           v-model="editForm.title"
           label="标题"
@@ -15,28 +15,28 @@
       </div>
 
       <!-- 信息 -->
-      <div class="detail-card">
-        <div class="detail-row" @click="showPicker = true">
-          <span class="detail-row-label">执行人</span>
-          <div class="detail-row-value">
+      <div class="screen-card mb-12">
+        <div class="press flex items-center justify-between px-16 py-14 min-h-touch border-b border-gray-50 active:bg-gray-50" @click="showPicker = true">
+          <span class="text-base font-medium text-gray-600">执行人</span>
+          <div class="flex items-center gap-4 text-base text-gray-800">
             <span>{{ assigneeLabel || '未指定' }}</span>
-            <van-icon name="arrow" color="#cbd5e1" size="14" />
+            <van-icon name="arrow" color="#a9b1bf" size="14" />
           </div>
         </div>
-        <div class="detail-row" @click="showDatePicker = true">
-          <span class="detail-row-label">截止日期</span>
-          <div class="detail-row-value">
+        <div class="press flex items-center justify-between px-16 py-14 min-h-touch border-b border-gray-50 active:bg-gray-50" @click="showDatePicker = true">
+          <span class="text-base font-medium text-gray-600">截止日期</span>
+          <div class="flex items-center gap-4 text-base text-gray-800">
             <span>{{ editForm.dueDate || '未设置' }}</span>
-            <van-icon name="arrow" color="#cbd5e1" size="14" />
+            <van-icon name="arrow" color="#a9b1bf" size="14" />
           </div>
         </div>
-        <div class="detail-row">
-          <span class="detail-row-label">创建人</span>
-          <span class="detail-row-value">{{ todo.creatorName }}</span>
+        <div class="flex items-center justify-between px-16 py-14 min-h-touch border-b border-gray-50">
+          <span class="text-base font-medium text-gray-600">创建人</span>
+          <span class="text-base text-gray-800">{{ todo.creatorName }}</span>
         </div>
-        <div class="detail-row">
-          <span class="detail-row-label">状态</span>
-          <span class="detail-row-value">
+        <div class="flex items-center justify-between px-16 py-14 min-h-touch">
+          <span class="text-base font-medium text-gray-600">状态</span>
+          <span class="text-base text-gray-800">
             <van-tag :type="todo.status === 'completed' ? 'success' : 'primary'" round>
               {{ todo.status === 'completed' ? '已完成' : '未完成' }}
             </van-tag>
@@ -45,7 +45,7 @@
       </div>
 
       <!-- 操作 -->
-      <div class="detail-actions">
+      <div class="flex flex-col gap-8 pt-8">
         <van-button block round type="primary" @click="handleSave">
           保存修改
         </van-button>
@@ -74,7 +74,7 @@
       </div>
     </div>
 
-    <van-skeleton v-else :row="4" title style="padding: 16px" />
+    <van-skeleton v-else :row="4" title class="p-16" />
 
     <!-- 执行人选择 -->
     <van-popup v-model:show="showPicker" round position="bottom" teleport="body">
@@ -101,7 +101,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showConfirmDialog, showSuccessToast } from 'vant'
+import { showConfirmDialog } from 'vant'
 import { useTodoStore } from '@/stores/todo'
 import { useFamilyStore } from '@/stores/family'
 
@@ -186,23 +186,8 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.detail-screen { min-height: 100vh; background: #f8fafc; }
-.detail-screen :deep(.van-nav-bar) { background: #fff; }
-.detail-content { padding: 12px 16px; }
-.detail-card {
-  background: #fff; border-radius: 16px; margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03); overflow: hidden;
-}
-.detail-input :deep(.van-field__label) { color: #64748b; font-weight: 500; }
-.detail-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; border-bottom: 1px solid #f1f5f9;
-}
-.detail-row:last-child { border-bottom: none; }
-.detail-row-label { font-size: 14px; color: #64748b; font-weight: 500; }
-.detail-row-value { display: flex; align-items: center; gap: 4px; font-size: 14px; color: #1e293b; }
-.detail-actions { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
-.detail-actions :deep(.van-button--primary) {
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border: none; height: 46px; font-size: 15px;
+.detail-input :deep(.van-field__label) {
+  color: theme('colors.gray.600');
+  font-weight: 500;
 }
 </style>

@@ -12,7 +12,7 @@
     <div class="ms-edit-form">
       <!-- 事件归属 -->
       <div class="ms-edit-field">
-        <label class="ms-edit-label">事件归属 <span class="ms-edit-required">*</span></label>
+        <label class="text-base font-medium text-gray-600 mb-8 block">事件归属 <span class="text-danger">*</span></label>
         <BaseRadio
           class="ms-edit-type-radio"
           v-model="form.type"
@@ -23,15 +23,16 @@
 
       <!-- 发生时间 -->
       <div class="ms-edit-field">
-        <label class="ms-edit-label">发生时间 <span class="ms-edit-required">*</span></label>
-        <div class="ms-edit-date-row">
+        <label class="text-base font-medium text-gray-600 mb-8 block">发生时间 <span class="text-danger">*</span></label>
+        <div class="flex items-center gap-8">
           <base-date-picker
             v-model="form.happenDate"
             :precision="dateMode"
             placeholder="请选择时间"
             :max-date="maxDate"
+            class="flex-1"
           />
-          <div class="ms-edit-date-mode">
+          <div class="flex flex-col gap-4 flex-shrink-0">
             <span
               class="ms-edit-mode-btn"
               :class="{ 'ms-edit-mode-btn--active': dateMode === 'day' }"
@@ -48,7 +49,7 @@
 
       <!-- 事件标题 -->
       <div class="ms-edit-field">
-        <label class="ms-edit-label">事件标题 <span class="ms-edit-required">*</span></label>
+        <label class="text-base font-medium text-gray-600 mb-8 block">事件标题 <span class="text-danger">*</span></label>
         <van-field
           v-model="form.title"
           placeholder="简洁概括事件，如：正式入职互联网行业"
@@ -60,7 +61,7 @@
 
       <!-- 事件详情 -->
       <div class="ms-edit-field">
-        <label class="ms-edit-label">事件详情</label>
+        <label class="text-base font-medium text-gray-600 mb-8 block">事件详情</label>
         <van-field
           v-model="form.desc"
           type="textarea"
@@ -74,7 +75,9 @@
 
       <!-- 上传配图 -->
       <div class="ms-edit-field">
-        <label class="ms-edit-label">上传配图 <span class="ms-edit-hint">最多3张</span></label>
+        <label class="text-base font-medium text-gray-600 mb-8 block">
+          上传配图 <span class="text-sm text-gray-400 font-normal ml-4">最多3张</span>
+        </label>
         <self-upload
           v-model="form.imageList"
           :multiple="true"
@@ -85,24 +88,24 @@
       </div>
 
       <!-- 核心高光开关 -->
-      <div class="ms-edit-field ms-edit-core">
-        <div class="ms-edit-core-info">
+      <div class="ms-edit-core">
+        <div class="flex flex-col gap-4">
           <span class="ms-edit-core-label">
-            <van-icon name="star" size="16" :color="form.isCore ? '#f59e0b' : '#cbd5e1'" />
+            <van-icon name="star" size="16" :color="form.isCore ? '#ff7d00' : '#a9b1bf'" />
             纳入碑文汇总
           </span>
-          <span class="ms-edit-core-hint">{{ coreHint }}</span>
+          <span class="text-xs text-gray-400">{{ coreHint }}</span>
         </div>
         <van-switch
           v-model="form.isCore"
           :disabled="!canToggleCore"
           size="20px"
-          active-color="#f59e0b"
+          style="--van-switch-on-background: #ff7d00"
         />
       </div>
 
       <!-- 保存按钮 -->
-      <div class="ms-edit-submit">
+      <div class="pt-8 pb-safe-only">
         <base-button block round type="primary" :loading="submitting" @click="handleSubmit">
           保存
         </base-button>
@@ -293,99 +296,54 @@ async function handleSubmit() {
   margin-bottom: 16px;
 }
 
-.ms-edit-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: #334155;
-  margin-bottom: 8px;
-}
-
 .ms-edit-type-radio {
   min-height: 28px;
   align-items: center;
 }
 
-.ms-edit-required {
-  color: #ef4444;
-}
-
-.ms-edit-hint {
-  font-size: 12px;
-  color: #94a3b8;
-  font-weight: 400;
-  margin-left: 4px;
-}
-
-.ms-edit-date-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ms-edit-date-row > :first-child {
-  flex: 1;
-}
-
-.ms-edit-date-mode {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
+/* 日期精度切换（触控目标加强） */
 .ms-edit-mode-btn {
-  font-size: 10px;
-  color: #94a3b8;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background: #f1f5f9;
+  font-size: theme('fontSize.sm');
+  color: theme('colors.gray.400');
+  padding: 6px 12px;
+  border-radius: theme('borderRadius.DEFAULT');
+  background: theme('colors.gray.50');
   cursor: pointer;
   white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.ms-edit-mode-btn:active {
+  opacity: 0.7;
 }
 
 .ms-edit-mode-btn--active {
-  background: #e0f2fe;
-  color: #0ea5e9;
+  background: theme('colors.primary.100');
+  color: theme('colors.primary.600');
   font-weight: 500;
 }
 
-.ms-edit :deep(.van-field) {
-  background: #f7f8fa;
-  border-radius: 8px;
+.ms-edit-field :deep(.van-field) {
+  background: theme('colors.gray.50');
+  border-radius: theme('borderRadius.md');
 }
 
 .ms-edit-core {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f7f8fa;
-  border-radius: 8px;
+  background: theme('colors.gray.50');
+  border-radius: theme('borderRadius.md');
   padding: 12px;
-}
-
-.ms-edit-core-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  margin-bottom: 16px;
 }
 
 .ms-edit-core-label {
-  font-size: 14px;
+  font-size: theme('fontSize.base');
   font-weight: 500;
-  color: #334155;
+  color: theme('colors.gray.600');
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.ms-edit-core-hint {
-  font-size: 11px;
-  color: #94a3b8;
-}
-
-.ms-edit-submit {
-  padding: 8px 0;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
 }
 </style>

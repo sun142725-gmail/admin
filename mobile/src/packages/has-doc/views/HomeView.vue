@@ -1,5 +1,5 @@
 <template>
-  <div class="home-page flex flex-col h-[100vh] bg-gray-50 overflow-hidden">
+  <div class="home-page flex flex-col h-screen bg-gray-50 overflow-hidden">
     <!-- 顶部标题区 -->
     <div class="header px-16 pt-20 pb-24 bg-gradient-to-br from-primary-500 to-primary-400 flex-shrink-0">
       <div class="flex-between text-white mb-20">
@@ -7,13 +7,13 @@
           <h1 class="text-xl font-bold">组件库</h1>
           <p class="text-sm opacity-90 mt-8">移动端基础组件示例</p>
         </div>
-        <div class="w-[40px] h-[40px] rounded-full bg-white/20 flex-center">
+        <div class="w-40 h-40 rounded-full bg-white/20 flex-center">
           <van-icon name="bulb-o" size="20" color="#fff" />
         </div>
       </div>
 
       <div class="search-bar flex items-center bg-white/95 rounded-full px-16 py-10 shadow-card">
-        <van-icon name="search" size="16" color="gray-400" />
+        <van-icon name="search" size="16" color="#86909c" />
         <span class="text-sm text-gray-400 ml-8">搜索组件名称</span>
       </div>
     </div>
@@ -33,7 +33,7 @@
                   @click="$router.push(item.route)"
                 >
                   <div
-                    class="icon-box w-[44px] h-[44px] rounded-lg flex-center mb-12"
+                    class="icon-box w-44 h-44 rounded-lg flex-center mb-12"
                     :style="{ background: `${item.color}15` }"
                   >
                     <van-icon :name="item.icon" size="22" :color="item.color" />
@@ -49,7 +49,7 @@
           <div class="px-12 mt-12 pb-24">
             <div class="app-card">
               <div class="flex items-start">
-                <div class="w-[32px] h-[32px] rounded-full bg-warning/10 flex-center mr-12 flex-shrink-0">
+                <div class="w-32 h-32 rounded-full bg-warning/10 flex-center mr-12 flex-shrink-0">
                   <van-icon name="info-o" size="16" color="#ff7d00" />
                 </div>
                 <div>

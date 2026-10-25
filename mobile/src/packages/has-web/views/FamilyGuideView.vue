@@ -1,36 +1,42 @@
 <template>
-  <div class="guide-screen">
+  <div class="page-screen">
     <!-- Hero -->
-    <div class="guide-hero">
-      <div class="guide-hero-icon">
+    <div class="guide-hero hero-safe-top">
+      <div class="relative z-[1] w-72 h-72 rounded-2xl bg-white/15 flex-center mx-auto mb-16">
         <van-icon name="home-o" size="36" color="#fff" />
       </div>
-      <h1 class="guide-hero-title">欢迎使用</h1>
-      <p class="guide-hero-desc">创建或加入家庭，开启协作之旅</p>
+      <h1 class="relative z-[1] text-2xl font-bold text-white mb-8">欢迎使用</h1>
+      <p class="relative z-[1] text-base text-white/80">创建或加入家庭，开启协作之旅</p>
     </div>
 
     <!-- 入口卡片 -->
-    <div class="guide-cards">
-      <div class="guide-card guide-card-create" @click="showCreate = true">
-        <div class="guide-card-icon" style="background: #e0f2fe; color: #0ea5e9">
+    <div class="p-24 px-16 flex flex-col gap-12">
+      <div
+        class="press bg-white rounded-xl px-16 py-20 flex items-center gap-12 shadow-popover active:scale-[0.98] transition-transform"
+        @click="showCreate = true"
+      >
+        <div class="w-56 h-56 rounded-lg flex-center flex-shrink-0 bg-chip-blue-bg text-chip-blue-fg">
           <van-icon name="add-o" size="28" />
         </div>
-        <div class="guide-card-body">
-          <h3 class="guide-card-title">创建家庭</h3>
-          <p class="guide-card-desc">创建一个新家庭，成为房主</p>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-base font-semibold text-gray-800 mb-4">创建家庭</h3>
+          <p class="text-sm text-gray-400 text-ellipsis-1">创建一个新家庭，成为房主</p>
         </div>
-        <van-icon name="arrow" color="#cbd5e1" size="16" />
+        <van-icon name="arrow" color="#a9b1bf" size="16" />
       </div>
 
-      <div class="guide-card guide-card-join" @click="showJoin = true">
-        <div class="guide-card-icon" style="background: #d1fae5; color: #10b981">
+      <div
+        class="press bg-white rounded-xl px-16 py-20 flex items-center gap-12 shadow-popover active:scale-[0.98] transition-transform"
+        @click="showJoin = true"
+      >
+        <div class="w-56 h-56 rounded-lg flex-center flex-shrink-0 bg-chip-green-bg text-chip-green-fg">
           <van-icon name="share-o" size="28" />
         </div>
-        <div class="guide-card-body">
-          <h3 class="guide-card-title">加入家庭</h3>
-          <p class="guide-card-desc">输入邀请码加入已有家庭</p>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-base font-semibold text-gray-800 mb-4">加入家庭</h3>
+          <p class="text-sm text-gray-400 text-ellipsis-1">输入邀请码加入已有家庭</p>
         </div>
-        <van-icon name="arrow" color="#cbd5e1" size="16" />
+        <van-icon name="arrow" color="#a9b1bf" size="16" />
       </div>
     </div>
 
@@ -39,7 +45,7 @@
       <div class="sheet">
         <div class="sheet-header">
           <h3 class="sheet-title">创建家庭</h3>
-          <van-icon name="cross" size="20" color="#94a3b8" @click="showCreate = false" />
+          <van-icon name="cross" size="20" color="#86909c" class="press" @click="showCreate = false" />
         </div>
         <div class="sheet-body">
           <!-- 家庭名称 -->
@@ -58,18 +64,21 @@
           <!-- 家庭头像 -->
           <div class="sheet-field">
             <label class="sheet-label">选择头像</label>
-            <div class="avatar-grid">
+            <div class="grid grid-cols-4 gap-12">
               <div
                 v-for="avatar in FAMILY_AVATARS"
                 :key="avatar.id"
-                class="avatar-grid-item"
-                :class="{ 'is-selected': createForm.avatar === avatar.id }"
+                class="press flex flex-col items-center gap-4"
                 @click="createForm.avatar = avatar.id"
               >
-                <div class="avatar-grid-icon" :style="{ background: avatar.bg, color: avatar.color }">
+                <div
+                  class="w-56 h-56 rounded-lg flex-center border-2 transition-colors"
+                  :class="createForm.avatar === avatar.id ? 'border-primary-500' : 'border-transparent'"
+                  :style="{ background: avatar.bg, color: avatar.color }"
+                >
                   <van-icon :name="avatar.icon" size="24" />
                 </div>
-                <span class="avatar-grid-label">{{ avatar.label }}</span>
+                <span class="text-xs text-gray-500">{{ avatar.label }}</span>
               </div>
             </div>
           </div>
@@ -94,7 +103,7 @@
       <div class="sheet">
         <div class="sheet-header">
           <h3 class="sheet-title">加入家庭</h3>
-          <van-icon name="cross" size="20" color="#94a3b8" @click="showJoin = false" />
+          <van-icon name="cross" size="20" color="#86909c" class="press" @click="showJoin = false" />
         </div>
         <div class="sheet-body">
           <div class="sheet-field">
@@ -181,19 +190,13 @@ async function handleJoin() {
 </script>
 
 <style scoped>
-.guide-screen {
-  min-height: 100vh;
-  background: #f8fafc;
-}
-
 .guide-hero {
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-  padding: 64px 24px 48px;
-  text-align: center;
   position: relative;
   overflow: hidden;
+  text-align: center;
+  background: linear-gradient(135deg, theme('colors.primary.500') 0%, theme('colors.primary.600') 100%);
+  padding: 64px 24px 48px;
 }
-
 .guide-hero::before {
   content: '';
   position: absolute;
@@ -203,8 +206,8 @@ async function handleJoin() {
   height: 160px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
 }
-
 .guide-hero::after {
   content: '';
   position: absolute;
@@ -214,184 +217,13 @@ async function handleJoin() {
   height: 120px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
+  pointer-events: none;
 }
-
-.guide-hero-icon {
-  width: 72px;
-  height: 72px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 16px;
-  position: relative;
-  z-index: 1;
-}
-
-.guide-hero-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 8px;
-  position: relative;
-  z-index: 1;
-}
-
-.guide-hero-desc {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
-  position: relative;
-  z-index: 1;
-}
-
-.guide-cards {
-  padding: 24px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.guide-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 20px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-  cursor: pointer;
-  transition: transform 0.15s;
-}
-
-.guide-card:active {
-  transform: scale(0.98);
-}
-
-.guide-card-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.guide-card-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.guide-card-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 4px;
-}
-
-.guide-card-desc {
-  font-size: 13px;
-  color: #94a3b8;
-}
-
-/* Sheet */
-.sheet {
-  padding: 20px 16px;
-}
-
-.sheet-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.sheet-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.sheet-body {
-  margin-bottom: 20px;
-}
-
-.sheet-field {
-  margin-bottom: 20px;
-}
-
-.sheet-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: #475569;
-  margin-bottom: 8px;
-}
-
-.sheet-input {
-  background: #f8fafc;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
 .join-code-input :deep(.van-field__control) {
-  font-size: 20px;
+  font-size: theme('fontSize.xl');
   font-weight: 600;
   letter-spacing: 4px;
   text-align: center;
   text-transform: uppercase;
-}
-
-.sheet-hint {
-  font-size: 12px;
-  color: #94a3b8;
-  margin-top: 8px;
-}
-
-.avatar-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-}
-
-.avatar-grid-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-}
-
-.avatar-grid-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid transparent;
-  transition: border-color 0.2s;
-}
-
-.avatar-grid-item.is-selected .avatar-grid-icon {
-  border-color: #0ea5e9;
-}
-
-.avatar-grid-label {
-  font-size: 11px;
-  color: #64748b;
-}
-
-.sheet-footer {
-  padding-bottom: 8px;
-}
-
-.sheet-footer :deep(.van-button--primary) {
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-  border: none;
-  height: 48px;
-  font-size: 16px;
-  font-weight: 600;
 }
 </style>

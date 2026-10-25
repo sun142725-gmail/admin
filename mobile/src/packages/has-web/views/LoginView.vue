@@ -88,7 +88,7 @@
           </div>
           <input
             v-model.trim="form.code"
-            class="auth-input pr-[120px]"
+            class="auth-input pr-120"
             type="text"
             inputmode="numeric"
             maxlength="6"

@@ -67,9 +67,9 @@ const rootClass = computed(() => [
 const themeColor = computed(() => {
   const map = {
     primary: '#0ea5e9',
-    success: '#10b981',
-    warning: '#f59e0b',
-    danger: '#ef4444'
+    success: '#00b42a',
+    warning: '#ff7d00',
+    danger: '#f53f3f'
   }
   return map[props.theme] || map.primary
 })
@@ -121,7 +121,7 @@ function onChange(opt) {
   cursor: pointer;
   user-select: none;
   font-size: 14px;
-  color: #334155;
+  color: theme('colors.gray.600');
 }
 
 .base-radio__item.is-disabled {
@@ -142,7 +142,7 @@ function onChange(opt) {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 1.5px solid #cbd5e1;
+  border: 1.5px solid theme('colors.gray.300');
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -172,17 +172,17 @@ function onChange(opt) {
 
 /* 主题色：金色 */
 .base-radio--warning {
-  --base-radio-accent: #f59e0b;
+  --base-radio-accent: theme('colors.warning');
 }
 
 /* 主题色：成功 */
 .base-radio--success {
-  --base-radio-accent: #10b981;
+  --base-radio-accent: theme('colors.success');
 }
 
 /* 主题色：危险 */
 .base-radio--danger {
-  --base-radio-accent: #ef4444;
+  --base-radio-accent: theme('colors.danger');
 }
 
 .base-radio__label {
@@ -191,6 +191,6 @@ function onChange(opt) {
 }
 
 .base-radio__item.is-disabled .base-radio__label {
-  color: #94a3b8;
+  color: theme('colors.gray.400');
 }
 </style>

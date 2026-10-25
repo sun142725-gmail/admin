@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import GlobalComponents from '@shared/components'
 import App from './App.vue'
 import router from './router'
+import '@shared/styles/base.css'
 import './styles/index.css'
 import 'amfe-flexible'
 

@@ -14,7 +14,7 @@
       @click="openPicker"
     >
       <span class="base-date-picker__value">{{ displayValue || placeholder }}</span>
-      <van-icon name="arrow-down" size="14" color="#c0c4cc" />
+      <van-icon name="arrow-down" size="14" color="#a9b1bf" />
     </div>
 
     <!-- 日期选择弹窗 -->
@@ -125,7 +125,7 @@ function onCancel() {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: #f7f8fa;
+  background: theme('colors.gray.50');
   border-radius: 8px;
   cursor: pointer;
   min-height: 36px;
@@ -138,10 +138,10 @@ function onCancel() {
 
 .base-date-picker__value {
   font-size: 14px;
-  color: #1e293b;
+  color: theme('colors.gray.800');
 }
 
 .base-date-picker__trigger.is-placeholder .base-date-picker__value {
-  color: #c0c4cc;
+  color: theme('colors.gray.300');
 }
 </style>

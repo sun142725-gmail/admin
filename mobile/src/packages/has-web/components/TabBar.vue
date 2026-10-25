@@ -20,13 +20,8 @@ const tabs = [
 </script>
 
 <style scoped>
+/* 颜色/高度/字号已由 html:root 的 Vant 变量桥接统一，这里只做浮层投影 */
 .family-tabbar {
-  --van-tabbar-height: 56px;
-  --van-tabbar-background: #ffffff;
-  --van-tabbar-item-active-color: #0ea5e9;
-  --van-tabbar-item-text-color: #94a3b8;
-  --van-tabbar-item-icon-size: 22px;
-  --van-tabbar-item-font-size: 11px;
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 -2px 12px rgba(10, 12, 16, 0.04);
 }
 </style>

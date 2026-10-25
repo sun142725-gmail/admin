@@ -1,62 +1,64 @@
 <template>
-  <div class="settings-screen">
+  <div class="page-screen">
     <van-nav-bar title="设置" left-arrow @click-left="$router.back()" :border="false" />
 
-    <div class="settings-content">
+    <div class="p-12 px-16">
       <!-- 通知设置 -->
-      <div class="settings-card">
-        <div class="settings-row">
-          <div class="settings-row-left">
+      <div class="screen-card mb-12">
+        <div class="flex items-center justify-between px-16 py-14 min-h-touch">
+          <div class="flex items-center gap-10">
             <van-icon name="bell" size="18" color="#0ea5e9" />
-            <span class="settings-row-label">消息通知</span>
+            <span class="text-base font-medium text-gray-800">消息通知</span>
           </div>
           <van-switch v-model="settings.notificationEnabled" size="20px" @change="handleNotificationChange" />
         </div>
       </div>
 
       <!-- 关于 -->
-      <div class="settings-card">
-        <div class="settings-row" @click="showAbout = true">
-          <div class="settings-row-left">
-            <van-icon name="info-o" size="18" color="#64748b" />
-            <span class="settings-row-label">关于我们</span>
+      <div class="screen-card mb-12">
+        <div class="press flex items-center justify-between px-16 py-14 min-h-touch border-b border-gray-50 active:bg-gray-50" @click="showAbout = true">
+          <div class="flex items-center gap-10">
+            <van-icon name="info-o" size="18" color="#4e5969" />
+            <span class="text-base font-medium text-gray-800">关于我们</span>
           </div>
-          <van-icon name="arrow" color="#cbd5e1" size="14" />
+          <van-icon name="arrow" color="#a9b1bf" size="14" />
         </div>
-        <div class="settings-row" @click="openLink('用户协议')">
-          <div class="settings-row-left">
-            <van-icon name="description" size="18" color="#64748b" />
-            <span class="settings-row-label">用户协议</span>
+        <div class="press flex items-center justify-between px-16 py-14 min-h-touch border-b border-gray-50 active:bg-gray-50" @click="openLink('用户协议')">
+          <div class="flex items-center gap-10">
+            <van-icon name="description" size="18" color="#4e5969" />
+            <span class="text-base font-medium text-gray-800">用户协议</span>
           </div>
-          <van-icon name="arrow" color="#cbd5e1" size="14" />
+          <van-icon name="arrow" color="#a9b1bf" size="14" />
         </div>
-        <div class="settings-row" @click="openLink('隐私政策')">
-          <div class="settings-row-left">
-            <van-icon name="shield-o" size="18" color="#64748b" />
-            <span class="settings-row-label">隐私政策</span>
+        <div class="press flex items-center justify-between px-16 py-14 min-h-touch active:bg-gray-50" @click="openLink('隐私政策')">
+          <div class="flex items-center gap-10">
+            <van-icon name="shield-o" size="18" color="#4e5969" />
+            <span class="text-base font-medium text-gray-800">隐私政策</span>
           </div>
-          <van-icon name="arrow" color="#cbd5e1" size="14" />
+          <van-icon name="arrow" color="#a9b1bf" size="14" />
         </div>
       </div>
 
       <!-- 版本信息 -->
-      <div class="settings-version">
-        <p>版本 v1.0.0</p>
+      <div class="text-center py-16">
+        <p class="text-sm text-gray-400">版本 v1.0.0</p>
       </div>
 
       <!-- 退出账号 -->
-      <div class="settings-card">
-        <div class="settings-row settings-row-danger" @click="handleLogout">
-          <span class="settings-row-label">退出账号</span>
+      <div class="screen-card">
+        <div class="press flex items-center justify-center px-16 py-14 min-h-touch active:bg-chip-rose-bg" @click="handleLogout">
+          <span class="text-base font-medium text-danger">退出账号</span>
         </div>
       </div>
     </div>
 
     <!-- 关于弹窗 -->
     <van-dialog v-model:show="showAbout" title="关于我们" confirm-button-text="知道了" teleport="body">
-      <div class="about-content">
-        <p>家庭管理 v1.0.0</p>
-        <p>一款面向家庭场景的轻量协作工具，核心解决家庭成员间的家务分工与信息同步问题。</p>
+      <div class="px-20 py-16">
+        <p class="text-sm text-gray-500 leading-relaxed mb-8">家庭管理 v1.0.0</p>
+        <p class="text-sm text-gray-500 leading-relaxed mb-8">
+          一款面向家庭场景的轻量协作工具，核心解决家庭成员间的家务分工与信息同步问题。
+        </p>
       </div>
     </van-dialog>
   </div>
@@ -115,27 +117,3 @@ onMounted(async () => {
   }
 })
 </script>
-
-<style scoped>
-.settings-screen { min-height: 100vh; background: #f8fafc; }
-.settings-screen :deep(.van-nav-bar) { background: #fff; }
-.settings-content { padding: 12px 16px; }
-.settings-card {
-  background: #fff; border-radius: 16px; margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03); overflow: hidden;
-}
-.settings-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; border-bottom: 1px solid #f1f5f9; cursor: pointer;
-}
-.settings-row:last-child { border-bottom: none; }
-.settings-row:active { background: #f8fafc; }
-.settings-row-left { display: flex; align-items: center; gap: 10px; }
-.settings-row-label { font-size: 14px; color: #1e293b; font-weight: 500; }
-.settings-row-danger { justify-content: center; }
-.settings-row-danger .settings-row-label { color: #ef4444; }
-.settings-version { text-align: center; padding: 16px 0; }
-.settings-version p { font-size: 12px; color: #94a3b8; }
-.about-content { padding: 16px 20px; }
-.about-content p { font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 8px; }
-</style>

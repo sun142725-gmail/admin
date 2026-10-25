@@ -1,15 +1,15 @@
 <template>
-  <div class="members-screen">
+  <div class="page-screen pb-24">
     <van-nav-bar title="成员管理" left-arrow @click-left="$router.back()" :border="false" />
 
     <!-- 邀请码模块（房主可见） -->
-    <div v-if="familyStore.isOwner" class="invite-section">
-      <div class="invite-card">
-        <div class="invite-card-top">
-          <div>
-            <p class="invite-card-label">家庭邀请码</p>
-            <p class="invite-card-code">{{ familyStore.inviteCode || '点击生成' }}</p>
-            <p class="invite-card-expire" v-if="familyStore.inviteCodeExpiresAt">
+    <div v-if="familyStore.isOwner" class="px-16">
+      <div class="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-16 flex flex-col gap-12">
+        <div class="flex items-start justify-between gap-12">
+          <div class="min-w-0">
+            <p class="text-sm text-gray-500 mb-4">家庭邀请码</p>
+            <p class="text-3xl font-bold text-primary-500 tracking-4 text-ellipsis-1">{{ familyStore.inviteCode || '点击生成' }}</p>
+            <p v-if="familyStore.inviteCodeExpiresAt" class="text-xs text-gray-400 mt-4">
               有效期至 {{ formatDate(familyStore.inviteCodeExpiresAt) }}
             </p>
           </div>
@@ -24,25 +24,31 @@
     </div>
 
     <!-- 成员列表 -->
-    <div class="member-section">
-      <div class="member-section-header">
-        <h3 class="member-section-title">家庭成员</h3>
-        <span class="member-section-count">{{ members.length }}/20 人</span>
+    <div class="pt-20 px-16">
+      <div class="flex items-center justify-between mb-12">
+        <h3 class="text-base font-semibold text-gray-800">家庭成员</h3>
+        <span class="text-sm text-gray-400">{{ members.length }}/20 人</span>
       </div>
 
       <van-skeleton v-if="loading && !members.length" :row="3" title avatar />
-      <div v-else class="member-list">
-        <div v-for="m in members" :key="m.id" class="member-item">
+      <div v-else class="screen-card">
+        <div
+          v-for="m in members"
+          :key="m.id"
+          class="flex items-center gap-12 px-16 py-14 border-b border-gray-50 active:bg-gray-50 last:border-b-0"
+        >
           <van-image v-if="m.avatarUrl" round width="40" height="40" :src="m.avatarUrl" />
-          <div v-else class="member-avatar-fallback">{{ (m.nickname || '?')[0] }}</div>
+          <div v-else class="w-40 h-40 rounded-full bg-primary-100 flex-center text-base font-semibold text-primary-500 flex-shrink-0">
+            {{ (m.nickname || '?')[0] }}
+          </div>
 
-          <div class="member-info">
-            <div class="member-name-row">
-              <span class="member-name">{{ m.nickname }}</span>
-              <span v-if="m.role === 'owner'" class="member-tag member-tag-owner">房主</span>
-              <span v-else class="member-tag member-tag-normal">成员</span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-6 mb-2">
+              <span class="text-base font-medium text-gray-800 text-ellipsis-1">{{ m.nickname }}</span>
+              <span v-if="m.role === 'owner'" class="text-xs px-6 py-1 rounded bg-chip-orange-bg text-chip-orange-fg flex-shrink-0">房主</span>
+              <span v-else class="text-xs px-6 py-1 rounded bg-gray-50 text-gray-500 flex-shrink-0">成员</span>
             </div>
-            <span class="member-joined">加入于 {{ formatDate(m.joinedAt) }}</span>
+            <span class="text-xs text-gray-400">加入于 {{ formatDate(m.joinedAt) }}</span>
           </div>
 
           <van-button
@@ -60,20 +66,26 @@
     </div>
 
     <!-- 加入申请列表（房主可见，有数据才显示） -->
-    <div v-if="familyStore.isOwner && joinRequests.length" class="member-section">
-      <div class="member-section-header">
-        <h3 class="member-section-title">加入申请</h3>
-        <span class="member-section-count">{{ joinRequests.length }} 条待处理</span>
+    <div v-if="familyStore.isOwner && joinRequests.length" class="pt-20 px-16">
+      <div class="flex items-center justify-between mb-12">
+        <h3 class="text-base font-semibold text-gray-800">加入申请</h3>
+        <span class="text-sm text-gray-400">{{ joinRequests.length }} 条待处理</span>
       </div>
-      <div class="member-list">
-        <div v-for="r in joinRequests" :key="r.id" class="member-item">
+      <div class="screen-card">
+        <div
+          v-for="r in joinRequests"
+          :key="r.id"
+          class="flex items-center gap-12 px-16 py-14 border-b border-gray-50 last:border-b-0"
+        >
           <van-image v-if="r.avatarUrl" round width="40" height="40" :src="r.avatarUrl" />
-          <div v-else class="member-avatar-fallback">{{ (r.nickname || '?')[0] }}</div>
-          <div class="member-info">
-            <span class="member-name">{{ r.nickname }}</span>
-            <span class="member-joined">{{ formatDate(r.createdAt) }} 申请</span>
+          <div v-else class="w-40 h-40 rounded-full bg-primary-100 flex-center text-base font-semibold text-primary-500 flex-shrink-0">
+            {{ (r.nickname || '?')[0] }}
           </div>
-          <div class="request-actions">
+          <div class="flex-1 min-w-0">
+            <p class="text-base font-medium text-gray-800 text-ellipsis-1">{{ r.nickname }}</p>
+            <span class="text-xs text-gray-400">{{ formatDate(r.createdAt) }} 申请</span>
+          </div>
+          <div class="flex gap-6 flex-shrink-0">
             <van-button size="mini" round type="primary" @click="handleApprove(r)">同意</van-button>
             <van-button size="mini" plain round @click="handleReject(r)">拒绝</van-button>
           </div>
@@ -82,19 +94,17 @@
     </div>
 
     <!-- 退出家庭（非房主） -->
-    <div v-if="!familyStore.isOwner" class="leave-section">
+    <div v-if="!familyStore.isOwner" class="px-16 pt-24">
       <van-button block plain round type="danger" @click="handleLeave">
         退出家庭
       </van-button>
     </div>
-
-    <div style="height: 24px"></div>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { showConfirmDialog, showToast, showSuccessToast } from 'vant'
+import { showConfirmDialog, showToast } from 'vant'
 import { useFamilyStore } from '@/stores/family'
 
 const familyStore = useFamilyStore()
@@ -172,42 +182,3 @@ onMounted(async () => {
   }
 })
 </script>
-
-<style scoped>
-.members-screen { min-height: 100vh; background: #f8fafc; }
-.members-screen :deep(.van-nav-bar) { background: transparent; }
-
-.invite-section { padding: 0 16px; }
-.invite-card {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px;
-}
-.invite-card-top { display: flex; align-items: flex-start; justify-content: space-between; }
-.invite-card-label { font-size: 12px; color: #64748b; margin-bottom: 4px; }
-.invite-card-code { font-size: 28px; font-weight: 700; color: #0ea5e9; letter-spacing: 4px; }
-.invite-card-expire { font-size: 11px; color: #94a3b8; margin-top: 4px; }
-
-.member-section { padding: 20px 16px 0; }
-.member-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.member-section-title { font-size: 15px; font-weight: 600; color: #1e293b; }
-.member-section-count { font-size: 12px; color: #94a3b8; }
-
-.member-list { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
-.member-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
-.member-item:last-child { border-bottom: none; }
-.member-avatar-fallback {
-  width: 40px; height: 40px; border-radius: 50%; background: #e0f2fe;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px; font-weight: 600; color: #0ea5e9;
-}
-.member-info { flex: 1; min-width: 0; }
-.member-name-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-.member-name { font-size: 14px; font-weight: 500; color: #1e293b; }
-.member-tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; }
-.member-tag-owner { background: #fef3c7; color: #f59e0b; }
-.member-tag-normal { background: #f1f5f9; color: #64748b; }
-.member-joined { font-size: 11px; color: #94a3b8; }
-.request-actions { display: flex; gap: 6px; }
-
-.leave-section { padding: 24px 16px 0; }
-</style>

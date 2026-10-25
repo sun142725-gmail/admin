@@ -32,7 +32,7 @@
                   <div
                     v-for="i in hList"
                     :key="i"
-                    class="h-[80px] w-[80px] rounded-lg bg-primary-100 flex-center flex-col"
+                    class="h-80 w-80 rounded-lg bg-primary-100 flex-center flex-col"
                   >
                     <span class="text-md text-primary-500 font-bold">{{ i }}</span>
                     <span class="text-xs text-gray-500 mt-4">项</span>
@@ -63,7 +63,7 @@
                           <div
                             v-for="(item, idx) in group.items"
                             :key="idx"
-                            class="h-[80px] w-[100px] rounded-lg flex-center flex-col"
+                            class="h-80 w-100 rounded-lg flex-center flex-col"
                             :style="{ background: group.color }"
                           >
                             <span class="text-md text-white font-bold">{{ item }}</span>

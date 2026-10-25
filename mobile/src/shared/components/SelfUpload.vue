@@ -10,7 +10,7 @@
       <div
         v-for="item in fileList"
         :key="item.uid"
-        class="self-upload__item relative h-[80px] w-[80px] rounded-md overflow-hidden bg-gray-100"
+        class="self-upload__item relative h-80 w-80 rounded-md overflow-hidden bg-gray-100"
       >
         <img v-if="item.url" :src="item.url" class="w-full h-full object-cover" @click="onPreview(item)" />
         <!-- 遮罩：上传中 / 失败 -->
@@ -25,7 +25,7 @@
         <!-- 删除按钮 -->
         <span
           v-if="!disabled && deletable"
-          class="self-upload__del absolute top-0 right-0 w-[24px] h-[24px] flex-center bg-danger text-white rounded-full"
+          class="self-upload__del absolute top-0 right-0 w-24 h-24 flex-center bg-danger text-white rounded-full"
           @click="remove(item)"
         >
           <van-icon name="cross" size="12" color="#fff" />
@@ -35,7 +35,7 @@
       <!-- 选择按钮 -->
       <div
         v-if="showPicker"
-        class="self-upload__picker h-[80px] w-[80px] rounded-md flex-center border border-dashed border-gray-200 text-gray-400"
+        class="self-upload__picker h-80 w-80 rounded-md flex-center border border-dashed border-gray-200 text-gray-400"
         :class="{ 'is-disabled': disabled }"
         @click="trigger"
       >

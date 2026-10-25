@@ -4,7 +4,7 @@
     <van-nav-bar left-arrow fixed placeholder @click-left="$router.back()" />
 
     <!-- 品牌区域 -->
-    <div class="auth-brand !pt-32 !pb-24">
+    <div class="auth-brand auth-brand--compact">
       <div class="auth-brand-icon">
         <van-icon name="friends-o" size="32" color="#fff" />
       </div>
@@ -55,7 +55,7 @@
           </div>
           <input
             v-model.trim="form.code"
-            class="auth-input pr-[120px]"
+            class="auth-input pr-120"
             type="text"
             inputmode="numeric"
             maxlength="6"

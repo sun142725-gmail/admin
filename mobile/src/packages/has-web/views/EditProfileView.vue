@@ -1,19 +1,21 @@
 <template>
-  <div class="edit-profile-screen">
+  <div class="page-screen">
     <!-- 导航栏 -->
     <van-nav-bar title="编辑资料" left-arrow @click-left="$router.back()" />
 
-    <div class="edit-profile-content">
+    <div class="p-16">
       <!-- 头像 -->
-      <div class="edit-avatar-section" @click="triggerUpload">
-        <van-image v-if="form.avatarUrl" round width="80" height="80" :src="form.avatarUrl" />
-        <div v-else class="edit-avatar-fallback">
-          <van-icon name="user-o" size="40" color="#fff" />
+      <div class="press flex flex-col items-center pt-24 pb-32 relative" @click="triggerUpload">
+        <div class="relative">
+          <van-image v-if="form.avatarUrl" round width="80" height="80" :src="form.avatarUrl" />
+          <div v-else class="w-80 h-80 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex-center">
+            <van-icon name="user-o" size="40" color="#fff" />
+          </div>
+          <div class="absolute -bottom-2 -right-2 z-[1] w-28 h-28 rounded-full bg-white flex-center shadow-popover">
+            <van-icon name="photograph" size="14" color="#0ea5e9" />
+          </div>
         </div>
-        <div class="edit-avatar-camera">
-          <van-icon name="photograph" size="14" color="#0ea5e9" />
-        </div>
-        <p class="edit-avatar-hint">点击更换头像</p>
+        <p class="text-sm text-gray-400 mt-12">点击更换头像</p>
       </div>
 
       <!-- 隐藏的上传组件 -->
@@ -27,9 +29,9 @@
       />
 
       <!-- 资料表单 -->
-      <div class="edit-form-card">
-        <div class="edit-form-row">
-          <span class="edit-form-label">昵称</span>
+      <div class="screen-card px-16 py-4 mb-24">
+        <div class="flex items-center justify-between py-14 min-h-touch border-b border-gray-50">
+          <span class="text-base font-medium text-gray-600 flex-shrink-0">昵称</span>
           <input
             v-model.trim="form.nickname"
             class="edit-form-input"
@@ -37,8 +39,8 @@
             maxlength="20"
           />
         </div>
-        <div class="edit-form-row">
-          <span class="edit-form-label">邮箱</span>
+        <div class="flex items-center justify-between py-14 min-h-touch border-b border-gray-50">
+          <span class="text-base font-medium text-gray-600 flex-shrink-0">邮箱</span>
           <input
             :value="form.email"
             class="edit-form-input"
@@ -46,14 +48,18 @@
             readonly
           />
         </div>
-        <div class="edit-form-row">
-          <span class="edit-form-label">账号</span>
-          <span class="edit-form-value">{{ form.username || '-' }}</span>
+        <div class="flex items-center justify-between py-14 min-h-touch">
+          <span class="text-base font-medium text-gray-600 flex-shrink-0">账号</span>
+          <span class="text-base text-gray-400">{{ form.username || '-' }}</span>
         </div>
       </div>
 
       <!-- 保存按钮 -->
-      <button class="edit-save-btn" :disabled="saving" @click="onSave">
+      <button
+        class="w-full h-btn_lg rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-white text-base font-semibold press flex items-center justify-center active:opacity-90 disabled:opacity-50"
+        :disabled="saving"
+        @click="onSave"
+      >
         <van-loading v-if="saving" size="18" color="#fff" />
         <span v-else>保存资料</span>
       </button>
@@ -126,55 +132,19 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.edit-profile-screen { min-height: 100vh; background: #f8fafc; }
-
-.edit-profile-content { padding: 16px; }
-
-/* Avatar */
-.edit-avatar-section {
-  display: flex; flex-direction: column; align-items: center; padding: 24px 0 32px;
-  position: relative;
-}
-.edit-avatar-fallback {
-  width: 80px; height: 80px; border-radius: 50%;
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-  display: flex; align-items: center; justify-content: center;
-}
-.edit-avatar-camera {
-  position: absolute; top: 38px; right: calc(50% - 52px);
-  width: 28px; height: 28px; border-radius: 50%; background: #fff;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1;
-}
-.edit-avatar-hint {
-  font-size: 12px; color: #94a3b8; margin-top: 12px;
-}
-
-/* Form */
-.edit-form-card {
-  background: #fff; border-radius: 16px; padding: 4px 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03); margin-bottom: 24px;
-}
-.edit-form-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 0; border-bottom: 1px solid #f1f5f9;
-}
-.edit-form-row:last-child { border-bottom: none; }
-.edit-form-label { font-size: 15px; color: #475569; font-weight: 500; flex-shrink: 0; }
 .edit-form-input {
-  flex: 1; text-align: right; font-size: 15px; color: #1e293b;
-  border: none; outline: none; background: transparent; -webkit-appearance: none;
+  flex: 1;
+  text-align: right;
+  font-size: theme('fontSize.base');
+  color: theme('colors.gray.800');
+  border: none;
+  outline: none;
+  background: transparent;
+  -webkit-appearance: none;
+  min-width: 0;
 }
-.edit-form-input::placeholder { color: #cbd5e1; }
-.edit-form-value { font-size: 15px; color: #94a3b8; }
 
-/* Save */
-.edit-save-btn {
-  width: 100%; height: 46px; border-radius: 23px; border: none;
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-  color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+.edit-form-input::placeholder {
+  color: theme('colors.gray.300');
 }
-.edit-save-btn:active { opacity: 0.9; }
-.edit-save-btn:disabled { opacity: 0.5; }
 </style>

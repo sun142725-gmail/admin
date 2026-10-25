@@ -1,0 +1,62 @@
+/* ============================================================
+   多分辨率适配 shell（has-doc / has-web 共用）
+   由各包 main.js 直接 import（不进 @import 内联），并在
+   postcss-pxtorem 中排除本文件：这里必须保持 px 原值，
+   否则 html font-size 会被转成自引用 rem 导致封顶失效。
+   ============================================================ */
+
+/* 1. 基础渲染 */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* 2. 宽屏封顶字号：
+   amfe-flexible 恒按 视口宽/10 设置根字号，平板/桌面会被等比拉大约 2 倍。
+   ≥480px 视口冻结 root=48px（对应 480 设计稿基准），手机段仍随宽度流式缩放。
+   amfe-flexible 写的是内联样式，必须 !important 才能覆盖。 */
+@media (min-width: 480px) {
+  html {
+    font-size: 48px !important;
+  }
+}
+
+/* 3. 宽屏居中列：内容限宽 480px 居中，两侧露出版式底色；
+   fixed 定位的浮层（teleport 到 body 的 Vant 组件）单独约束对齐。 */
+@media (min-width: 480px) {
+  body {
+    background-color: #e5e6eb; /* 规范 gray-100 */
+  }
+  #app {
+    position: relative;
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: #f2f3f5; /* 规范 gray-50 */
+    box-shadow: 0 0 24px rgba(10, 12, 16, 0.08);
+  }
+
+  /* 与内容列对齐的全宽 fixed 浮层：tabbar / 固定导航栏 / 底部与顶部弹层 / 通知条 */
+  .van-tabbar--fixed,
+  .van-nav-bar--fixed,
+  .van-popup--bottom,
+  .van-popup--top,
+  .van-notify {
+    right: 0;
+    left: 0;
+    margin-inline: auto;
+    max-width: 480px;
+  }
+
+  /* 底部/顶部弹层默认 width:100%，改 auto 以配合 max-width 居中 */
+  .van-popup--bottom,
+  .van-popup--top {
+    width: auto;
+  }
+
+  /* 列内右侧悬浮元素（FAB 等）：屏宽不足时贴右 20px，宽屏时贴列右缘 */
+  .fab-right {
+    right: max(20px, calc(50% - 220px));
+  }
+}

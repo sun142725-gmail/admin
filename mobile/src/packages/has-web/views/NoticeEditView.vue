@@ -1,5 +1,5 @@
 <template>
-  <div class="edit-screen">
+  <div class="page-screen">
     <van-nav-bar title="发布公告" left-arrow @click-left="$router.back()" :border="false">
       <template #right>
         <van-button size="small" type="primary" round :loading="submitting" @click="handlePublish">
@@ -8,8 +8,8 @@
       </template>
     </van-nav-bar>
 
-    <div class="edit-content">
-      <div class="edit-card">
+    <div class="p-12 px-16">
+      <div class="screen-card mb-12">
         <van-field
           v-model="form.title"
           placeholder="公告标题（1-30 字）"
@@ -20,7 +20,7 @@
         />
       </div>
 
-      <div class="edit-card">
+      <div class="screen-card">
         <van-field
           v-model="form.content"
           type="textarea"
@@ -77,13 +77,12 @@ async function handlePublish() {
 </script>
 
 <style scoped>
-.edit-screen { min-height: 100vh; background: #f8fafc; }
-.edit-screen :deep(.van-nav-bar) { background: #fff; }
-.edit-content { padding: 12px 16px; }
-.edit-card {
-  background: #fff; border-radius: 16px; margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03); overflow: hidden;
+.edit-title-input :deep(.van-field__control) {
+  font-size: theme('fontSize.lg');
+  font-weight: 600;
 }
-.edit-title-input :deep(.van-field__control) { font-size: 18px; font-weight: 600; }
-.edit-content-input :deep(.van-field__control) { font-size: 14px; line-height: 1.6; }
+.edit-content-input :deep(.van-field__control) {
+  font-size: theme('fontSize.base');
+  line-height: 1.6;
+}
 </style>

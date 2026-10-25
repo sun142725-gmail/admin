@@ -3,6 +3,8 @@ import { resolve } from 'path'
 /** @type {import('tailwindcss').Config} */
 // 注意：spacing/height/minHeight/boxShadow/borderRadius 必须写进 extend，
 // 直接写在 theme 上会"替换"默认刻度，导致 rounded/shadow/h-full/h-screen 等默认工具类静默失效。
+// 规范约束：页面代码只允许使用本配置内的色板/字号/间距 token，禁止裸 hex 与任意值 [...]
+// （间距档位补齐到 80/120 后，页面不再需要 w-[48px] 这类任意值。）
 export default {
   content: [
     resolve(__dirname, 'src/packages/*/index.html'),
@@ -41,8 +43,20 @@ export default {
         800: '#1d2129',
         900: '#0a0c10',
       },
+      // 彩色图标 chip（快捷入口/菜单图标，bg 底色 + fg 前景色成对使用；取自 Arco light 变量）
+      chip: {
+        blue: { bg: '#f0f9ff', fg: '#0284c7' }, // primary 系
+        green: { bg: '#e8ffea', fg: '#00b42a' }, // success 系
+        orange: { bg: '#fff7e8', fg: '#ff7d00' }, // warning 系
+        rose: { bg: '#ffece8', fg: '#f53f3f' }, // danger 系
+        violet: { bg: '#f5f0ff', fg: '#722ed1' },
+        gray: { bg: '#f2f3f5', fg: '#4e5969' }, // info 系
+      },
       white: '#ffffff',
       black: '#000000',
+      // 替换默认色板后需手动保留的关键字色（border-transparent 等依赖）
+      transparent: 'transparent',
+      current: 'currentColor',
     },
 
     // 2. 移动端统一字号（px，适配手机阅读；替换默认，代码内只用这套字号）
@@ -57,7 +71,7 @@ export default {
       '3xl': '28px',
     },
 
-    // 3. 间距统一规范（margin/padding/gap；extend 追加，同名键覆盖默认值）
+    // 3. 间距统一规范（margin/padding/gap/w/h；extend 追加，同名键覆盖默认值）
     extend: {
       spacing: {
         0: '0px',
@@ -67,11 +81,22 @@ export default {
         8: '8px',
         10: '10px',
         12: '12px',
+        14: '14px',
         16: '16px',
         20: '20px',
         24: '24px',
         28: '28px',
         32: '32px',
+        36: '36px',
+        40: '40px',
+        44: '44px',
+        48: '48px',
+        56: '56px',
+        64: '64px',
+        72: '72px',
+        80: '80px',
+        100: '100px',
+        120: '120px',
       },
 
       // 4. 圆角统一（移动端柔和规范；DEFAULT 供裸 rounded 使用）
@@ -81,6 +106,7 @@ export default {
         md: '8px',
         lg: '12px',
         xl: '16px',
+        '2xl': '20px',
         full: '9999px',
       },
 

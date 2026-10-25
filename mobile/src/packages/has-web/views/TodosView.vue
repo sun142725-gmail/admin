@@ -1,25 +1,25 @@
 <template>
-  <div class="todos-screen">
+  <div class="page-screen tabbar-pad">
     <van-nav-bar title="家务待办" :border="false">
       <template #right>
-        <van-icon name="plus" size="20" color="#0ea5e9" @click="showCreate = true" />
+        <van-icon name="plus" size="20" color="#0ea5e9" class="press" @click="showCreate = true" />
       </template>
     </van-nav-bar>
 
-    <!-- Tab 切换 -->
-    <van-tabs v-model:active="todoStore.activeTab" @change="handleTabChange" color="#0ea5e9" title-active-color="#0ea5e9" line-width="24">
+    <!-- Tab 切换（主题色由 Vant 变量桥接统一） -->
+    <van-tabs v-model:active="todoStore.activeTab" @change="handleTabChange" line-width="24">
       <van-tab title="未完成" name="pending" />
       <van-tab title="已完成" name="completed" />
     </van-tabs>
 
     <!-- 待办列表 -->
-    <div class="todo-list">
+    <div class="p-12 px-16">
       <van-skeleton v-if="todoStore.loading && !todoStore.todos.length" :row="3" />
       <template v-else-if="todoStore.todos.length">
         <div
           v-for="todo in todoStore.todos"
           :key="todo.id"
-          class="todo-item"
+          class="press bg-white rounded-lg px-16 py-14 mb-8 shadow-card flex items-center gap-12"
           @click="$router.push(`/todos/${todo.id}`)"
         >
           <van-checkbox
@@ -27,22 +27,25 @@
             @click.stop="handleToggle(todo)"
             shape="square"
           />
-          <div class="todo-item-body">
-            <p class="todo-item-title" :class="{ 'is-done': todo.status === 'completed' }">
+          <div class="flex-1 min-w-0">
+            <p
+              class="text-base font-medium text-gray-800 mb-6 text-ellipsis-1"
+              :class="{ 'text-gray-400 line-through': todo.status === 'completed' }"
+            >
               {{ todo.title }}
             </p>
-            <div class="todo-item-meta">
-              <span class="todo-item-assignee">
+            <div class="flex gap-12">
+              <span class="flex items-center gap-2 text-xs text-gray-400">
                 <van-icon name="user-o" size="12" />
                 {{ todo.assigneeName }}
               </span>
-              <span class="todo-item-date">
+              <span class="flex items-center gap-2 text-xs text-gray-400">
                 <van-icon name="clock-o" size="12" />
                 {{ todo.dueDate }}
               </span>
             </div>
           </div>
-          <van-icon name="arrow" color="#cbd5e1" size="14" />
+          <van-icon name="arrow" color="#a9b1bf" size="14" />
         </div>
       </template>
       <EmptyState v-else icon="todo-list-o" :text="todoStore.activeTab === 'pending' ? '暂无待办，点击右上角添加' : '暂无已完成待办'" />
@@ -53,7 +56,7 @@
       <div class="sheet">
         <div class="sheet-header">
           <h3 class="sheet-title">新建待办</h3>
-          <van-icon name="cross" size="20" color="#94a3b8" @click="showCreate = false" />
+          <van-icon name="cross" size="20" color="#86909c" class="press" @click="showCreate = false" />
         </div>
         <div class="sheet-body">
           <div class="sheet-field">
@@ -127,7 +130,6 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { showToast } from 'vant'
 import { useTodoStore } from '@/stores/todo'
 import { useFamilyStore } from '@/stores/family'
 import EmptyState from '@/components/EmptyState.vue'
@@ -215,32 +217,3 @@ onMounted(async () => {
   await todoStore.loadTodos()
 })
 </script>
-
-<style scoped>
-.todos-screen { min-height: 100vh; background: #f8fafc; }
-.todos-screen :deep(.van-nav-bar) { background: #fff; }
-
-.todo-list { padding: 12px 16px; }
-.todo-item {
-  background: #fff; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px;
-  display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-}
-.todo-item:active { opacity: 0.8; }
-.todo-item-body { flex: 1; min-width: 0; }
-.todo-item-title { font-size: 14px; font-weight: 500; color: #1e293b; margin-bottom: 6px; }
-.todo-item-title.is-done { color: #94a3b8; text-decoration: line-through; }
-.todo-item-meta { display: flex; gap: 12px; }
-.todo-item-assignee, .todo-item-date { display: flex; align-items: center; gap: 3px; font-size: 11px; color: #94a3b8; }
-
-/* Sheet */
-.sheet { padding: 20px 16px; }
-.sheet-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.sheet-title { font-size: 18px; font-weight: 700; color: #1e293b; }
-.sheet-body { margin-bottom: 20px; }
-.sheet-field { margin-bottom: 16px; }
-.sheet-label { display: block; font-size: 14px; font-weight: 500; color: #475569; margin-bottom: 8px; }
-.sheet-input { background: #f8fafc; border-radius: 10px; overflow: hidden; }
-.sheet-footer :deep(.van-button--primary) {
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border: none; height: 48px; font-size: 16px; font-weight: 600;
-}
-</style>

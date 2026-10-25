@@ -1,5 +1,5 @@
 <template>
-  <div class="notices-screen">
+  <div class="page-screen tabbar-pad">
     <van-nav-bar title="家庭公告" :border="false">
       <template #right>
         <van-icon
@@ -7,34 +7,36 @@
           name="plus"
           size="20"
           color="#0ea5e9"
+          class="press"
           @click="$router.push('/notices/edit')"
         />
       </template>
     </van-nav-bar>
 
-    <div class="notice-list">
+    <div class="p-12 px-16">
       <van-skeleton v-if="noticeStore.loading && !noticeStore.notices.length" :row="3" />
       <template v-else-if="noticeStore.notices.length">
         <div
           v-for="n in noticeStore.notices"
           :key="n.id"
-          class="notice-item"
+          class="press bg-white rounded-xl p-16 mb-10 shadow-card"
           @click="showDetail(n)"
         >
-          <div class="notice-item-header">
-            <span class="notice-item-title">{{ n.title }}</span>
+          <div class="flex items-center justify-between mb-8">
+            <span class="text-base font-semibold text-gray-800 text-ellipsis-1">{{ n.title }}</span>
             <van-icon
               v-if="familyStore.isOwner"
               name="delete-o"
               size="16"
-              color="#ef4444"
+              color="#f53f3f"
+              class="flex-shrink-0 ml-8"
               @click.stop="handleDelete(n)"
             />
           </div>
-          <p class="notice-item-content">{{ n.content }}</p>
-          <div class="notice-item-footer">
-            <span class="notice-item-publisher">{{ n.publisherName }}</span>
-            <span class="notice-item-time">{{ formatTime(n.publishedAt) }}</span>
+          <p class="text-sm text-gray-500 leading-relaxed text-ellipsis-2 mb-10">{{ n.content }}</p>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-primary-500">{{ n.publisherName }}</span>
+            <span class="text-xs text-gray-400">{{ formatTime(n.publishedAt) }}</span>
           </div>
         </div>
       </template>
@@ -52,9 +54,9 @@
       confirm-button-text="关闭"
       teleport="body"
     >
-      <div class="notice-detail-body">
-        <p class="notice-detail-content">{{ detailNotice?.content }}</p>
-        <div class="notice-detail-meta">
+      <div class="px-20 py-16 max-h-[50vh] overflow-y-auto">
+        <p class="text-base text-gray-600 leading-relaxed whitespace-pre-wrap mb-12">{{ detailNotice?.content }}</p>
+        <div class="flex gap-12 text-sm text-gray-400">
           <span>{{ detailNotice?.publisherName }}</span>
           <span>{{ formatTime(detailNotice?.publishedAt) }}</span>
         </div>
@@ -106,28 +108,3 @@ onMounted(async () => {
   await noticeStore.loadNotices()
 })
 </script>
-
-<style scoped>
-.notices-screen { min-height: 100vh; background: #f8fafc; }
-.notices-screen :deep(.van-nav-bar) { background: #fff; }
-.notice-list { padding: 12px 16px; }
-.notice-item {
-  background: #fff; border-radius: 16px; padding: 16px; margin-bottom: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-}
-.notice-item:active { opacity: 0.8; }
-.notice-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.notice-item-title { font-size: 15px; font-weight: 600; color: #1e293b; }
-.notice-item-content {
-  font-size: 13px; color: #64748b; line-height: 1.5;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; margin-bottom: 10px;
-}
-.notice-item-footer { display: flex; align-items: center; justify-content: space-between; }
-.notice-item-publisher { font-size: 12px; color: #0ea5e9; }
-.notice-item-time { font-size: 11px; color: #94a3b8; }
-
-.notice-detail-body { padding: 16px 20px; max-height: 50vh; overflow-y: auto; }
-.notice-detail-content { font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 12px; white-space: pre-wrap; }
-.notice-detail-meta { display: flex; gap: 12px; font-size: 12px; color: #94a3b8; }
-</style>
