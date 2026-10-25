@@ -11,6 +11,8 @@ export interface AiModel {
   baseUrl: string;
   apiKeyMask: string;
   capabilities: string[];
+  // 默认采样参数 JSON：{ temperature, topP, maxTokens }；视频模型另可含 protocol 协议声明。
+  defaultParams?: Record<string, unknown> | null;
   contextLength: number;
   maxOutput: number;
   priority: number;

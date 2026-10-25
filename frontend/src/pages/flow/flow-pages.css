@@ -1,0 +1,77 @@
+/* 任务流列表/历史页响应式：标题不折行、描述分级隐藏、筛选区自适应换行。 */
+
+.flow-page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  margin-bottom: 16px;
+}
+
+.flow-page-header-title {
+  margin: 0 !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.flow-page-header-desc {
+  color: var(--text-sub);
+  font-size: 13px;
+  min-width: 0;
+}
+
+.flow-page-header-spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 中屏：描述收进省略号 */
+@media (max-width: 1280px) {
+  .flow-page-header-desc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 380px;
+  }
+}
+
+/* 窄屏：描述隐藏、搜索框弹性收缩 */
+@media (max-width: 1024px) {
+  .flow-page-header-desc {
+    display: none;
+  }
+
+  .flow-page-header-search {
+    flex: 1 1 140px;
+    min-width: 120px;
+    max-width: 260px;
+  }
+}
+
+/* 手机：头部整体纵排，操作区满宽 */
+@media (max-width: 640px) {
+  .flow-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .flow-page-header-title {
+    align-self: flex-start;
+  }
+
+  .flow-page-header-search {
+    max-width: none;
+    flex: 1 1 auto;
+  }
+}
+
+/* 卡片操作行：窄屏允许换行 */
+.flow-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}

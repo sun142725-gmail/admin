@@ -34,6 +34,7 @@ const TYPE_OPTIONS = [
 const CAPABILITY_OPTIONS = [
   { value: 'chat', label: '对话' },
   { value: 'image', label: '生图' },
+  { value: 'video', label: '视频' },
   { value: 'vision', label: '视觉理解' },
   { value: 'embedding', label: '向量' }
 ];
@@ -47,6 +48,7 @@ interface ModelFormValues {
   baseUrl: string;
   apiKey?: string;
   capabilities?: string[];
+  defaultParamsJson?: string;
   contextLength?: number;
   maxOutput?: number;
   remark?: string;
@@ -87,6 +89,7 @@ export const ModelsPage: React.FC = () => {
         type: record.type,
         baseUrl: record.baseUrl,
         capabilities: record.capabilities,
+        defaultParamsJson: record.defaultParams ? JSON.stringify(record.defaultParams, null, 2) : '',
         contextLength: record.contextLength,
         maxOutput: record.maxOutput,
         remark: record.remark
@@ -98,12 +101,28 @@ export const ModelsPage: React.FC = () => {
 
   const submit = useCallback(async () => {
     const values = await form.validateFields();
+    // 扩展参数 JSON 校验（视频模型协议声明等）。
+    let defaultParams: Record<string, unknown> | null = null;
+    if (values.defaultParamsJson?.trim()) {
+      try {
+        const parsed: unknown = JSON.parse(values.defaultParamsJson);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('must be object');
+        }
+        defaultParams = parsed as Record<string, unknown>;
+      } catch {
+        message.error('扩展参数必须是合法的 JSON 对象');
+        return;
+      }
+    }
     setSaving(true);
     try {
       const payload = {
         ...values,
-        capabilities: values.capabilities?.join(',')
+        capabilities: values.capabilities?.join(','),
+        defaultParams
       };
+      delete (payload as Record<string, unknown>).defaultParamsJson;
       if (editing) {
         delete payload.modelKey; // 模型 Key 创建后不可改
         if (!payload.apiKey) {
@@ -291,6 +310,19 @@ export const ModelsPage: React.FC = () => {
           </Form.Item>
           <Form.Item name="capabilities" label="能力标签">
             <Select mode="multiple" options={CAPABILITY_OPTIONS} />
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, next) => prev.capabilities !== next.capabilities}>
+            {({ getFieldValue }) =>
+              getFieldValue('capabilities')?.includes('video') ? (
+                <Form.Item
+                  name="defaultParamsJson"
+                  label="扩展参数（JSON）"
+                  extra='视频协议声明：阿里云百炼/通义万相填 {"protocol":"dashscope"}；Sora 形态网关留空'
+                >
+                  <Input.TextArea rows={3} placeholder='{"protocol": "dashscope"}' />
+                </Form.Item>
+              ) : null
+            }
           </Form.Item>
           <Space size="large" wrap>
             <Form.Item name="contextLength" label="上下文长度">

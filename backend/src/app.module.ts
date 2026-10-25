@@ -56,6 +56,10 @@ import { AiUsageLog } from './common/entities/ai-usage-log.entity';
 import { AiImage } from './common/entities/ai-image.entity';
 import { StockRoundtable } from './common/entities/stock-roundtable.entity';
 import { StockRoundtableTurn } from './common/entities/stock-roundtable-turn.entity';
+import { FlowDefinition } from './common/entities/flow-definition.entity';
+import { FlowRun } from './common/entities/flow-run.entity';
+import { FlowRunNode } from './common/entities/flow-run-node.entity';
+import { FlowModule } from './modules/flow/flow.module';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -109,7 +113,10 @@ const isTest = process.env.NODE_ENV === 'test';
               AiUsageLog,
               AiImage,
               StockRoundtable,
-              StockRoundtableTurn
+              StockRoundtableTurn,
+              FlowDefinition,
+              FlowRun,
+              FlowRunNode
             ],
             synchronize: true
           }
@@ -153,7 +160,10 @@ const isTest = process.env.NODE_ENV === 'test';
               AiUsageLog,
               AiImage,
               StockRoundtable,
-              StockRoundtableTurn
+              StockRoundtableTurn,
+              FlowDefinition,
+              FlowRun,
+              FlowRunNode
             ],
             synchronize: process.env.DB_SYNC === 'true'
           }
@@ -175,7 +185,8 @@ const isTest = process.env.NODE_ENV === 'test';
     NotificationModule,
     DashboardModule,
     FamilyModule,
-    StockModule
+    StockModule,
+    FlowModule
   ],
   // 测试环境不注册限流守卫：测试用例会在同一 IP 上发起大量请求，避免被 429 干扰
   providers: [
@@ -198,7 +209,8 @@ export class AppModule implements NestModule {
         { path: 'divinations/:id/interpretation/stream', method: RequestMethod.GET },
         { path: 'ai/chat/completions', method: RequestMethod.POST },
         { path: 'ai/chat/stream/:messageId', method: RequestMethod.GET },
-        { path: 'stock/roundtable/:id/stream', method: RequestMethod.GET }
+        { path: 'stock/roundtable/:id/stream', method: RequestMethod.GET },
+        { path: 'flows/runs/:id/stream', method: RequestMethod.GET }
       );
   }
 }

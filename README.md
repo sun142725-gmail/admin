@@ -25,6 +25,7 @@
 - Audit：审计日志查询
 - Notification：模板管理、通知发布、发送记录、站内信收件箱
 - Stock：股市圆桌（行情快照/K线+指标/板块 + 五专家圆桌会议 SSE 流式分析）
+- Flow：任务流（AI 视频生成 DAG 画布编排、执行引擎、试运行/断点重跑调试）
 - 接口文档：`/api/docs`
 
 ## 4. 前端路由与页面
@@ -175,3 +176,16 @@ docker-compose up -d --build frontend nginx
 - 智能体同步：`cd backend && npm run sync:stock`（按 code 幂等；未同步时自动回落内置人设；无模型渠道时五位专家走本地规则兜底，会议仍可完整进行）。
 - 会议模式：quick（独立+总结）/ standard（+1轮辩论）/ deep（+2轮辩论）。
 - ⚠️ 分析结果仅供学习研究参考，不构成投资建议。
+
+## 任务流模块（flow）
+- AI 视频生成的可视化编排：一级菜单「任务流」（流程管理 / 运行历史），编辑器 `/flow/editor/:id` 全屏画布（React Flow）。
+- 节点类型：开始（入参变量）/ LLM（支持 JSON 结构化输出）/ 生图 / 视频（文生/图生，首帧引用上游生图）/ HTTP / 延时 / 结束 / 备注。
+- 变量引用：`{{节点ID.字段}}`（如 `{{storyboard.firstFramePrompt}}`、`{{firstFrame.url}}`），配置面板支持一键插入上游变量。
+- 执行引擎：DAG 拓扑分层并行调度，节点级状态/输入输出/耗时/命中模型全部落库（flow_runs / flow_run_nodes）；看门狗兜底服务重启导致的悬挂运行。
+- 调试三件套：
+  - 完整运行：SSE 实时推送节点状态（`GET /api/flows/runs/:id/stream`），画布节点亮状态角标、连线流动；
+  - 单节点试运行：mock 上游上下文（按最近一次成功运行预填）只执行选中节点；
+  - 断点重跑：复用已成功节点产物（reused），从失败节点继续。
+- 模型接入：复用 AI 模型管理（chat/image 能力自动路由）；视频上游按「提交→轮询→取回」三段式适配（OpenAI Sora 形态，`POST {baseUrl}/videos` + `GET {baseUrl}/videos/:id`），在 AI 模型管理里加 capabilities 含 `video` 的模型行即可。
+- 权限码：`flow:define:manage`（流程管理）/ `flow:run:execute`（执行/取消/重跑）/ `flow:run:view`（历史查看）。
+- 新建流程自带一套「主题 → 分镜脚本(JSON) → 首帧生图 → 图生视频 → 汇总输出」模板，配好 chat + image + video 模型即可跑通。

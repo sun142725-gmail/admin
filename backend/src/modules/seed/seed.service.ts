@@ -50,6 +50,7 @@ export class SeedService implements OnModuleInit {
       await this.ensureMessageChannelSetup();
       await this.ensureAiSetup();
       await this.ensureStockSetup();
+      await this.ensureFlowSetup();
       return;
     }
 
@@ -63,6 +64,7 @@ export class SeedService implements OnModuleInit {
     await this.ensureMessageChannelSetup();
     await this.ensureAiSetup();
     await this.ensureStockSetup();
+    await this.ensureFlowSetup();
     this.logger.log('初始化数据已完成');
   }
 
@@ -114,7 +116,10 @@ export class SeedService implements OnModuleInit {
       { name: 'AI 用量', code: 'ai:usage:view' },
       { name: 'AI 对话', code: 'ai:chat:use' },
       { name: 'AI 生图', code: 'ai:image:use' },
-      { name: '股市圆桌', code: 'stock:roundtable:use' }
+      { name: '股市圆桌', code: 'stock:roundtable:use' },
+      { name: '任务流管理', code: 'flow:define:manage' },
+      { name: '任务流执行', code: 'flow:run:execute' },
+      { name: '运行历史查看', code: 'flow:run:view' }
     ];
     const entities = this.permissionRepo.create(items);
     return this.permissionRepo.save(entities);
@@ -723,6 +728,53 @@ export class SeedService implements OnModuleInit {
     }
     if (permission) {
       await this.ensureAdminRolePermission(permission);
+    }
+  }
+
+  // 任务流一级菜单与权限（幂等）：AI 视频生成的画布编排 + 运行调试。
+  private async ensureFlowSetup() {
+    const codes: Array<{ code: string; name: string }> = [
+      { code: 'flow:define:manage', name: '任务流管理' },
+      { code: 'flow:run:execute', name: '任务流执行' },
+      { code: 'flow:run:view', name: '运行历史查看' }
+    ];
+    for (const item of codes) {
+      const permission = await this.ensurePermissionByCode(item.code, item.name);
+      if (permission) {
+        await this.ensureAdminRolePermission(permission);
+      }
+    }
+
+    let flowMenu = await this.resourceRepo.findOne({ where: { name: '任务流', type: 'menu' } });
+    if (!flowMenu) {
+      flowMenu = await this.resourceRepo.save(
+        this.resourceRepo.create({ name: '任务流', type: 'menu', sortOrder: 7 })
+      );
+    }
+    const pages: Array<{ path: string; name: string; code: string }> = [
+      { path: '/flow', name: '流程管理', code: 'flow:define:manage' },
+      { path: '/flow/runs', name: '运行历史', code: 'flow:run:view' }
+    ];
+    for (const page of pages) {
+      const exists = await this.resourceRepo.findOne({ where: { path: page.path } });
+      if (exists) {
+        if (exists.parentId !== flowMenu.id || exists.permissionCode !== page.code) {
+          await this.resourceRepo.update(
+            { id: exists.id },
+            { parentId: flowMenu.id, permissionCode: page.code }
+          );
+        }
+        continue;
+      }
+      await this.resourceRepo.save(
+        this.resourceRepo.create({
+          name: page.name,
+          type: 'page',
+          path: page.path,
+          parentId: flowMenu.id,
+          permissionCode: page.code
+        })
+      );
     }
   }
 

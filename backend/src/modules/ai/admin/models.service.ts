@@ -37,6 +37,7 @@ export class AiModelsService {
       apiKeyCipher: encryptSecret(dto.apiKey),
       apiKeyMask: maskSecret(dto.apiKey),
       capabilities: dto.capabilities?.trim() || 'chat',
+      defaultParams: dto.defaultParams ?? null,
       contextLength: dto.contextLength ?? 8192,
       maxOutput: dto.maxOutput ?? 4096,
       priority: dto.priority ?? 0,
@@ -68,6 +69,7 @@ export class AiModelsService {
       record.apiKeyMask = maskSecret(dto.apiKey);
     }
     if (dto.capabilities !== undefined) record.capabilities = dto.capabilities.trim();
+    if (dto.defaultParams !== undefined) record.defaultParams = dto.defaultParams;
     if (dto.contextLength !== undefined) record.contextLength = dto.contextLength;
     if (dto.maxOutput !== undefined) record.maxOutput = dto.maxOutput;
     if (dto.priority !== undefined) record.priority = dto.priority;
@@ -166,6 +168,7 @@ export class AiModelsService {
       baseUrl: item.baseUrl,
       apiKeyMask: item.apiKeyMask,
       capabilities: item.capabilities.split(',').filter(Boolean),
+      defaultParams: item.defaultParams ?? null,
       contextLength: item.contextLength,
       maxOutput: item.maxOutput,
       priority: item.priority,

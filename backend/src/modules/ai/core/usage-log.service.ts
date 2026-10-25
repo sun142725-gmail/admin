@@ -7,7 +7,7 @@ import { AiUsageLog } from '../../../common/entities/ai-usage-log.entity';
 export interface UsageLogPayload {
   userId: number;
   modelId?: number;
-  kind: 'chat' | 'image' | 'roundtable';
+  kind: 'chat' | 'image' | 'roundtable' | 'video';
   promptTokens?: number;
   completionTokens?: number;
   latencyMs?: number;

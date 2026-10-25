@@ -99,10 +99,30 @@ export class OpenAiCompatibleAdapter implements LlmAdapter {
       signal: AbortSignal.timeout(STREAM_TIMEOUT_MS)
     });
     if (!response.ok) {
-      throw new Error(`生图上游响应异常: ${response.status}`);
+      const detail = await response.text().catch(() => '');
+      throw new Error(`生图上游响应异常: ${response.status}${detail.slice(0, 120)}`);
     }
-    const data = (await response.json()) as { data?: Array<{ url?: string }> };
-    const urls = (data.data ?? []).map((item) => item.url).filter((url): url is string => Boolean(url));
+    // gpt-image 系列只返回 b64_json（不支持 response_format=url），dall-e/聚合网关多返回 url；两者都兼容。
+    // MIME 按魔数判定（/9j/=JPEG，iVBOR=PNG），避免前缀与实际字节不符。
+    const data = (await response.json()) as { data?: Array<{ url?: string; b64_json?: string }> };
+    const urls = (data.data ?? [])
+      .map((item) => {
+        if (item.url) {
+          return item.url;
+        }
+        if (!item.b64_json) {
+          return undefined;
+        }
+        const mime = item.b64_json.startsWith('iVBOR')
+          ? 'image/png'
+          : item.b64_json.startsWith('/9j/')
+            ? 'image/jpeg'
+            : item.b64_json.startsWith('UklGR')
+              ? 'image/webp'
+              : 'image/png';
+        return `data:${mime};base64,${item.b64_json}`;
+      })
+      .filter((url): url is string => Boolean(url));
     if (urls.length === 0) {
       throw new Error('生图结果为空');
     }

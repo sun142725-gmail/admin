@@ -20,7 +20,15 @@ import { TemplatePage } from '../pages/notification/TemplatePage';
 import { PublishPage } from '../pages/notification/PublishPage';
 import { InboxPage } from '../pages/notification/InboxPage';
 import { StockPage } from '../pages/stock/StockPage';
+import { FlowsPage } from '../pages/flow/FlowsPage';
+import { FlowRunsPage } from '../pages/flow/FlowRunsPage';
 import { RequireAuth } from './RequireAuth';
+
+// 画布编辑器较重（React Flow），按需加载不进首屏包。
+const FlowEditorPage = React.lazy(async () => {
+  const module = await import('../pages/flow/editor/FlowEditorPage');
+  return { default: module.FlowEditorPage };
+});
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -30,6 +38,17 @@ export const router = createBrowserRouter([
     element: (
       <RequireAuth>
         <DivinationPage />
+      </RequireAuth>
+    )
+  },
+  {
+    // 任务流编辑器全屏渲染（画布需要最大空间），同样走登录守卫。
+    path: '/flow/editor/:id',
+    element: (
+      <RequireAuth>
+        <React.Suspense fallback={<div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>加载编辑器…</div>}>
+          <FlowEditorPage />
+        </React.Suspense>
       </RequireAuth>
     )
   },
@@ -54,6 +73,8 @@ export const router = createBrowserRouter([
       { path: '/ai/chat', element: <ChatPage /> },
       { path: '/ai/images', element: <ImagesPage /> },
       { path: '/stock', element: <StockPage /> },
+      { path: '/flow', element: <FlowsPage /> },
+      { path: '/flow/runs', element: <FlowRunsPage /> },
       { path: '/notifications/templates', element: <TemplatePage /> },
       { path: '/notifications/publish', element: <PublishPage /> },
       { path: '/notifications/publishes', element: <Navigate to="/notifications/publish" replace /> },

@@ -2,6 +2,7 @@
 import {
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -39,6 +40,11 @@ export class CreateModelDto {
   @IsString()
   @MaxLength(128)
   capabilities?: string;
+
+  // 扩展参数：视频模型可指定 {"protocol":"dashscope"} 走百炼异步任务协议。
+  @IsOptional()
+  @IsObject()
+  defaultParams?: Record<string, unknown>;
 
   @IsOptional()
   @IsInt()
@@ -96,6 +102,11 @@ export class UpdateModelDto {
   @IsString()
   @MaxLength(128)
   capabilities?: string;
+
+  // 扩展参数（对象整体覆盖，传 null 清空）。
+  @IsOptional()
+  @IsObject()
+  defaultParams?: Record<string, unknown> | null;
 
   @IsOptional()
   @IsInt()

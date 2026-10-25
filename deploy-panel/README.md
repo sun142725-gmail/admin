@@ -34,6 +34,16 @@ PUBLISH_SECRET=replace-with-strong-secret
 
 页面首次访问会提示输入发布密钥，并保存到浏览器 `localStorage`。如需更换密钥，清理浏览器本地存储后重新输入。
 
+## 发布目标
+
+| 目标 | 脚本 | 作用 |
+|---|---|---|
+| backend / frontend / has-doc / has-web | `deploy-*.sh` | git pull + 重建对应服务 |
+| all | `deploy-all.sh` | git pull + 重建全部应用与 nginx |
+| **stock-agents** | `sync-stock-agents.sh` | git pull 后在 mysql 容器内执行 `deploy/scripts/stock-agents.sql`，幂等同步六位「股市圆桌」智能体并按 `model_key+base_url` 绑定模型（不重建应用） |
+
+SQL 生成方式（开发机，提示词变更后）：`cd backend && npm run sync:stock:gen`，产物 `deploy/scripts/stock-agents.sql` 随仓库提交。线上模型名不同时，直接修改该 SQL 文末 UPDATE 中的两个字面量。
+
 ## 容器运行机制
 
 `deploy-panel` 服务会把项目根目录挂载到容器内与宿主机一致的绝对路径，默认是 `/home/sun142725/admin`，同时挂载宿主机 `/var/run/docker.sock`。发布脚本在该路径中执行 `git pull` 与 Docker Compose，因此可以从容器内控制宿主机 Docker 重建服务并正确解析 bind mount。

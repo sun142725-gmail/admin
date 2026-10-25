@@ -1,0 +1,494 @@
+/* 任务流编辑器：画布节点卡片 / 左侧节点面板 / 右侧配置面板 / 底部运行控制台。配色复用全局设计 token。 */
+
+.flow-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--app-bg);
+  overflow: hidden;
+}
+
+.flow-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 56px;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--panel-border);
+  flex-shrink: 0;
+}
+
+/* 标题单行省略，宽度随视口分级收缩 */
+.flow-editor-title {
+  margin: 0 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+  flex-shrink: 1;
+}
+
+@media (max-width: 1280px) {
+  .flow-editor-title {
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .flow-editor-title {
+    max-width: 140px;
+  }
+}
+
+.flow-editor-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------- 左侧节点面板 ---------- */
+.flow-palette {
+  width: 208px;
+  flex-shrink: 0;
+  background: var(--sider-bg);
+  border-right: 1px solid var(--panel-border);
+  padding: 12px 10px;
+  overflow-y: auto;
+}
+
+/* 细滚动条 */
+.flow-palette::-webkit-scrollbar,
+.flow-config-panel-body::-webkit-scrollbar,
+.flow-run-panel-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.flow-palette::-webkit-scrollbar-thumb,
+.flow-config-panel-body::-webkit-scrollbar-thumb,
+.flow-run-panel-body::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 3px;
+}
+
+.flow-palette::-webkit-scrollbar-track,
+.flow-config-panel-body::-webkit-scrollbar-track,
+.flow-run-panel-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.flow-palette-title {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin: 0 4px 8px;
+  letter-spacing: 1px;
+}
+
+/* 紧凑列表式条目：统一高度，描述单行省略（悬停看全文） */
+.flow-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  margin-bottom: 2px;
+  cursor: grab;
+  background: transparent;
+  transition: all 0.15s;
+}
+
+.flow-palette-item:hover {
+  background: var(--panel-bg);
+  border-color: var(--panel-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.flow-palette-item:active {
+  cursor: grabbing;
+}
+
+.flow-palette-item-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.flow-palette-item-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.flow-palette-item-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.4;
+}
+
+.flow-palette-item-desc {
+  font-size: 11px;
+  color: var(--text-sub);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 画布 ---------- */
+.flow-canvas-wrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.flow-canvas-wrap .react-flow__attribution {
+  display: none;
+}
+
+/* 小地图：圆角卡片化 */
+.flow-canvas-wrap .react-flow__minimap {
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+  overflow: hidden;
+}
+
+/* 缩放控件：圆角卡片化 */
+.flow-canvas-wrap .react-flow__controls {
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+  overflow: hidden;
+}
+
+.flow-canvas-wrap .react-flow__controls-button {
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--panel-border);
+  width: 26px;
+  height: 26px;
+}
+
+.flow-canvas-wrap .react-flow__controls-button:hover {
+  background: var(--app-bg);
+}
+
+/* ---------- 自定义节点卡片 ---------- */
+.flow-node-card {
+  position: relative;
+  width: 216px;
+  /* 统一高度：所有节点的左右 Handle 都在同一水平线上，节点对齐时连线水平不拐弯 */
+  height: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel-bg);
+  border: 1.5px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.flow-node-card:hover {
+  border-color: #b6d8ff;
+}
+
+.flow-node-card.selected {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+}
+
+.flow-node-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.flow-node-card-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.flow-node-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-node-card-type {
+  font-size: 11px;
+  color: var(--text-sub);
+}
+
+.flow-node-card-summary {
+  flex: 1;
+  min-height: 0;
+  font-size: 11px;
+  color: var(--text-sub);
+  background: var(--app-bg);
+  border-radius: 6px;
+  padding: 4px 6px;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* 运行状态角标 */
+.flow-node-status {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #fff;
+  border: 2px solid var(--panel-bg);
+}
+
+.flow-node-card.status-running {
+  border-color: var(--brand-primary);
+}
+
+.flow-node-card.status-running .flow-node-status {
+  background: var(--brand-primary);
+  animation: flow-pulse 1.2s ease-in-out infinite;
+}
+
+.flow-node-card.status-succeeded {
+  border-color: #b7eb8f;
+}
+
+.flow-node-card.status-succeeded .flow-node-status {
+  background: #52c41a;
+}
+
+.flow-node-card.status-failed {
+  border-color: #ffa39e;
+}
+
+.flow-node-card.status-failed .flow-node-status {
+  background: #ff4d4f;
+}
+
+.flow-node-card.status-reused .flow-node-status {
+  background: #9254de;
+}
+
+.flow-node-card.status-cancelled .flow-node-status {
+  background: #8c8c8c;
+}
+
+@keyframes flow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(22, 119, 255, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(22, 119, 255, 0);
+  }
+}
+
+/* note 节点：便签样式（不参与连线，高度自适应） */
+.flow-node-card.note {
+  width: 180px;
+  height: auto;
+  min-height: 64px;
+  background: #fffbe6;
+  border-style: dashed;
+  border-color: #ffe58f;
+}
+
+.flow-node-card.note .flow-node-card-summary {
+  -webkit-line-clamp: 4;
+}
+
+/* ---------- 右侧配置面板 ---------- */
+.flow-config-panel {
+  width: 340px;
+  flex-shrink: 0;
+  background: var(--panel-bg);
+  border-left: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.flow-config-panel-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flow-config-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* ---------- 底部运行控制台 ---------- */
+.flow-run-panel {
+  flex-shrink: 0;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  max-height: 40vh;
+}
+
+.flow-run-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.flow-run-panel-body {
+  overflow-y: auto;
+  padding: 0 16px 12px;
+  min-height: 120px;
+}
+
+.flow-run-log-line {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.9;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.flow-run-log-time {
+  color: var(--text-sub);
+  flex-shrink: 0;
+}
+
+.flow-run-outputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.flow-run-outputs video,
+.flow-run-outputs img {
+  max-width: 260px;
+  max-height: 160px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+}
+
+/* 变量标签（插入变量面板内） */
+.flow-var-tag {
+  cursor: pointer;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+/* 编辑器里的 antd 表单紧凑化 */
+.flow-config-panel .ant-form-item {
+  margin-bottom: 14px;
+}
+
+/* 抽屉形态（窄屏）：占满抽屉宽度，去掉内联面板的左边框 */
+.flow-config-panel.in-drawer {
+  width: 100%;
+  border-left: none;
+  flex: 1;
+}
+
+/* ---------- 响应式适配 ---------- */
+/* 中屏：面板收窄，画布保空间 */
+@media (max-width: 1280px) {
+  .flow-palette {
+    width: 176px;
+  }
+
+  .flow-config-panel {
+    width: 300px;
+  }
+}
+
+/* 窄屏（≤1024px）：编辑器切换「浮层」形态 */
+.flow-editor.narrow .flow-editor-header {
+  height: auto;
+  min-height: 56px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.flow-editor.narrow .flow-editor-body {
+  position: relative;
+}
+
+.flow-editor.narrow .flow-palette {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  box-shadow: 6px 0 16px rgba(0, 0, 0, 0.12);
+}
+
+.flow-palette-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.flow-editor.narrow .flow-run-panel {
+  max-height: 32vh;
+}
+
+/* 窄屏节点卡片与运行产物稍缩，避免溢出 */
+.flow-editor.narrow .flow-node-card {
+  width: 188px;
+}
+
+.flow-editor.narrow .flow-run-outputs video,
+.flow-editor.narrow .flow-run-outputs img {
+  max-width: 200px;
+  max-height: 120px;
+}
+
+/* 手机竖屏：隐藏小地图，进一步释放画布 */
+@media (max-width: 640px) {
+  .flow-editor .react-flow__minimap {
+    display: none;
+  }
+
+  .flow-editor .flow-palette {
+    width: 168px;
+  }
+}
