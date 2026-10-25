@@ -12,13 +12,19 @@
 - 修法：`@Column({ name: 'final_video_path', type: 'varchar', length: 255, nullable: true })`
 - 状态：任务方已补显式类型，后端 22:55 successfully started，登录接口恢复正常
 
-## 🟡 P1 · 全站响应式（MainLayout，flow 任务会动它，暂缓）
+## ✅ P1 · 全站响应式（2026-10-25 晚已修复，flow 任务已收工）
 
-### 2. Sider 无响应式断点
+### 2. Sider 无响应式断点（已修复）
 - 文件：`frontend/src/layouts/MainLayout.tsx:250`（`<Sider width={240} collapsedWidth={64}>`）
 - 实测（375px）：侧边栏固定 240px，**内容区只剩 135px**，快照卡/工具栏全部竖排堆叠（users 页筛选卡高达 265px）
 - 建议：Sider 加 `breakpoint="lg"`（<1024 自动收起为 64px）；或 <768 用 Drawer 抽屉菜单
 - 768px 佐证：内容区 528px（侧栏占 31%），分析台工具行输入框被压至约 40px 宽
+- **修复实现**（踩坑记录）：
+  1. antd Sider `breakpoint="lg"` + `onBreakpoint` 同步 React 状态（isNarrow）；`effectiveCollapsed = isNarrow || collapsed` 统一驱动侧栏视觉与 app-main margin（跨断点时生效）
+  2. **mount 时不触发 onBreakpoint**（仅跨越断点回调）→ 窄屏首屏由 global.css 媒体查询兜底（`@media (max-width: 1023.9px)` 下 `.app-sider` 64px + `.app-main` margin + `.app-header` 定位，样式表 !important 稳赢 antd 内联，无竞态）
+  3. **踩坑**：曾尝试 React 内联 `setProperty('width', 'important')`——antd 在 resize 时重写同一内联槽位（无 important）导致竞态回退，已放弃该方案
+  4. **踩坑**：global.css 旧的 `.app-sider width: var() !important` 与 antd 打架的规则已移除（其 var 求值曾出现 240/64 不一致的诡异行为，重构成 CSS 兜底后问题消散）
+- 复测：375 内容区 135→**311px**（+130%）、768 528→**704px**、1440 桌面 1200px 不受影响
 - 连带：`MainLayout.tsx:301` 的 `style={{ marginLeft: siderWidth }}` 同步受影响
 
 ### 3. 断点刻度碎片化（已部分统一）
@@ -33,8 +39,8 @@
 - FlowEditorPage / NodeConfigPanel / FlowsPage 均在活跃开发中，未纳入本次检查
 - 提示：编辑器抽屉类组件注意 `width` 在 <768 的表现（建议 `min(90vw, NNNpx)`）；流程跑的 `flowRunUI` 里的状态色建议同样走语义 token
 
-### 5. pages/ai/ModelsPage.tsx + api/ai.ts（flow 任务最近改过）
-- `ModelsPage.tsx:329,332`：`w-[120px]` InputNumber 固定宽，375px 下会撑破筛选卡 → 建议 `w-full sm:w-[120px]`
+### 5. pages/ai/ModelsPage.tsx（已修复）
+- `w-[120px]` → `w-full sm:w-[120px]`（窄屏占满行、桌面保持紧凑）
 
 ## ✅ 已完成修复（安全文件，本次落地）
 

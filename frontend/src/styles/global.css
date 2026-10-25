@@ -52,13 +52,11 @@ a {
 
 .app-shell {
   min-height: 100vh;
-  --app-sider-width: 64px;
 }
 
-.app-shell.is-expanded {
-  --app-sider-width: 240px;
-}
-
+/* 侧栏宽度：桌面由 antd 内联（64/240 双态）决定；窄屏 <lg 由下方媒体查询
+   以样式表 !important 覆盖为 64px（样式表 important 稳赢 antd 内联，无竞态），
+   配合 MainLayout 的 breakpoint="lg" 在跨断点时同步 React 状态。 */
 .app-sider {
   position: fixed !important;
   left: 0;
@@ -68,10 +66,6 @@ a {
   overflow: hidden;
   background: var(--sider-bg) !important;
   border-right: 1px solid var(--sider-border);
-  width: var(--app-sider-width) !important;
-  min-width: var(--app-sider-width) !important;
-  max-width: var(--app-sider-width) !important;
-  flex: 0 0 var(--app-sider-width) !important;
   transition:
     width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
     min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
@@ -849,5 +843,24 @@ a {
 
   .role-permissions-anchor-card {
     position: static;
+  }
+}
+
+/* 窄屏响应式：侧栏收起为 64px，内容区跟随左移（兜底 onBreakpoint 不在 mount 触发的场景） */
+@media (max-width: 1023.9px) {
+  .app-sider {
+    width: 64px !important;
+    min-width: 64px !important;
+    max-width: 64px !important;
+    flex: 0 0 64px !important;
+  }
+
+  .app-main {
+    margin-left: 64px !important;
+  }
+
+  .app-header {
+    left: 64px !important;
+    width: calc(100vw - 64px) !important;
   }
 }

@@ -125,6 +125,8 @@ export const MainLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('sider-collapsed') === 'true';
   });
+  // 视口 < lg(1024) 时强制收起侧栏，保证内容区可用宽度（Sider breakpoint 回写）。
+  const [isNarrow, setIsNarrow] = useState(false);
   const [menuTree, setMenuTree] = useState<MenuItem[]>([]);
   const [openKeys, setOpenKeys] = useState<string[]>([]);
 
@@ -243,19 +245,24 @@ export const MainLayout: React.FC = () => {
     navigate('/profile');
   };
 
-  const siderWidth = collapsed ? 64 : 240;
+  const effectiveCollapsed = isNarrow || collapsed;
+  const siderWidth = effectiveCollapsed ? 64 : 240;
+  // 窄屏（<lg）时 antd 内联宽度被 global.css 媒体查询 !important 覆盖为 64px
+  // （onBreakpoint 仅在跨越断点时回调，mount 场景由该 CSS 兜底，避免内联竞态）。
 
   return (
-    <Layout className={`app-shell ${collapsed ? 'is-collapsed' : 'is-expanded'}`}>
+    <Layout className={`app-shell ${effectiveCollapsed ? 'is-collapsed' : 'is-expanded'}`}>
       <Sider
         width={240}
+        breakpoint="lg"
+        onBreakpoint={setIsNarrow}
         collapsedWidth={64}
-        collapsed={collapsed}
+        collapsed={effectiveCollapsed}
         theme="light"
         trigger={null}
         className="app-sider"
       >
-        <div className={`app-brand ${collapsed ? 'is-collapsed' : ''}`}>
+        <div className={`app-brand ${effectiveCollapsed ? 'is-collapsed' : ''}`}>
           <Link
             to="/"
             className="app-brand-link"
@@ -292,12 +299,12 @@ export const MainLayout: React.FC = () => {
           className="app-menu"
         />
         <div className="app-sider-trigger" onClick={toggleCollapsed}>
-          {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-          {!collapsed && <span className="app-sider-trigger-text">收起菜单</span>}
+          {effectiveCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          {!effectiveCollapsed && <span className="app-sider-trigger-text">收起菜单</span>}
         </div>
       </Sider>
       <Layout
-        className={`app-main ${collapsed ? 'is-collapsed' : 'is-expanded'}`}
+        className={`app-main ${effectiveCollapsed ? 'is-collapsed' : 'is-expanded'}`}
         style={{ marginLeft: siderWidth }}
       >
         <Header
