@@ -27,8 +27,8 @@ export class NovelProject extends BaseEntity {
   @Column({ length: 64 })
   name!: string;
 
-  // 原文（整本/片段/章节文本）。
-  @Column({ type: 'longtext' })
+  // 原文（整本/片段/章节文本）。longtext 为 MySQL 专属类型，测试环境（sqlite）回退 text
+  @Column({ type: process.env.NODE_ENV === 'test' ? 'text' : 'longtext' })
   sourceText!: string;
 
   // draft / running / completed / failed / cancelled

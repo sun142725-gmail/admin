@@ -1,5 +1,5 @@
 // 日志事件 DTO 用于批量上报。
-import { IsIn, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsDateString, IsIn, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class LogEventDto {
   @IsIn(['track', 'frontend', 'error'])
@@ -14,7 +14,6 @@ export class LogEventDto {
   traceId?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(64)
+  @IsDateString()
   createdAt?: string;
 }

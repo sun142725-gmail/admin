@@ -6,6 +6,7 @@ export const listAuditLogs = (params: {
   pageSize?: number;
   userId?: number;
   module?: string;
+  action?: string;
   start?: string;
   end?: string;
 }) => {

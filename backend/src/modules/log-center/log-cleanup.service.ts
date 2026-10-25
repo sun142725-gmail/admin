@@ -7,8 +7,9 @@ import { LogCenterService } from './log-center.service';
 export class LogCleanupService {
   constructor(private readonly logCenterService: LogCenterService) {}
 
+  // 保留天数不在此处写死：由服务统一读取 LOG_RETENTION_DAYS，与查询窗口保持一致
   @Cron('0 3 * * *')
   async handleCleanup() {
-    await this.logCenterService.cleanupExpired(7);
+    await this.logCenterService.cleanupExpired();
   }
 }

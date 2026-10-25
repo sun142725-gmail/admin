@@ -864,3 +864,17 @@ a {
     width: calc(100vw - 64px) !important;
   }
 }
+
+/* 审计中心：日志详情弹窗内堆栈/元数据的等宽展示 */
+.log-detail-pre {
+  max-height: 240px;
+  overflow: auto;
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f7faff;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

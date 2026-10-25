@@ -9,7 +9,6 @@ import { existsSync, mkdirSync } from 'fs';
 import * as express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 async function bootstrap() {
@@ -26,7 +25,7 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGIN?.split(',') ?? '*',
     credentials: true
   });
-  app.useGlobalFilters(new HttpExceptionFilter());
+  // 全局异常过滤器在 LogCenterModule 以 APP_FILTER 注册（需注入 ErrorLog 仓库实现 5xx 落库）
   app.useGlobalInterceptors(new ResponseInterceptor(new Reflector()));
   app.useGlobalPipes(
     new ValidationPipe({

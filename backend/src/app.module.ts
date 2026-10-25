@@ -23,6 +23,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { FilesModule } from './modules/files/files.module';
 import { FamilyModule } from './modules/family/family.module';
 import { StockModule } from './modules/stock/stock.module';
+import { ProxyModule } from './modules/proxy/proxy.module';
 import { User } from './common/entities/user.entity';
 import { Role } from './common/entities/role.entity';
 import { Permission } from './common/entities/permission.entity';
@@ -195,7 +196,8 @@ const isTest = process.env.NODE_ENV === 'test';
     DashboardModule,
     FamilyModule,
     StockModule,
-    FlowModule
+    FlowModule,
+    ProxyModule
   ],
   // 测试环境不注册限流守卫：测试用例会在同一 IP 上发起大量请求，避免被 429 干扰
   providers: [

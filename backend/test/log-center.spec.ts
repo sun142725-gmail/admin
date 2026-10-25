@@ -1,6 +1,7 @@
 // LogCenter 模块测试覆盖批量上报与查询。
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,6 +10,7 @@ import * as request from 'supertest';
 import { User } from '../src/common/entities/user.entity';
 import { Role } from '../src/common/entities/role.entity';
 import { Permission } from '../src/common/entities/permission.entity';
+import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 
 describe('LogCenter (e2e)', () => {
   let app: INestApplication;
@@ -28,7 +30,13 @@ describe('LogCenter (e2e)', () => {
       imports: [AppModule]
     }).compile();
 
+    // 与 main.ts 的启动行为对齐（前缀/管道/拦截器），否则路径 404、响应体未包装
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api');
+    app.useGlobalInterceptors(new ResponseInterceptor(new Reflector()));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })
+    );
     await app.init();
 
     userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
@@ -87,5 +95,35 @@ describe('LogCenter (e2e)', () => {
       .expect(200);
 
     expect(detailResponse.body.data.id).toBe(itemId);
+  });
+
+  it('should skip oversized events instead of rejecting the whole batch', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ username: 'tester', password: 'password' })
+      .expect(201);
+    const accessToken = loginResponse.body.data.accessToken;
+
+    const ingestResponse = await request(app.getHttpServer())
+      .post('/api/log-center/events')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        source: 'web',
+        sessionId: 'session-test',
+        events: [
+          {
+            type: 'frontend',
+            payload: { level: 'info', message: '正常事件' }
+          },
+          {
+            type: 'frontend',
+            payload: { level: 'info', message: 'x'.repeat(5000) }
+          }
+        ]
+      })
+      .expect(201);
+
+    expect(ingestResponse.body.data.accepted).toBe(1);
+    expect(ingestResponse.body.data.skipped).toBe(1);
   });
 });

@@ -541,7 +541,8 @@ export class SeedService implements OnModuleInit {
     const items = [
       { value: 'web', label: 'Web', sortOrder: 1 },
       { value: 'pc', label: 'PC', sortOrder: 2 },
-      { value: 'app', label: 'App', sortOrder: 3 }
+      { value: 'app', label: 'App', sortOrder: 3 },
+      { value: 'server', label: '服务端', sortOrder: 4 }
     ];
 
     for (const item of items) {

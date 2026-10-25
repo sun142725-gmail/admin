@@ -10,7 +10,6 @@ import * as request from 'supertest';
 import { User } from '../src/common/entities/user.entity';
 import { Role } from '../src/common/entities/role.entity';
 import { Permission } from '../src/common/entities/permission.entity';
-import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 
 describe('AI Admin (e2e)', () => {
@@ -35,7 +34,6 @@ describe('AI Admin (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
-    app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ResponseInterceptor(new Reflector()));
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })

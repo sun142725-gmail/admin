@@ -1,6 +1,6 @@
 // 日志中心查询 DTO 用于分页与筛选。
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class QueryLogDto {
   @IsIn(['track', 'frontend', 'error'])
@@ -8,11 +8,14 @@ export class QueryLogDto {
 
   @IsOptional()
   @IsInt()
+  @Min(1)
   @Type(() => Number)
   page?: number;
 
   @IsOptional()
   @IsInt()
+  @Min(1)
+  @Max(100)
   @Type(() => Number)
   pageSize?: number;
 
@@ -23,29 +26,34 @@ export class QueryLogDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(128)
   traceId?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(128)
   sessionId?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(128)
   pageCode?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   level?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   keyword?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   start?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   end?: string;
 }

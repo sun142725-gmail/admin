@@ -17,6 +17,15 @@ deploy/
     └── 04-sync-stock-agents.sh # 步骤 4：同步「股市圆桌」六位智能体（幂等，也可由步骤 2 覆盖）
 ```
 
+## 微服务网关与 Go core 服务（多语言架构）
+
+架构：前端 → Node(`/api/svc/:service/*`) → 下游微服务。Node 统一鉴权 + 访问审计后**流式透传**（含 SSE），下游自己产出与 Node 同构的统一响应。
+
+- **服务注册表**：`backend/src/modules/proxy/proxy-registry.ts`——新接一个服务（如将来的 Python 量化服务）在此登记一条即可；目标地址用环境变量覆盖（开发默认 `http://127.0.0.1:8081/api/v1`，compose 内 `http://core:8081/api/v1`）
+- **Go 脚手架**：`services/core/`（gin + JWT 验签 + 统一响应 + SSE 示例，暂无业务），详见其 README
+- **部署**：发布面板选「仅 Go 服务 core」（`deploy-panel/scripts/deploy-core.sh`），或服务器上执行 `docker compose up -d --build core`；「全部应用」已包含 core
+- **冒烟**：`curl http://127.0.0.1:8081/healthz`（直连）与 `curl -H "Authorization: Bearer <token>" http://127.0.0.1:3000/api/svc/core/examples`（经网关）
+
 ## 上线准备事项（Checklist）
 
 - [ ] 服务器具备 Node.js 20（宿主机执行脚本用）+ Docker Compose
@@ -26,6 +35,7 @@ deploy/
 - [ ] 「股市圆桌」上线项（详见步骤 4）：6 位圆桌智能体 + `gpt-6.1-sol` 模型行需同步；权限 `stock:roundtable:use` 与菜单随 `SEED=true` 首启自动初始化（幂等，挂在「AI 中心」菜单下）
 - [ ] （可选）消息面联网检索：配置 `BOCHA_API_KEY`（博查，国内直连）或 `TAVILY_API_KEY`（Tavily，海外）；不配置则自动降级为"公告 + 同花顺 F10 + 模型知识注入"，主流程不受影响
 - [ ] JWT 两把密钥已换成生产专用随机值
+- [ ] Go 核心服务（`services/core`，compose 服务名 `core`）：随 `docker compose up -d` 或发布面板「仅 Go 服务 core」一起部署；backend 通过 `PROXY_CORE_TARGET=http://core:8081/api/v1` 转发 `/api/svc/core/*`，core 用与 backend 相同的 `JWT_ACCESS_SECRET` 验签（在 `deploy-panel/.env` 配置后由 compose 注入）
 - [ ] `docker compose up -d` 后 `docker compose logs backend` 无报错（首启自动建表 + seed 权限菜单）
 
 ## 脚本执行顺序

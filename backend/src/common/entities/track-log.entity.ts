@@ -5,6 +5,8 @@ import { BaseEntity } from './base.entity';
 @Entity('track_logs')
 @Index(['traceId'])
 @Index(['sessionId'])
+@Index(['createdAt'])
+@Index(['userId'])
 export class TrackLog extends BaseEntity {
   @Column({ name: 'user_id', nullable: true })
   userId?: number;

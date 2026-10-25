@@ -7,6 +7,8 @@ import { uuid } from '../utils/uuid';
 
 const CLIENT_SOURCE = 'web';
 const LOG_ENDPOINT = '/log-center/events';
+// 慢请求阈值：正常成功请求不记日志（避免刷库淹没关键信息），仅记录慢请求与失败请求
+const SLOW_API_MS = 1000;
 
 const http = axios.create({
   baseURL: '/api',
@@ -37,24 +39,28 @@ http.interceptors.request.use((config) => {
 http.interceptors.response.use(
   (response) => {
     const payload = response.data;
-    const traceId = payload?.traceId as string | undefined;
     const config = response.config;
     const url = config?.url ?? '';
+    const duration = Date.now() - ((config as any).metadata?.startTime ?? Date.now());
     if (!url.includes(LOG_ENDPOINT)) {
-      const duration = Date.now() - ((config as any).metadata?.startTime ?? Date.now());
-      enqueueLogEvent({
-        type: 'frontend',
-        traceId,
-        payload: {
-          level: 'info',
-          category: 'api',
-          message: `${(config.method ?? 'GET').toUpperCase()} ${url}`,
-          meta: {
-            status: response.status,
-            duration
+      // 响应体没有 traceId 时回退用请求头里生成的值，保证事件可关联
+      const headerTraceId = (config?.headers?.['x-trace-id'] as string | undefined) ?? undefined;
+      const traceId = (payload?.traceId as string | undefined) ?? headerTraceId;
+      if (duration >= SLOW_API_MS) {
+        enqueueLogEvent({
+          type: 'frontend',
+          traceId,
+          payload: {
+            level: 'warn',
+            category: 'api',
+            message: `慢请求 ${(config.method ?? 'GET').toUpperCase()} ${url}`,
+            meta: {
+              status: response.status,
+              duration
+            }
           }
-        }
-      });
+        });
+      }
     }
     if (payload?.code !== 0) {
       return Promise.reject(new Error(payload?.message ?? '请求失败'));
@@ -64,19 +70,38 @@ http.interceptors.response.use(
   async (error) => {
     const { response, config } = error;
     const url = config?.url ?? '';
-    if (response?.data && !url.includes(LOG_ENDPOINT)) {
-      const traceId = response.data?.traceId as string | undefined;
-      enqueueLogEvent({
-        type: 'error',
-        traceId,
-        payload: {
-          message: response.data?.message ?? '请求失败',
-          meta: {
-            status: response.status,
-            url
+    if (!url.includes(LOG_ENDPOINT)) {
+      const headerTraceId = (config?.headers?.['x-trace-id'] as string | undefined) ?? undefined;
+      const traceId = (response?.data?.traceId as string | undefined) ?? headerTraceId;
+      if (response) {
+        enqueueLogEvent({
+          type: 'error',
+          traceId,
+          payload: {
+            message: `${(config.method ?? 'GET').toUpperCase()} ${url} -> ${response.status}`,
+            stack: typeof response.data?.message === 'string' ? response.data.message : undefined,
+            meta: {
+              status: response.status,
+              url
+            }
           }
-        }
-      });
+        });
+      } else {
+        // 网络层失败（断网/DNS/超时/被拦截）没有响应体，是排查"用户说打不开"的关键信号
+        enqueueLogEvent({
+          type: 'error',
+          traceId: headerTraceId,
+          payload: {
+            message: `网络错误 ${(config?.method ?? 'GET').toUpperCase()} ${url}`,
+            stack: error?.message,
+            meta: {
+              network: true,
+              timeout: Boolean(config?.timeout && error?.code === 'ECONNABORTED'),
+              url
+            }
+          }
+        });
+      }
     }
     if (!response || response.status !== 401 || (config as any)._retry) {
       return Promise.reject(error);

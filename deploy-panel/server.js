@@ -51,6 +51,7 @@ const SCRIPT_MAP = {
   frontend: path.join(__dirname, 'scripts/deploy-frontend.sh'),
   'has-doc': path.join(__dirname, 'scripts/deploy-has-doc.sh'),
   'has-web': path.join(__dirname, 'scripts/deploy-has-web.sh'),
+  core: path.join(__dirname, 'scripts/deploy-core.sh'),
   all: path.join(__dirname, 'scripts/deploy-all.sh'),
   'stock-agents': path.join(__dirname, 'scripts/sync-stock-agents.sh')
 };

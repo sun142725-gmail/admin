@@ -18,6 +18,18 @@ services:
     ports:
       - "6379:6379"
 
+  core:
+    build: ./services/core
+    environment:
+      PORT: 8081
+      GIN_MODE: release
+      # 与 backend 共用同一 JWT 密钥：网关转发的 accessToken 在 Go 侧同样可验签（纵深防御）
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-rbac_access_secret}
+    ports:
+      # 暴露给宿主机便于直连调试；生产不需要时可去掉
+      - "8081:8081"
+    restart: unless-stopped
+
   backend:
     build: ./backend
     environment:
@@ -41,6 +53,8 @@ services:
       REDIS_PORT: 6379
       REDIS_DB: 0
       DICT_CACHE_TTL: 21600
+      # 微服务网关：/api/svc/core/* 转发到 Go 服务（compose 网络内走服务名）
+      PROXY_CORE_TARGET: http://core:8081/api/v1
       AI_ENCRYPTION_KEY: ${AI_ENCRYPTION_KEY:-}
       # 股市圆桌消息面联网检索（可选，不配自动降级）
       BOCHA_API_KEY: ${BOCHA_API_KEY:-}
@@ -55,6 +69,7 @@ services:
     depends_on:
       - mysql
       - redis
+      - core
     ports:
       - "3000:3000"
     volumes:

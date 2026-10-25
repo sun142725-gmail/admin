@@ -1,5 +1,5 @@
-// 日志中心控制器提供分页与详情接口。
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+// 审计中心控制器提供分页与详情接口。
+import { Controller, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -22,7 +22,7 @@ export class AuditCenterController {
 
   @Get(':id')
   @Permissions('system:audit:center')
-  async detail(@Param('id') id: string) {
-    return this.auditCenterService.detail(Number(id));
+  async detail(@Param('id', ParseIntPipe) id: number) {
+    return this.auditCenterService.detail(id);
   }
 }

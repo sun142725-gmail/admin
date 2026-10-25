@@ -9,7 +9,6 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as request from 'supertest';
 import { User } from '../src/common/entities/user.entity';
-import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { MarketDataService } from '../src/modules/stock/market/market-data.service';
 import { KlineItem } from '../src/modules/stock/indicators.util';
@@ -122,7 +121,6 @@ describe('Stock Roundtable (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
-    app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ResponseInterceptor(new Reflector()));
     app.useGlobalPipes(
       new ValidationPipe({
