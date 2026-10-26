@@ -1,7 +1,15 @@
 // 行情数据服务：聚合免费公开行情（腾讯实时快照 / 东财 K 线与板块），内存 TTL 缓存 + 双源互备。
 // 仅供学习研究，接口为公开非官方通道，失败时抛出明确错误由上层降级提示。
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { KlineItem } from '../indicators.util';
+import { KlineFreq, KlineItem, resampleKlines } from '../indicators.util';
+import { fetchGbk, fetchJson, fetchText } from './http.util';
+
+/** K 线周期 → 东财 klt 码（101 日 / 102 周 / 103 月）。 */
+export const KLINE_FREQ_KLT: Record<KlineFreq, 101 | 102 | 103> = {
+  day: 101,
+  week: 102,
+  month: 103
+};
 import {
   QuoteSnapshot,
   SuggestItem,
@@ -49,7 +57,6 @@ import {
 } from './cninfo.api';
 import { ThsFinancials, buildThsF10Url, parseThsFinancials } from './ths-f10.api';
 
-const FETCH_TIMEOUT_MS = 8000;
 const QUOTE_TTL_MS = 30 * 1000;
 const KLINE_TTL_MS = 10 * 60 * 1000;
 const SECTOR_TTL_MS = 5 * 60 * 1000;
@@ -71,58 +78,6 @@ export interface MarketOverview {
 interface CacheEntry<T> {
   at: number;
   data: T;
-}
-
-async function fetchText(url: string, headers?: Record<string, string>): Promise<string> {
-  const response = await fetch(url, {
-    headers,
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-  });
-  if (!response.ok) {
-    throw new Error(`行情接口返回 ${response.status}`);
-  }
-  return response.text();
-}
-
-// 腾讯/新浪返回 GBK 编码，需按 GBK 解码（Node 20 内置全量 ICU）。
-async function fetchGbk(url: string, headers?: Record<string, string>): Promise<string> {
-  const response = await fetch(url, {
-    headers,
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-  });
-  if (!response.ok) {
-    throw new Error(`行情接口返回 ${response.status}`);
-  }
-  const buffer = await response.arrayBuffer();
-  return new TextDecoder('gbk').decode(buffer);
-}
-
-async function fetchJson<T>(
-  url: string,
-  init?: { method?: string; headers?: Record<string, string>; body?: string }
-): Promise<T> {
-  let text: string;
-  if (init?.method) {
-    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!response.ok) {
-      throw new Error(`接口返回 ${response.status}`);
-    }
-    text = await response.text();
-  } else {
-    text = await fetchText(url);
-  }
-  // 部分接口（如东财 suggest）会返回 jQuery...( {...} ) 的 JSONP 包装，剥离后解析。
-  const firstBrace = text.indexOf('{');
-  const firstBracket = text.indexOf('[');
-  const start =
-    firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket) ? firstBrace : firstBracket;
-  const endBrace = text.lastIndexOf('}');
-  const endBracket = text.lastIndexOf(']');
-  const end = endBrace > endBracket ? endBrace : endBracket;
-  if (start >= 0 && end > start && (start > 0 || end < text.length - 1)) {
-    text = text.slice(start, end + 1);
-  }
-  return JSON.parse(text) as T;
 }
 
 @Injectable()
@@ -226,10 +181,15 @@ export class MarketDataService {
     return snapshot;
   }
 
-  /** 日 K 线（前复权）：东财主源（含板块 BK）→ 腾讯 → 新浪三级容灾，个股/指数 sh/sz。
-   *  新浪体系板块（new_xxx）无公开 K 线源，抛出特定错误由会议简报层降级为成分股聚合。 */
-  async kline(symbol: string, limit = 250): Promise<{ name: string; items: KlineItem[] }> {
-    const key = `${symbol}:${limit}`;
+  /** K 线（前复权）：东财主源（含板块 BK，原生支持日/周/月）→ 腾讯 → 新浪三级容灾，个股/指数 sh/sz。
+   *  新浪体系板块（new_xxx）无公开 K 线源，抛出特定错误由会议简报层降级为成分股聚合。
+   *  周/月线主源为东财原生聚合；若东财不可用，回退为拉日 K 后本地重采样（口径近似行情软件）。 */
+  async kline(
+    symbol: string,
+    limit = 250,
+    freq: KlineFreq = 'day'
+  ): Promise<{ name: string; items: KlineItem[] }> {
+    const key = `${symbol}:${limit}:${freq}`;
     const cached = this.getCache(this.klineCache, key, KLINE_TTL_MS);
     if (cached) {
       return cached;
@@ -240,7 +200,9 @@ export class MarketDataService {
     let parsed: { name: string; items: KlineItem[] } | null = null;
 
     try {
-      const payload = await fetchJson<EastmoneyKlineResponse>(buildEastmoneyKlineUrl(symbol, limit));
+      const payload = await fetchJson<EastmoneyKlineResponse>(
+        buildEastmoneyKlineUrl(symbol, limit, KLINE_FREQ_KLT[freq])
+      );
       parsed = parseEastmoneyKline(payload);
     } catch (error) {
       this.logger.warn(`东财 K 线失败: ${error instanceof Error ? error.message : '未知错误'}`);
@@ -250,10 +212,17 @@ export class MarketDataService {
       if (isEastmoneySectorCode(symbol)) {
         throw new ServiceUnavailableException('板块 K 线数据暂时不可用（东财接口无响应），请稍后重试');
       }
-      parsed = await this.fetchKlineFromTencent(symbol, limit).catch(() => null);
-    }
-    if (!parsed || parsed.items.length === 0) {
-      parsed = await this.fetchKlineFromSina(symbol, limit).catch(() => null);
+      if (freq === 'day') {
+        parsed = await this.fetchKlineFromTencent(symbol, limit).catch(() => null);
+        if (!parsed || parsed.items.length === 0) {
+          parsed = await this.fetchKlineFromSina(symbol, limit).catch(() => null);
+        }
+      } else {
+        // 腾讯/新浪仅支持日 K：拉足日 K 后本地重采样为周/月
+        const dailyLimit = freq === 'month' ? 800 : Math.min(800, limit * 5);
+        const daily = await this.kline(symbol, dailyLimit, 'day');
+        parsed = { name: daily.name, items: resampleKlines(daily.items, freq) };
+      }
     }
     if (!parsed || parsed.items.length === 0) {
       throw new ServiceUnavailableException(`未查询到 ${symbol} 的 K 线数据（已尝试东财/腾讯/新浪），请稍后重试`);

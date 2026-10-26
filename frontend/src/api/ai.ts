@@ -93,9 +93,11 @@ export const updateModel = (id: number, payload: object) =>
   http.put<never, AiModel>(`/ai/admin/models/${id}`, payload);
 export const removeModel = (id: number) => http.delete<never, { success: boolean }>(`/ai/admin/models/${id}`);
 export const testModel = (id: number) =>
-  http.post<never, ProbeResultVo>(`/ai/admin/models/${id}/test`, undefined, LONG_TASK_TIMEOUT);
+  http.post<never, ProbeResultVo>(`/ai/admin/models/${id}/test`, undefined, { timeout: LONG_TASK_TIMEOUT });
 export const probeModelModels = (id: number) =>
-  http.post<never, ProbeResultVo>(`/ai/admin/models/${id}/probe-models`, undefined, LONG_TASK_TIMEOUT);
+  http.post<never, ProbeResultVo>(`/ai/admin/models/${id}/probe-models`, undefined, {
+    timeout: LONG_TASK_TIMEOUT
+  });
 
 // ---------- 智能体 ----------
 export const listAgents = () => http.get<never, AiAgent[]>('/ai/admin/agents');
@@ -155,5 +157,7 @@ export const streamChat = (
 
 // ---------- 生图 ----------
 export const generateImages = (payload: { modelId?: number; prompt: string; size?: string; count?: number }) =>
-  http.post<never, { images: AiImageRecord[] }>('/ai/images/generations', payload, LONG_TASK_TIMEOUT);
+  http.post<never, { images: AiImageRecord[] }>('/ai/images/generations', payload, {
+    timeout: LONG_TASK_TIMEOUT
+  });
 export const listImageHistory = () => http.get<never, AiImageRecord[]>('/ai/images');

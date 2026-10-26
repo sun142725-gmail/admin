@@ -3,9 +3,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Input, Segmented, Select, Tooltip, message } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
 import type { InputProps } from 'antd';
+import { useSearchParams } from 'react-router-dom';
 import { Permission } from '../../components/permission/Permission';
 import { KlineResult, RoundtableMode, StockModelOption, fetchKline, fetchStockModels } from '../../api/stock';
 import { SubjectPicker, SubjectSelection } from './components/SubjectPicker';
+import { WatchStarButton } from './components/WatchStarButton';
 import { KlineChart } from './components/KlineChart';
 import { RoundtableStage } from './components/RoundtableStage';
 import { HistoryTable } from './components/HistoryTable';
@@ -24,11 +26,19 @@ const SECTOR_SYMBOL_RE = /^(BK\d{4,6}|new_[a-z0-9_]+)$/i;
 const SECURITY_SYMBOL_RE = /^(sh|sz)\d{6}$/;
 
 export const StockPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<'stage' | 'history'>('stage');
-  const [subject, setSubject] = useState<SubjectSelection>({
-    subjectType: 'market',
-    symbol: '',
-    name: 'A股大盘'
+  // 深链支持：/stock?symbol=sh600519&name=贵州茅台（选股结果"去圆桌分析"跳转）
+  const [subject, setSubject] = useState<SubjectSelection>(() => {
+    const deepLinkSymbol = searchParams.get('symbol');
+    if (deepLinkSymbol && SECURITY_SYMBOL_RE.test(deepLinkSymbol.toLowerCase())) {
+      return {
+        subjectType: 'stock',
+        symbol: deepLinkSymbol.toLowerCase(),
+        name: searchParams.get('name') || deepLinkSymbol
+      };
+    }
+    return { subjectType: 'market', symbol: '', name: 'A股大盘' };
   });
   const [question, setQuestion] = useState('');
   const [mode, setMode] = useState<RoundtableMode>('standard');
@@ -179,6 +189,9 @@ export const StockPage: React.FC = () => {
           <div className="flex flex-col gap-3">
             <SubjectPicker value={subject} onChange={setSubject} disabled={running} />
             <div className="flex flex-wrap items-center gap-2">
+              {subject.subjectType === 'stock' && subject.symbol && (
+                <WatchStarButton symbol={subject.symbol} name={subject.name} />
+              )}
               <Input
                 className="flex-1 min-w-[220px]"
                 placeholder="想让专家们重点关注什么？（可选，回车直接开会）"

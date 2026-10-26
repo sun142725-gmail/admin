@@ -15,11 +15,12 @@ import { RequireAuth } from './RequireAuth';
 
 // 大页面按需加载：此前 20 个页面全部静态引入，echarts/react-quill 等重依赖全进首屏主包（3MB）。
 // 登录页与首页保持静态加载，保证首屏直出。
-const lazyPage = (loader: () => Promise<Record<string, unknown>>, name: string) => {
+// 返回的是「组件」而非 JSX 元素：路由侧统一 <Page /> 用法（元素当组件渲染会让 React 崩溃）。
+const lazyPage = (loader: () => Promise<Record<string, unknown>>, name: string): React.FC => {
   const Component = React.lazy(() =>
     loader().then((module) => ({ default: module[name] as React.ComponentType }))
   );
-  return (
+  return () => (
     <React.Suspense
       fallback={
         <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8' }}>页面加载中…</div>
@@ -36,6 +37,8 @@ const AgentsPage = lazyPage(() => import('../pages/ai/AgentsPage'), 'AgentsPage'
 const ChatPage = lazyPage(() => import('../pages/ai/ChatPage'), 'ChatPage');
 const ImagesPage = lazyPage(() => import('../pages/ai/ImagesPage'), 'ImagesPage');
 const StockPage = lazyPage(() => import('../pages/stock/StockPage'), 'StockPage');
+const ScreenerPage = lazyPage(() => import('../pages/stock/ScreenerPage'), 'ScreenerPage');
+const WatchlistPage = lazyPage(() => import('../pages/stock/WatchlistPage'), 'WatchlistPage');
 const FlowsPage = lazyPage(() => import('../pages/flow/FlowsPage'), 'FlowsPage');
 const FlowRunsPage = lazyPage(() => import('../pages/flow/FlowRunsPage'), 'FlowRunsPage');
 const NovelVideoPage = lazyPage(() => import('../pages/flow/NovelVideoPage'), 'NovelVideoPage');
@@ -92,6 +95,8 @@ export const router = createBrowserRouter([
       { path: '/ai/chat', element: <ChatPage /> },
       { path: '/ai/images', element: <ImagesPage /> },
       { path: '/stock', element: <StockPage /> },
+      { path: '/stock/screener', element: <ScreenerPage /> },
+      { path: '/stock/watchlist', element: <WatchlistPage /> },
       { path: '/flow', element: <FlowsPage /> },
       { path: '/flow/runs', element: <FlowRunsPage /> },
       { path: '/flow/novel', element: <NovelVideoPage /> },

@@ -60,11 +60,14 @@ export function parseEastmoneyKline(payload: EastmoneyKlineResponse): { name: st
   return { name: payload?.data?.name ?? '', items };
 }
 
-export function buildEastmoneyKlineUrl(symbol: string, limit = 250): string {
+/** 东财 K 线周期码：101 日 / 102 周 / 103 月（原生聚合，口径对齐行情软件）。 */
+export type EastmoneyKlt = 101 | 102 | 103;
+
+export function buildEastmoneyKlineUrl(symbol: string, limit = 250, klt: EastmoneyKlt = 101): string {
   return (
     `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secidFor(symbol)}` +
     `&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61` +
-    `&klt=101&fqt=1&end=20500101&lmt=${limit}`
+    `&klt=${klt}&fqt=1&end=20500101&lmt=${limit}`
   );
 }
 
@@ -85,7 +88,9 @@ interface EastmoneyClistRow {
   f2?: number | string;
   f3?: number | string;
   f12?: string;
+  f13?: number;
   f14?: string;
+  f20?: number | string;
   f104?: number;
   f105?: number;
   f128?: string;
@@ -137,6 +142,54 @@ export function buildEastmoneyConstituentsUrl(bkCode: string, pageSize = 10): st
     `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=${pageSize}&po=1&np=1&fltt=2&invt=2` +
     `&fid=f3&fs=b:${bkCode}+f:!50&fields=f2,f3,f12,f14`
   );
+}
+
+// ---------- 市场板块股票列表（选股池数据源） ----------
+
+/** 市场板块 → 东财 fs 过滤串。北交所（m:0+t:81）K 线源不支持，不纳入。 */
+export type EastmoneyBoard = 'main' | 'chinext' | 'star';
+
+export const EASTMONEY_BOARD_FS: Record<EastmoneyBoard, string> = {
+  // 沪深主板：上证 60xxxx + 深证 000xxx
+  main: 'm:1+t:2,m:0+t:6',
+  // 创业板：300xxx / 301xxx
+  chinext: 'm:0+t:80',
+  // 科创板：688xxx
+  star: 'm:1+t:23'
+};
+
+export interface StockListItem {
+  /** 归一化代码（sh600519 / sz300750）。 */
+  symbol: string;
+  name: string;
+  /** 总市值（元）；停牌等为 null。 */
+  marketCap: number | null;
+}
+
+/** 股票列表：按总市值（f20）从大到小分页拉取。 */
+export function buildEastmoneyStockListUrl(fs: string, page: number, pageSize = 100): string {
+  return (
+    `https://push2.eastmoney.com/api/qt/clist/get?pn=${page}&pz=${pageSize}&po=1&np=1&fltt=2&invt=2` +
+    `&fid=f20&fs=${fs}+f:!50&fields=f12,f13,f14,f20`
+  );
+}
+
+export function parseEastmoneyStockList(payload: EastmoneyClistResponse): { total: number; items: StockListItem[] } {
+  const rows = payload?.data?.diff ?? [];
+  const items = rows
+    .map((row) => {
+      const code = row.f12 ?? '';
+      if (!/^\d{6}$/.test(code) || row.f13 !== 0 && row.f13 !== 1) {
+        return null;
+      }
+      return {
+        symbol: `${row.f13 === 1 ? 'sh' : 'sz'}${code}`,
+        name: row.f14 ?? '',
+        marketCap: rowNum(row.f20)
+      };
+    })
+    .filter((item): item is StockListItem => item !== null);
+  return { total: payload?.data?.total ?? items.length, items };
 }
 
 export interface SearchItem {

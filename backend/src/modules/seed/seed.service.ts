@@ -691,44 +691,60 @@ export class SeedService implements OnModuleInit {
     }
   }
 
-  // 股市圆桌菜单与权限（幂等）：挂在「AI 中心」菜单下，菜单缺失时建独立顶级菜单兜底。
+  // 股市一级菜单与权限（幂等）：「股市」作为独立一级菜单（后续在此挂更多子功能），
+  // 股市圆桌 /stock 与选股 /stock/screener 是其子页。旧数据曾挂在「AI 中心」下，启动时自动迁移。
   private async ensureStockSetup() {
-    const permission = await this.ensurePermissionByCode('stock:roundtable:use', '股市圆桌');
-
-    let parent = await this.resourceRepo.findOne({ where: { name: 'AI 中心', type: 'menu' } });
-    if (!parent) {
-      const existingPage = await this.resourceRepo.findOne({ where: { path: '/stock', type: 'page' } });
-      if (existingPage?.parentId) {
-        parent = await this.resourceRepo.findOne({ where: { id: existingPage.parentId } });
+    // 一级菜单「股市」：早期兜底逻辑创建过名为「股市圆桌」的一级菜单，顺带重命名（幂等）
+    let stockMenu = await this.resourceRepo.findOne({ where: { name: '股市', type: 'menu' } });
+    if (!stockMenu) {
+      const legacy = await this.resourceRepo.findOne({ where: { name: '股市圆桌', type: 'menu' } });
+      if (legacy) {
+        legacy.name = '股市';
+        stockMenu = await this.resourceRepo.save(legacy);
       }
     }
-    if (!parent) {
-      parent = await this.resourceRepo.save(
-        this.resourceRepo.create({ name: '股市圆桌', type: 'menu', sortOrder: 6 })
+    if (!stockMenu) {
+      stockMenu = await this.resourceRepo.save(
+        this.resourceRepo.create({ name: '股市', type: 'menu', sortOrder: 6 })
       );
     }
 
-    const exists = await this.resourceRepo.findOne({ where: { path: '/stock' } });
-    if (exists) {
-      if (exists.parentId !== parent.id || exists.permissionCode !== 'stock:roundtable:use') {
-        await this.resourceRepo.update(
-          { id: exists.id },
-          { name: '股市圆桌', parentId: parent.id, permissionCode: 'stock:roundtable:use' }
+    const pages: Array<{ name: string; path: string; permissionCode: string }> = [
+      { name: '股市圆桌', path: '/stock', permissionCode: 'stock:roundtable:use' },
+      { name: '选股器', path: '/stock/screener', permissionCode: 'stock:screener:use' },
+      { name: '自选股', path: '/stock/watchlist', permissionCode: 'stock:watchlist:use' }
+    ];
+    for (const page of pages) {
+      const exists = await this.resourceRepo.findOne({ where: { path: page.path } });
+      if (exists) {
+        // 迁移：无论旧父级是「AI 中心」还是旧兜底菜单，统一挂到「股市」下
+        if (exists.parentId !== stockMenu.id || exists.permissionCode !== page.permissionCode) {
+          await this.resourceRepo.update(
+            { id: exists.id },
+            { name: page.name, parentId: stockMenu.id, permissionCode: page.permissionCode }
+          );
+        }
+      } else {
+        await this.resourceRepo.save(
+          this.resourceRepo.create({
+            name: page.name,
+            type: 'page',
+            path: page.path,
+            parentId: stockMenu.id,
+            permissionCode: page.permissionCode
+          })
         );
       }
-    } else {
-      await this.resourceRepo.save(
-        this.resourceRepo.create({
-          name: '股市圆桌',
-          type: 'page',
-          path: '/stock',
-          parentId: parent.id,
-          permissionCode: 'stock:roundtable:use'
-        })
-      );
     }
-    if (permission) {
-      await this.ensureAdminRolePermission(permission);
+    for (const [code, name] of [
+      ['stock:roundtable:use', '股市圆桌'],
+      ['stock:screener:use', '选股器'],
+      ['stock:watchlist:use', '自选股']
+    ] as const) {
+      const ensured = await this.ensurePermissionByCode(code, name);
+      if (ensured) {
+        await this.ensureAdminRolePermission(ensured);
+      }
     }
   }
 

@@ -563,3 +563,216 @@ export function scoreToStance(score: number): { direction: 'bull' | 'bear' | 'ne
   }
   return { direction: 'neutral', confidence: 45 };
 }
+
+// ==================== 选股（Screener）纯函数 ====================
+
+export type KlineFreq = 'day' | 'week' | 'month';
+
+/** 日 K 重采样为周/月 K（东财原生周期不可用时的兜底；ISO 周一锚定 / 自然月聚合）。 */
+export function resampleKlines(daily: KlineItem[], freq: 'week' | 'month'): KlineItem[] {
+  if (freq === 'week') {
+    const buckets = new Map<string, KlineItem[]>();
+    for (const bar of daily) {
+      const d = new Date(`${bar.date}T00:00:00Z`);
+      if (Number.isNaN(d.getTime())) {
+        continue;
+      }
+      // ISO 周：周四所属周为锚（周一为一周起点）
+      const day = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() - day + 1);
+      const weekKey = d.toISOString().slice(0, 10);
+      const list = buckets.get(weekKey) ?? [];
+      list.push(bar);
+      buckets.set(weekKey, list);
+    }
+    return [...buckets.values()].map(aggregateBucket).filter((bar): bar is KlineItem => bar !== null);
+  }
+  const buckets = new Map<string, KlineItem[]>();
+  for (const bar of daily) {
+    const monthKey = bar.date.slice(0, 7);
+    const list = buckets.get(monthKey) ?? [];
+    list.push(bar);
+    buckets.set(monthKey, list);
+  }
+  return [...buckets.values()].map(aggregateBucket).filter((bar): bar is KlineItem => bar !== null);
+}
+
+const aggregateBucket = (bars: KlineItem[]): KlineItem | null => {
+  if (!bars.length) {
+    return null;
+  }
+  const sorted = [...bars].sort((a, b) => a.date.localeCompare(b.date));
+  const open = sorted[0].open;
+  const close = sorted[sorted.length - 1].close;
+  const high = Math.max(...sorted.map((b) => b.high));
+  const low = Math.min(...sorted.map((b) => b.low));
+  return {
+    date: sorted[sorted.length - 1].date,
+    open,
+    close,
+    high,
+    low,
+    volume: sorted.reduce((sum, b) => sum + b.volume, 0),
+    amount: sorted.reduce((sum, b) => sum + b.amount, 0),
+    pct:
+      open > 0
+        ? Math.round(((close - open) / open) * 10000) / 100
+        : sorted[sorted.length - 1].pct,
+    turnover: sorted[sorted.length - 1].turnover
+  };
+};
+
+export interface CrossSignal {
+  /** golden=已金叉（近 withinBars 内上穿）；upcoming=即将金叉；null=无信号。 */
+  status: 'golden' | 'upcoming' | null;
+  /** 金叉发生距今的 bar 数（golden 时有效）。 */
+  barsAgo?: number;
+  /** 快线-慢线当前差值（upcoming 时用于展示收敛程度）。 */
+  gap?: number;
+}
+
+/** 交叉检测的相对误差阈值：过滤浮点累积误差造成的 epsilon 级假交叉（如恒定斜率序列 DIF≈DEA）。 */
+const CROSS_EPSILON = 1e-9;
+
+const meaningfulGap = (gap: number, scale: number): boolean =>
+  Math.abs(gap) > CROSS_EPSILON * Math.max(1, Math.abs(scale));
+
+/** 最近一次上穿（金叉）：在 withinBars 内快线 a 从下方穿越慢线 b。 */
+export function detectGoldenCross(a: Series, b: Series, withinBars = 3): CrossSignal {
+  const n = Math.min(a.length, b.length);
+  for (let i = n - 1; i >= Math.max(1, n - withinBars); i -= 1) {
+    const aNow = a[i];
+    const bNow = b[i];
+    const aPrev = a[i - 1];
+    const bPrev = b[i - 1];
+    if (aNow == null || bNow == null || aPrev == null || bPrev == null) {
+      continue;
+    }
+    if (
+      aPrev <= bPrev &&
+      aNow > bNow &&
+      meaningfulGap(aNow - bNow, Math.max(Math.abs(aNow), Math.abs(bNow)))
+    ) {
+      return { status: 'golden', barsAgo: n - 1 - i };
+    }
+  }
+  return { status: null };
+}
+
+/**
+ * 即将金叉判定（可解释启发式，基于最新一根 bar 的状态）：
+ * 1. 快线在慢线下方（gap < 0）；
+ * 2. 快线上行（a[n-1] > a[n-2]）；
+ * 3. 差值在收敛（|gap| < |prevGap|）；
+ * 4. 按当前收敛速度估算 ≤3 根内可交叉（|gap| ≤ 3×单根收敛量）。
+ */
+export function detectUpcomingCross(a: Series, b: Series): CrossSignal {
+  const n = Math.min(a.length, b.length);
+  if (n < 2) {
+    return { status: null };
+  }
+  const aNow = a[n - 1];
+  const bNow = b[n - 1];
+  const aPrev = a[n - 2];
+  const bPrev = b[n - 2];
+  if (aNow == null || bNow == null || aPrev == null || bPrev == null) {
+    return { status: null };
+  }
+  const gap = aNow - bNow;
+  const prevGap = aPrev - bPrev;
+  const scale = Math.max(Math.abs(aNow), Math.abs(bNow));
+  // 必须在慢线下方有意义的距离，否则是浮点抖动而非"接近金叉"
+  if (!meaningfulGap(gap, scale) || !meaningfulGap(prevGap, scale)) {
+    return { status: null };
+  }
+  if (gap >= 0 || prevGap >= 0 || aNow <= aPrev || Math.abs(gap) >= Math.abs(prevGap)) {
+    return { status: null };
+  }
+  const convergePerBar = Math.abs(prevGap) - Math.abs(gap);
+  if (convergePerBar > 0 && Math.abs(gap) <= 3 * convergePerBar) {
+    return { status: 'upcoming', gap: Math.round(gap * 10000) / 10000 };
+  }
+  return { status: null };
+}
+
+export type ScreenerIndicator = 'kdj' | 'macd';
+export type ScreenerStatusFilter = 'golden' | 'upcoming' | 'both';
+export type ScreenerMode = 'any' | 'all';
+
+export interface ScreenerOptions {
+  indicators: ScreenerIndicator[];
+  mode: ScreenerMode;
+  status: ScreenerStatusFilter;
+  withinBars: number;
+}
+
+export interface ScreenerIndicatorSignal extends CrossSignal {
+  /** 快线/慢线最新值，便于前端展示。 */
+  fast?: number | null;
+  slow?: number | null;
+}
+
+export interface ScreenerEvaluation {
+  kdj: ScreenerIndicatorSignal;
+  macd: ScreenerIndicatorSignal;
+  /** 是否命中筛选条件。 */
+  matched: boolean;
+}
+
+const statusMatches = (status: 'golden' | 'upcoming' | null, filter: ScreenerStatusFilter): boolean => {
+  if (!status) {
+    return false;
+  }
+  return filter === 'both' || status === filter;
+};
+
+/** 对单只股票单周期评估 KDJ/MACD 金叉与即将金叉。 */
+export function evaluateScreener(klines: KlineItem[], options: ScreenerOptions): ScreenerEvaluation | null {
+  if (klines.length < 35) {
+    // MACD(12,26,9) 至少需要 35 根才形成有效 DEA
+    return null;
+  }
+  const closes = klines.map((k) => k.close);
+  const highs = klines.map((k) => k.high);
+  const lows = klines.map((k) => k.low);
+  const macdPack = macd(closes);
+  const kdjPack = kdj(highs, lows, closes);
+
+  const build = (indicator: ScreenerIndicator): ScreenerIndicatorSignal => {
+    const fast = indicator === 'macd' ? macdPack.dif : kdjPack.k;
+    const slow = indicator === 'macd' ? macdPack.dea : kdjPack.d;
+    const golden = detectGoldenCross(fast, slow, options.withinBars);
+    if (golden.status) {
+      return {
+        status: 'golden',
+        barsAgo: golden.barsAgo,
+        fast: Math.round((fast[fast.length - 1] as number) * 100) / 100,
+        slow: Math.round((slow[slow.length - 1] as number) * 100) / 100
+      };
+    }
+    const upcoming = detectUpcomingCross(fast, slow);
+    if (upcoming.status) {
+      return {
+        status: 'upcoming',
+        gap: upcoming.gap,
+        fast: Math.round((fast[fast.length - 1] as number) * 100) / 100,
+        slow: Math.round((slow[slow.length - 1] as number) * 100) / 100
+      };
+    }
+    return { status: null };
+  };
+
+  const signals: Record<ScreenerIndicator, ScreenerIndicatorSignal> = {
+    kdj: options.indicators.includes('kdj') ? build('kdj') : { status: null },
+    macd: options.indicators.includes('macd') ? build('macd') : { status: null }
+  };
+
+  const active = options.indicators.filter((indicator) => signals[indicator].status);
+  const matched =
+    options.mode === 'all'
+      ? options.indicators.length > 0 &&
+        options.indicators.every((indicator) => statusMatches(signals[indicator].status, options.status))
+      : active.some((indicator) => statusMatches(signals[indicator].status, options.status));
+
+  return { kdj: signals.kdj, macd: signals.macd, matched };
+}

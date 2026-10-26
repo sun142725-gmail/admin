@@ -8,6 +8,8 @@ import {
   ExperimentOutlined,
   FileSearchOutlined,
   FileTextOutlined,
+  FilterOutlined,
+  StarOutlined,
   HomeOutlined,
   SafetyOutlined,
   SettingOutlined,
@@ -52,6 +54,8 @@ const getMenuIcon = (item: MenuItem) => {
       '/ai/chat': <MessageOutlined />,
       '/ai/images': <PictureOutlined />,
       '/stock': <StockOutlined />,
+      '/stock/screener': <FilterOutlined />,
+      '/stock/watchlist': <StarOutlined />,
       '/dicts': <BookOutlined />,
       '/notifications/templates': <BookOutlined />,
       '/notifications/publish': <FileTextOutlined />,
@@ -66,6 +70,7 @@ const getMenuIcon = (item: MenuItem) => {
     系统配置: <SettingOutlined />,
     日志管理: <FileSearchOutlined />,
     'AI 中心': <ThunderboltOutlined />,
+    股市: <StockOutlined />,
     工具: <AppstoreOutlined />
   };
   return nameIconMap[item.name];
@@ -109,6 +114,8 @@ const PAGE_CODE_MAP: Record<string, string> = {
   '/ai/chat': 'ai_chat',
   '/ai/images': 'ai_images',
   '/stock': 'stock_roundtable',
+  '/stock/screener': 'stock_screener',
+  '/stock/watchlist': 'stock_watchlist',
   '/dicts': 'config_dict',
   '/notifications/templates': 'notification_template',
   '/notifications/publish': 'notification_publish',

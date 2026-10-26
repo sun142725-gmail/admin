@@ -58,6 +58,7 @@ import { AiUsageLog } from './common/entities/ai-usage-log.entity';
 import { AiImage } from './common/entities/ai-image.entity';
 import { StockRoundtable } from './common/entities/stock-roundtable.entity';
 import { StockRoundtableTurn } from './common/entities/stock-roundtable-turn.entity';
+import { StockWatchlist } from './common/entities/stock-watchlist.entity';
 import { FlowDefinition } from './common/entities/flow-definition.entity';
 import { FlowRun } from './common/entities/flow-run.entity';
 import { FlowRunNode } from './common/entities/flow-run-node.entity';
@@ -103,6 +104,7 @@ const ENTITIES = [
   AiImage,
   StockRoundtable,
   StockRoundtableTurn,
+  StockWatchlist,
   FlowDefinition,
   FlowRun,
   FlowRunNode,
