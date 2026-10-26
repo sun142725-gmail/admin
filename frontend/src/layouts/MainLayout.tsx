@@ -1,6 +1,6 @@
 // 主布局提供菜单、头部与内容容器。
 import React, { useEffect, useMemo, useState } from 'react';
-import { Layout, Menu, Breadcrumb, Dropdown, Space, message, Avatar } from 'antd';
+import { Layout, Menu, Breadcrumb, Dropdown, Space, message, Avatar, Result } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   AppstoreOutlined,
@@ -27,8 +27,8 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMenuTree } from '../api/resources';
 import type { MenuTreeNode } from '../api/resources';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { clearTokens, setProfile } from '../store/authSlice';
-import { profile as fetchProfile, logout as apiLogout } from '../api/auth';
+import { clearTokens } from '../store/authSlice';
+import { logout as apiLogout } from '../api/auth';
 import { enqueueLogEvent } from '../utils/logBatcher';
 
 const { Header, Sider, Content } = Layout;
@@ -148,9 +148,9 @@ export const MainLayout: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchProfile().then((data) => dispatch(setProfile(data)));
+    // profile 由 RequireAuth 统一拉取，这里只取菜单树（此前双份拉取 profile 造成冗余请求）
     fetchMenuTree().then((data) => setMenuTree(data));
-  }, [dispatch]);
+  }, []);
 
   useEffect(() => {
     const pageCode = PAGE_CODE_MAP[location.pathname];
@@ -197,6 +197,27 @@ export const MainLayout: React.FC = () => {
     setOpenKeys(collapsed ? [] : activeParentKeys);
   }, [activeParentKeys, collapsed]);
 
+  // 路由级权限守卫：菜单树自带 path→permissionCode 映射（后端单一事实源）。
+  // 此前仅按钮被 Permission 组件隐藏，登录用户直接输 URL 可进入任意管理页（数据靠后端 403 兜底，体验差）。
+  const permissionByPath = useMemo(() => {
+    const map: Record<string, string> = {};
+    const walk = (nodes: MenuItem[]) => {
+      nodes.forEach((node) => {
+        if (node.path && node.permissionCode) {
+          map[node.path] = node.permissionCode;
+        }
+        if (node.children?.length) {
+          walk(node.children);
+        }
+      });
+    };
+    walk(menuTree);
+    return map;
+  }, [menuTree]);
+
+  const requiredPermission = permissionByPath[location.pathname];
+  const pageForbidden = Boolean(requiredPermission) && !permissions.includes(requiredPermission);
+
   const breadcrumbMap = useMemo(() => {
     const map = new Map<string, string[]>();
     const walk = (nodes: MenuItem[], parents: string[]) => {
@@ -235,10 +256,14 @@ export const MainLayout: React.FC = () => {
   }, [breadcrumbMap, location.pathname]);
 
   const onLogout = async () => {
-    await apiLogout();
-    dispatch(clearTokens());
-    message.success('已退出登录');
-    navigate('/login');
+    // 登出接口失败（断网/5xx）也必须清理本地令牌退出，否则用户被卡在系统内
+    try {
+      await apiLogout();
+    } finally {
+      dispatch(clearTokens());
+      message.success('已退出登录');
+      navigate('/login');
+    }
   };
 
   const onProfile = () => {
@@ -345,7 +370,15 @@ export const MainLayout: React.FC = () => {
           <div className="app-content-inner">
             <Breadcrumb items={breadcrumbItems} className="app-breadcrumb" />
             <div className="app-page-panel">
-            <Outlet />
+            {pageForbidden ? (
+              <Result
+                status="403"
+                title="无访问权限"
+                subTitle={`当前账号没有该页面（${requiredPermission}）的访问权限，请联系管理员开通。`}
+              />
+            ) : (
+              <Outlet />
+            )}
             </div>
           </div>
         </Content>

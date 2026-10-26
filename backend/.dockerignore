@@ -1,0 +1,12 @@
+# 防止密钥与本地产物进入镜像层
+.env
+.env.*
+!.env.example
+node_modules
+dist
+coverage
+test
+uploads
+*.tmp.js
+*.tmp.js.map
+*.tsbuildinfo

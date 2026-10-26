@@ -19,8 +19,12 @@ export const PermissionsPage: React.FC = () => {
   const [form] = Form.useForm();
 
   const fetchData = async () => {
-    const res = await listPermissions();
-    setData(res.items ?? []);
+    try {
+      const res = await listPermissions();
+      setData(res.items ?? []);
+    } catch {
+      message.error('权限列表加载失败');
+    }
   };
 
   useEffect(() => {
@@ -35,27 +39,49 @@ export const PermissionsPage: React.FC = () => {
 
   const onEdit = (item: PermissionItem) => {
     setEditItem(item);
+    // setFieldsValue 是浅合并：先重置，避免上一个编辑对象的描述字段残留到本次表单
+    form.resetFields();
     form.setFieldsValue(item);
     setOpen(true);
   };
 
   const onSubmit = async () => {
-    const values = await form.validateFields();
-    if (editItem) {
-      await updatePermission(editItem.id, values);
-      message.success('更新成功');
-    } else {
-      await createPermission(values);
-      message.success('创建成功');
+    let values;
+    try {
+      values = await form.validateFields();
+    } catch {
+      return;
     }
-    setOpen(false);
-    fetchData();
+    try {
+      if (editItem) {
+        await updatePermission(editItem.id, values);
+        message.success('更新成功');
+      } else {
+        await createPermission(values);
+        message.success('创建成功');
+      }
+      setOpen(false);
+      fetchData();
+    } catch (error) {
+      message.error(error instanceof Error && error.message ? error.message : '操作失败');
+    }
   };
 
-  const onDelete = async (item: PermissionItem) => {
-    await deletePermission(item.id);
-    message.success('删除成功');
-    fetchData();
+  const onDelete = (item: PermissionItem) => {
+    Modal.confirm({
+      title: '删除权限',
+      content: `确认删除权限「${item.name}」？该操作不可恢复。`,
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deletePermission(item.id);
+          message.success('删除成功');
+          fetchData();
+        } catch (error) {
+          message.error(error instanceof Error && error.message ? error.message : '删除失败');
+        }
+      }
+    });
   };
 
   const columns = [

@@ -81,6 +81,10 @@ export class RolesService {
       throw new NotFoundException('角色不存在');
     }
     const permissions = await this.permissionRepo.findBy({ id: In(dto.permissionIds) });
+    // 静默丢弃不存在的 ID 会让调用方误以为授权成功（传错 ID 甚至清空全部权限），必须显式报错
+    if (new Set(dto.permissionIds).size !== permissions.length) {
+      throw new BadRequestException('部分权限不存在，请刷新后重试');
+    }
     role.permissions = permissions;
     await this.roleRepo.save(role);
     await this.auditService.log('assign_permissions', 'roles', `为角色 ${role.name} 分配权限`, operatorId, ip);

@@ -8,6 +8,8 @@ import { NotificationTriggerService } from '../notification/notification-trigger
 import { sendSmsVerifyCode } from '../../utils/aliyun-sms';
 
 const LOGIN_TEMPLATE_CODE = 'LOGIN_TEMPLATE_CODE';
+// 单条验证码最大校验失败次数：6 位码空间 90 万，不限次校验可在线暴力枚举
+const MAX_VERIFY_FAILS = 5;
 
 @Injectable()
 export class VerificationCodeService {
@@ -91,7 +93,9 @@ export class VerificationCodeService {
       target,
       channel,
       scene,
-      code: process.env.NODE_ENV === 'production' ? undefined : code
+      // 仅显式 development 回显验证码便于联调；此前是"非 production 即回显"，
+      // 线上一旦漏配 NODE_ENV，任意账号可经发码接口直接拿到验证码完成接管
+      code: process.env.NODE_ENV === 'development' ? code : undefined
     };
   }
 
@@ -110,7 +114,15 @@ export class VerificationCodeService {
       throw new UnauthorizedException('验证码已过期');
     }
     if (record.codeHash !== this.hash(code)) {
-      throw new UnauthorizedException('验证码错误');
+      record.failCount += 1;
+      if (record.failCount >= MAX_VERIFY_FAILS) {
+        // 连续错太多次直接作废，逼迫重新获取
+        record.consumedAt = new Date();
+      }
+      await this.codeRepo.save(record);
+      throw new UnauthorizedException(
+        record.failCount >= MAX_VERIFY_FAILS ? '错误次数过多，验证码已作废，请重新获取' : '验证码错误'
+      );
     }
     record.consumedAt = new Date();
     await this.codeRepo.save(record);

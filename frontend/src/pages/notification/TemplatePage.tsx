@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { sanitizeHtml } from '../../utils/sanitize';
 import { Button, Drawer, Form, Input, Modal, Select, Space, Switch, Tag, message } from 'antd';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -454,7 +455,7 @@ export const TemplatePage: React.FC = () => {
               <Form.Item label="变量预览">
                 <div
                   className="preview-box"
-                  dangerouslySetInnerHTML={{ __html: highlightedPreview }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(highlightedPreview) }}
                 />
               </Form.Item>
             </div>

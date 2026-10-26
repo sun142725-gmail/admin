@@ -346,28 +346,35 @@ export class FlowEngineService implements OnModuleDestroy {
   }
 
   // 看门狗：running 超过 30 分钟无更新（服务重启/进程被杀）→ 标记失败，避免悬挂。
+  // 整体 try/catch：定时回调的异常无人接住，DB 一次闪断就会以未处理 Promise 拒绝打崩整个进程
   @Interval(60000)
   async watchdog() {
     if (process.env.NODE_ENV === 'test') {
       return;
     }
-    const stuck = await this.runRepo
-      .createQueryBuilder('run')
-      .where('run.status = :status', { status: 'running' })
-      .andWhere('run.updatedAt < :before', { before: new Date(Date.now() - 30 * 60 * 1000) })
-      .getMany();
-    for (const run of stuck) {
-      if (this.active.has(run.id)) {
-        continue; // 仍在正常执行（长视频节点）
+    try {
+      const stuck = await this.runRepo
+        .createQueryBuilder('run')
+        .where('run.status = :status', { status: 'running' })
+        .andWhere('run.updatedAt < :before', { before: new Date(Date.now() - 30 * 60 * 1000) })
+        .getMany();
+      for (const run of stuck) {
+        if (this.active.has(run.id)) {
+          continue; // 仍在正常执行（长视频节点）
+        }
+        this.logger.warn(`运行 ${run.id} 疑似中断（服务重启），标记失败`);
+        await this.runNodeRepo
+          .createQueryBuilder()
+          .update(FlowRunNode)
+          .set({ status: 'failed', error: '服务重启导致执行中断' })
+          .where('runId = :runId AND status IN (:...statuses)', { runId: run.id, statuses: ['pending', 'running'] })
+          .execute();
+        await this.finalize(run.id, 'failed', '服务重启导致执行中断');
       }
-      this.logger.warn(`运行 ${run.id} 疑似中断（服务重启），标记失败`);
-      await this.runNodeRepo
-        .createQueryBuilder()
-        .update(FlowRunNode)
-        .set({ status: 'failed', error: '服务重启导致执行中断' })
-        .where('runId = :runId AND status IN (:...statuses)', { runId: run.id, statuses: ['pending', 'running'] })
-        .execute();
-      await this.finalize(run.id, 'failed', '服务重启导致执行中断');
+    } catch (error) {
+      this.logger.error(
+        `flow 看门狗执行失败: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 }

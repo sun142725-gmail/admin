@@ -17,6 +17,7 @@ import { DivinationModule } from './modules/divination/divination.module';
 import { AuditCenterModule } from './modules/audit-center/audit-center.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { LogCenterModule } from './modules/log-center/log-center.module';
+import { HealthModule } from './modules/health/health.module';
 import { DictModule } from './modules/dict/dict.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -67,6 +68,49 @@ import { FlowModule } from './modules/flow/flow.module';
 
 const isTest = process.env.NODE_ENV === 'test';
 
+// 实体清单只维护一份：此前 test/sqlite 与 mysql 两份各列 40 行，新增实体漏同步只在单环境炸出
+const ENTITIES = [
+  User,
+  Role,
+  Permission,
+  Resource,
+  AuditLog,
+  Divination,
+  DivinationLine,
+  TrackLog,
+  FrontendLog,
+  ErrorLog,
+  Dict,
+  DictItem,
+  NotificationTemplate,
+  NotificationPublish,
+  NotificationMessage,
+  UserIdentifier,
+  VerificationCode,
+  FileAsset,
+  Family,
+  FamilyMember,
+  FamilyInviteCode,
+  FamilyTodo,
+  FamilyAnnouncement,
+  FamilyMilestone,
+  UserSetting,
+  AiModel,
+  AiAgent,
+  AiConversation,
+  AiMessage,
+  AiUsageLog,
+  AiImage,
+  StockRoundtable,
+  StockRoundtableTurn,
+  FlowDefinition,
+  FlowRun,
+  FlowRunNode,
+  NovelProject,
+  NovelChapter,
+  NovelShot
+];
+
 @Module({
   imports: [
     ThrottlerModule.forRoot({
@@ -84,47 +128,7 @@ const isTest = process.env.NODE_ENV === 'test';
         ? {
             type: 'sqlite',
             database: ':memory:',
-            entities: [
-              User,
-              Role,
-              Permission,
-              Resource,
-              AuditLog,
-              Divination,
-              DivinationLine,
-              TrackLog,
-              FrontendLog,
-              ErrorLog,
-              Dict,
-              DictItem,
-              NotificationTemplate,
-              NotificationPublish,
-              NotificationMessage,
-              UserIdentifier,
-              VerificationCode,
-              FileAsset,
-              Family,
-              FamilyMember,
-              FamilyInviteCode,
-              FamilyTodo,
-              FamilyAnnouncement,
-              FamilyMilestone,
-              UserSetting,
-              AiModel,
-              AiAgent,
-              AiConversation,
-              AiMessage,
-              AiUsageLog,
-              AiImage,
-              StockRoundtable,
-              StockRoundtableTurn,
-              FlowDefinition,
-              FlowRun,
-              FlowRunNode,
-              NovelProject,
-              NovelChapter,
-              NovelShot
-            ],
+            entities: ENTITIES,
             synchronize: true
           }
         : {
@@ -134,47 +138,7 @@ const isTest = process.env.NODE_ENV === 'test';
             username: process.env.DB_USERNAME,
             password: process.env.DB_PASSWORD,
             database: process.env.DB_NAME,
-            entities: [
-              User,
-              Role,
-              Permission,
-              Resource,
-              AuditLog,
-              Divination,
-              DivinationLine,
-              TrackLog,
-              FrontendLog,
-              ErrorLog,
-              Dict,
-              DictItem,
-              NotificationTemplate,
-              NotificationPublish,
-              NotificationMessage,
-              UserIdentifier,
-              VerificationCode,
-              FileAsset,
-              Family,
-              FamilyMember,
-              FamilyInviteCode,
-              FamilyTodo,
-              FamilyAnnouncement,
-              FamilyMilestone,
-              UserSetting,
-              AiModel,
-              AiAgent,
-              AiConversation,
-              AiMessage,
-              AiUsageLog,
-              AiImage,
-              StockRoundtable,
-              StockRoundtableTurn,
-              FlowDefinition,
-              FlowRun,
-              FlowRunNode,
-              NovelProject,
-              NovelChapter,
-              NovelShot
-            ],
+            entities: ENTITIES,
             synchronize: process.env.DB_SYNC === 'true'
           }
     ),
@@ -191,6 +155,7 @@ const isTest = process.env.NODE_ENV === 'test';
     ProfileModule,
     FilesModule,
     LogCenterModule,
+    HealthModule,
     DictModule,
     NotificationModule,
     DashboardModule,

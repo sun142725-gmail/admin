@@ -165,19 +165,34 @@ export class NotificationService {
     const variableValues = this.normalizeVariables(payload.variables);
     this.validateTemplateContent(template, variableValues, channelType);
 
-    const insertResult = await this.publishRepo.insert({
-      templateId: template.id,
-      channelType,
-      payload: {
-        recipients: normalizedRecipients,
-        variables: variableValues,
-        title: payload.title ?? template.name,
-        extra: payload.extra
-      },
-      status: 'sending',
-      retryCount: 0,
-      idempotencyKey: payload.idempotencyKey
-    });
+    let insertResult: Awaited<ReturnType<typeof this.publishRepo.insert>>;
+    try {
+      insertResult = await this.publishRepo.insert({
+        templateId: template.id,
+        channelType,
+        payload: {
+          recipients: normalizedRecipients,
+          variables: variableValues,
+          title: payload.title ?? template.name,
+          extra: payload.extra
+        },
+        status: 'sending',
+        retryCount: 0,
+        idempotencyKey: payload.idempotencyKey
+      });
+    } catch (error) {
+      // 幂等键唯一索引冲突：并发携带同一 key 的请求，后到者直接返回先到者的发布记录
+      const message = error instanceof Error ? error.message : String(error);
+      if (payload.idempotencyKey && (message.includes('UNIQUE') || message.includes('ER_DUP_ENTRY') || message.includes('duplicate key'))) {
+        const existing = await this.publishRepo.findOne({
+          where: { idempotencyKey: payload.idempotencyKey }
+        });
+        if (existing) {
+          return existing;
+        }
+      }
+      throw error;
+    }
     const publishId = Number(insertResult.identifiers?.[0]?.id);
     const publish = await this.publishRepo.findOne({ where: { id: publishId } });
     if (!publish) {

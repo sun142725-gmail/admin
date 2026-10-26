@@ -1,6 +1,6 @@
 // 查询通知模板 DTO 用于列表筛选。
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class QueryTemplateDto {
   @IsOptional()
@@ -22,5 +22,6 @@ export class QueryTemplateDto {
   @IsInt()
   @Type(() => Number)
   @Min(1)
+  @Max(100)
   pageSize?: number;
 }

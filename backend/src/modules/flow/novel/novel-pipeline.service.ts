@@ -497,7 +497,21 @@ export class NovelPipelineService implements OnModuleDestroy {
   }
 
   async list() {
-    const projects = await this.projectRepo.find({ order: { id: 'DESC' } });
+    // 列表不需要整本原文（longtext，随项目数线性放大传输/序列化），只取展示与统计字段
+    const projects = await this.projectRepo.find({
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        stage: true,
+        stageMessage: true,
+        finalVideoPath: true,
+        error: true,
+        durationMs: true,
+        createdAt: true
+      },
+      order: { id: 'DESC' }
+    });
     if (projects.length === 0) {
       return [];
     }

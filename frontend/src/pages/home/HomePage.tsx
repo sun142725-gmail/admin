@@ -75,7 +75,7 @@ export const HomePage: React.FC = () => {
     <div>
       <Space className="w-full justify-between mb-2">
         <Title level={3} className="!mb-0">
-          系统资源总览--------
+          系统资源总览
         </Title>
         <Space>
           <Tooltip

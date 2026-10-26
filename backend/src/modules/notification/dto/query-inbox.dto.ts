@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class QueryInboxDto {
   @IsOptional()
@@ -20,5 +20,6 @@ export class QueryInboxDto {
   @IsInt()
   @Type(() => Number)
   @Min(1)
+  @Max(100)
   pageSize?: number;
 }

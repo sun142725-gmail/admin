@@ -417,6 +417,10 @@ export class RoundtableService implements OnModuleInit, OnModuleDestroy {
       clearInterval(heartbeat);
       this.heartbeatTimers.delete(id);
     }
+    // 事件缓冲（含全部专家输出文本）与心跳时间戳必须一并移除，
+    // 否则删除会议后这些条目会滞留内存直到进程重启
+    this.streams.delete(id);
+    this.lastEmitAt.delete(id);
   }
 
   private finish(id: number, errorMessage?: string) {

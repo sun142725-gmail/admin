@@ -31,6 +31,8 @@ export const UsersPage: React.FC = () => {
     try {
       const res = await listUsers();
       setData(res.items);
+    } catch {
+      message.error('用户列表加载失败');
     } finally {
       setLoading(false);
     }
@@ -54,28 +56,50 @@ export const UsersPage: React.FC = () => {
 
   const onEdit = (item: UserItem) => {
     setEditItem(item);
+    // setFieldsValue 是浅合并：先重置，避免上一个编辑对象的可选字段残留到本次表单
+    form.resetFields();
     form.setFieldsValue(item);
     setOpen(true);
   };
 
   const onSubmit = async () => {
-    const values = await form.validateFields();
-    if (editItem) {
-      const { username, ...payload } = values;
-      await updateUser(editItem.id, payload);
-      message.success('更新成功');
-    } else {
-      await createUser(values);
-      message.success('创建成功');
+    let values;
+    try {
+      values = await form.validateFields();
+    } catch {
+      return;
     }
-    setOpen(false);
-    fetchData();
+    try {
+      if (editItem) {
+        const { username, ...payload } = values;
+        await updateUser(editItem.id, payload);
+        message.success('更新成功');
+      } else {
+        await createUser(values);
+        message.success('创建成功');
+      }
+      setOpen(false);
+      fetchData();
+    } catch (error) {
+      message.error(error instanceof Error && error.message ? error.message : '操作失败');
+    }
   };
 
-  const onDelete = async (item: UserItem) => {
-    await deleteUser(item.id);
-    message.success('删除成功');
-    fetchData();
+  const onDelete = (item: UserItem) => {
+    Modal.confirm({
+      title: '删除用户',
+      content: `确认删除用户「${item.username}」？该操作不可恢复。`,
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deleteUser(item.id);
+          message.success('删除成功');
+          fetchData();
+        } catch (error) {
+          message.error(error instanceof Error && error.message ? error.message : '删除失败');
+        }
+      }
+    });
   };
 
   const onDisable = async (item: UserItem) => {
@@ -102,14 +126,23 @@ export const UsersPage: React.FC = () => {
   };
 
   const submitRoles = async () => {
-    const values = await roleForm.validateFields();
+    let values;
+    try {
+      values = await roleForm.validateFields();
+    } catch {
+      return;
+    }
     if (!currentUser) {
       return;
     }
-    await assignRoles(currentUser.id, values.roleIds);
-    message.success('角色已更新');
-    setRoleModalOpen(false);
-    fetchData();
+    try {
+      await assignRoles(currentUser.id, values.roleIds);
+      message.success('角色已更新');
+      setRoleModalOpen(false);
+      fetchData();
+    } catch (error) {
+      message.error(error instanceof Error && error.message ? error.message : '角色分配失败');
+    }
   };
 
   const columns = useMemo(

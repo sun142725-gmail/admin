@@ -19,6 +19,8 @@ import {
 
 interface ChatBubble extends Pick<AiChatMessage, 'role' | 'content' | 'status'> {
   streaming?: boolean;
+  // 列表项稳定 key：regenerate 会弹出/追加气泡，用 index 作 key 会与结构变化冲突导致复用错乱
+  key: string;
 }
 
 const WELCOME_HINT = '选择一个智能体或直接输入问题开始对话。';
@@ -35,6 +37,9 @@ export const ChatPage: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const abortRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  // 流式/本地生成的气泡没有消息 id，用自增序号生成稳定 key
+  const bubbleKeySeq = useRef(0);
+  const nextBubbleKey = () => `b${++bubbleKeySeq.current}`;
 
   const { agentId, modelId } = useMemo(() => {
     const [kind, id] = (target ?? ':').split(':');
@@ -64,6 +69,10 @@ export const ChatPage: React.FC = () => {
   useEffect(() => {
     void loadConversations();
     void loadPickers();
+    // 卸载时中止进行中的 SSE：否则离开页面后流仍在后台跑到结束并触发会话列表刷新
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [loadConversations, loadPickers]);
 
   // 滚动到底部。
@@ -79,7 +88,7 @@ export const ChatPage: React.FC = () => {
       setBubbles(
         messages
           .filter((item) => item.role !== 'system')
-          .map((item) => ({ role: item.role as 'user' | 'assistant', content: item.content, status: item.status }))
+          .map((item) => ({ key: `m${item.id}`, role: item.role as 'user' | 'assistant', content: item.content, status: item.status }))
       );
     },
     []
@@ -98,7 +107,7 @@ export const ChatPage: React.FC = () => {
       abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
       setGenerating(true);
-      setBubbles((prev) => [...prev, { role: 'assistant', content: '', status: 'ok', streaming: true }]);
+      setBubbles((prev) => [...prev, { key: nextBubbleKey(), role: 'assistant', content: '', status: 'ok', streaming: true }]);
       try {
         await streamChat(targetMessageId, {
           signal,
@@ -131,6 +140,7 @@ export const ChatPage: React.FC = () => {
               const last = next[next.length - 1];
               const partial = last?.content ?? '';
               next[next.length - 1] = {
+                key: last?.key ?? nextBubbleKey(),
                 role: 'assistant',
                 content: partial ? `${partial}\n\n⚠ ${messageText}` : `⚠ ${messageText}`,
                 status: 'failed',
@@ -159,7 +169,7 @@ export const ChatPage: React.FC = () => {
       return;
     }
     setInput('');
-    setBubbles((prev) => [...prev, { role: 'user', content, status: 'ok' }]);
+    setBubbles((prev) => [...prev, { key: nextBubbleKey(), role: 'user', content, status: 'ok' }]);
     try {
       const result = await submitChat({ conversationId: activeId ?? undefined, agentId, modelId, content });
       if (!activeId) {
@@ -344,9 +354,9 @@ export const ChatPage: React.FC = () => {
           {bubbles.length === 0 ? (
             <Empty description={selectedAgent?.openingLine ?? WELCOME_HINT} imageStyle={{ height: 60 }} className="mt-20" />
           ) : (
-            bubbles.map((bubble, index) => (
+            bubbles.map((bubble) => (
               <div
-                key={index}
+                key={bubble.key}
                 className={`flex mb-3 ${bubble.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div

@@ -23,7 +23,8 @@ export class UsersController {
   @Get()
   @Permissions('system:user:list')
   async list(@Query('page') page?: string, @Query('pageSize') pageSize?: string) {
-    return this.usersService.list(Number(page ?? 1), Number(pageSize ?? 20));
+    // 分页封顶防止 ?pageSize=999999 拉全表
+    return this.usersService.list(Number(page ?? 1), Math.min(Number(pageSize ?? 20), 100));
   }
 
   @Post()

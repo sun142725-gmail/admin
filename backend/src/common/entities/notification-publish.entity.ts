@@ -1,9 +1,11 @@
 // 通知发布实体记录发送任务与状态。
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { NotificationTemplate } from './notification-template.entity';
 
 @Entity('notification_publishes')
+// 幂等键唯一索引：并发携带同一 key 的请求靠 DB 约束兜底，check-then-insert 存在竞态窗口
+@Index(['idempotencyKey'], { unique: true })
 export class NotificationPublish extends BaseEntity {
   @Column({ name: 'template_id' })
   templateId!: number;

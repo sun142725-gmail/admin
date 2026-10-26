@@ -63,6 +63,18 @@ http.interceptors.response.use(
       }
     }
     if (payload?.code !== 0) {
+      // HTTP 200 但业务码非 0：同样上报日志中心（HTTP 错误分支在上报，这里此前是盲区）
+      if (!url.includes(LOG_ENDPOINT)) {
+        const headerTraceId = (config?.headers?.['x-trace-id'] as string | undefined) ?? undefined;
+        enqueueLogEvent({
+          type: 'error',
+          traceId: headerTraceId,
+          payload: {
+            message: `业务失败 ${(config.method ?? 'GET').toUpperCase()} ${url}: ${payload?.message ?? ''}`,
+            meta: { code: payload?.code, url }
+          }
+        });
+      }
       return Promise.reject(new Error(payload?.message ?? '请求失败'));
     }
     return payload.data;
@@ -122,6 +134,10 @@ http.interceptors.response.use(
             return;
           }
           config.headers.Authorization = `Bearer ${token}`;
+          // 重放请求同样标记 _retry：若重放再次 401（tokenVersion 变更等），直接失败不再触发第二轮刷新
+          (config as any)._retry = true;
+          // 重置计时起点，否则慢请求日志会把 token 刷新耗时也算进接口耗时
+          (config as any).metadata = { startTime: Date.now() };
           resolve(http(config));
         });
       });

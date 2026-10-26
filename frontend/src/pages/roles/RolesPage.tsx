@@ -22,8 +22,12 @@ export const RolesPage: React.FC = () => {
   const [form] = Form.useForm();
 
   const fetchData = async () => {
-    const res = await listRoles(1, 200);
-    setData(res.items ?? []);
+    try {
+      const res = await listRoles(1, 200);
+      setData(res.items ?? []);
+    } catch {
+      message.error('角色列表加载失败');
+    }
   };
 
   useEffect(() => {
@@ -38,27 +42,49 @@ export const RolesPage: React.FC = () => {
 
   const onEdit = (item: RoleItem) => {
     setEditItem(item);
+    // setFieldsValue 是浅合并：先重置，避免上一个编辑对象的描述字段残留到本次表单
+    form.resetFields();
     form.setFieldsValue(item);
     setOpen(true);
   };
 
   const onSubmit = async () => {
-    const values = await form.validateFields();
-    if (editItem) {
-      await updateRole(editItem.id, values);
-      message.success('更新成功');
-    } else {
-      await createRole(values);
-      message.success('创建成功');
+    let values;
+    try {
+      values = await form.validateFields();
+    } catch {
+      return;
     }
-    setOpen(false);
-    fetchData();
+    try {
+      if (editItem) {
+        await updateRole(editItem.id, values);
+        message.success('更新成功');
+      } else {
+        await createRole(values);
+        message.success('创建成功');
+      }
+      setOpen(false);
+      fetchData();
+    } catch (error) {
+      message.error(error instanceof Error && error.message ? error.message : '操作失败');
+    }
   };
 
-  const onDelete = async (item: RoleItem) => {
-    await deleteRole(item.id);
-    message.success('删除成功');
-    fetchData();
+  const onDelete = (item: RoleItem) => {
+    Modal.confirm({
+      title: '删除角色',
+      content: `确认删除角色「${item.name}」？该操作不可恢复。`,
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deleteRole(item.id);
+          message.success('删除成功');
+          fetchData();
+        } catch (error) {
+          message.error(error instanceof Error && error.message ? error.message : '删除失败');
+        }
+      }
+    });
   };
 
   const columns = [

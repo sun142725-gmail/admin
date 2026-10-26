@@ -49,12 +49,19 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-# Secrets / env（根目录 .env 不入库；backend/.env 与 backend/.env.development 按需入库）
+# Secrets / env（任何含真实密钥的 env 一律不入库，示例文件 .env.example 除外。
+# 填好的 backend/.env 曾携带真实 API Key/SMTP 授权码/AES 主密钥入库，已出库并需轮换密钥）
+backend/.env
+backend/.env.development
 backend/.env.local
 /.env
 deploy/.env.production
 deploy/generated/
 backend/uploads/
+
+# 临时探针/验证脚本
+*.tmp.js
+*.tmp.js.map
 
 # TypeScript incremental build cache
 *.tsbuildinfo

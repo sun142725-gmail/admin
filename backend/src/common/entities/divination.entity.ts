@@ -1,9 +1,11 @@
 // 占卜实体用于记录主题与解卦结果。
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity, Index, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { DivinationLine } from './divination-line.entity';
 
 @Entity('divinations')
+// “我的占卜”列表按 userId 过滤分页，无索引时全表扫描
+@Index(['userId'])
 export class Divination extends BaseEntity {
   @Column()
   topic!: string;

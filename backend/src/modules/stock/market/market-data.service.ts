@@ -128,12 +128,32 @@ async function fetchJson<T>(
 @Injectable()
 export class MarketDataService {
   private readonly logger = new Logger(MarketDataService.name);
+  // 缓存条目上限：过期条目只惰性删除，不设上限时用户查过的每只陌生股票的 K 线数组都会常驻内存
+  private static readonly MAX_CACHE_KEYS = 200;
   private readonly quoteCache = new Map<string, CacheEntry<QuoteSnapshot>>();
   private readonly klineCache = new Map<string, CacheEntry<{ name: string; items: KlineItem[] }>>();
   private readonly sectorCache = new Map<string, CacheEntry<{ total: number; items: SectorItem[] }>>();
   private readonly overviewCache = new Map<string, CacheEntry<MarketOverview>>();
   private readonly announcementCache = new Map<string, CacheEntry<AnnouncementItem[]>>();
   private readonly financialsCache = new Map<string, CacheEntry<ThsFinancials | null>>();
+
+  // 超限时淘汰最旧的 key（Map 迭代序即插入序），并顺带清理已过期条目
+  private evictIfNeeded<T>(cache: Map<string, CacheEntry<T>>, ttl: number) {
+    if (cache.size <= MarketDataService.MAX_CACHE_KEYS) {
+      return;
+    }
+    for (const [key, entry] of cache) {
+      if (Date.now() - entry.at > ttl) {
+        cache.delete(key);
+      }
+    }
+    for (const key of cache.keys()) {
+      if (cache.size <= MarketDataService.MAX_CACHE_KEYS) {
+        break;
+      }
+      cache.delete(key);
+    }
+  }
 
   private getCache<T>(cache: Map<string, CacheEntry<T>>, key: string, ttl: number): T | null {
     const entry = cache.get(key);
@@ -168,6 +188,7 @@ export class MarketDataService {
       const fetched = await this.fetchQuotesWithFallback(missing);
       for (const snapshot of fetched) {
         this.quoteCache.set(snapshot.symbol, { at: now, data: snapshot });
+        this.evictIfNeeded(this.quoteCache, QUOTE_TTL_MS);
       }
       const fetchedMap = new Map(fetched.map((s) => [s.symbol, s]));
       result.push(...missing.map((s) => fetchedMap.get(s)).filter((s): s is QuoteSnapshot => !!s));
@@ -238,6 +259,7 @@ export class MarketDataService {
       throw new ServiceUnavailableException(`未查询到 ${symbol} 的 K 线数据（已尝试东财/腾讯/新浪），请稍后重试`);
     }
     this.klineCache.set(key, { at: Date.now(), data: parsed });
+    this.evictIfNeeded(this.klineCache, KLINE_TTL_MS);
     return parsed;
   }
 
@@ -283,6 +305,7 @@ export class MarketDataService {
       }
     }
     this.sectorCache.set(type, { at: Date.now(), data: parsed });
+    this.evictIfNeeded(this.sectorCache, SECTOR_TTL_MS);
     return parsed;
   }
 
@@ -442,6 +465,7 @@ export class MarketDataService {
     const items = parseCninfoAnnouncements(payload?.announcements ?? [], limit);
     if (items.length > 0) {
       this.announcementCache.set(code, { at: Date.now(), data: items });
+      this.evictIfNeeded(this.announcementCache, SECTOR_TTL_MS);
     }
     return items;
   }
@@ -462,6 +486,7 @@ export class MarketDataService {
     }).catch(() => '');
     const parsed = parseThsFinancials(html);
     this.financialsCache.set(code, { at: Date.now(), data: parsed });
+    this.evictIfNeeded(this.financialsCache, 30 * 60 * 1000);
     return parsed;
   }
 
@@ -492,6 +517,7 @@ export class MarketDataService {
       bottomSectors: sorted.slice(-5).reverse()
     };
     this.overviewCache.set('default', { at: Date.now(), data: overview });
+    this.evictIfNeeded(this.overviewCache, OVERVIEW_TTL_MS);
     return overview;
   }
 }

@@ -225,16 +225,21 @@ export class FamilyService {
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
-    const family = await this.familyRepo.save(this.familyRepo.create({ ...dto, ownerId: userId }));
-    await this.memberRepo.save(
-      this.memberRepo.create({
-        familyId: family.id,
-        userId,
-        nickname: this.memberNickname(user),
-        role: 'owner',
-        joinedAt: new Date()
-      })
-    );
+    // 家庭与房主成员必须同事务写入：成员写入失败会留下无主家庭，requireOwner 永远 403 只能修库
+    const family = await this.familyRepo.manager.transaction(async (manager) => {
+      const created = await manager.save(Family, manager.create(Family, { ...dto, ownerId: userId }));
+      await manager.save(
+        FamilyMember,
+        manager.create(FamilyMember, {
+          familyId: created.id,
+          userId,
+          nickname: this.memberNickname(user),
+          role: 'owner',
+          joinedAt: new Date()
+        })
+      );
+      return created;
+    });
     await this.switchFamily(userId, family.id);
     return this.formatFamily(family);
   }
@@ -258,15 +263,24 @@ export class FamilyService {
       throw new BadRequestException('家庭人数已满');
     }
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    await this.memberRepo.save(
-      this.memberRepo.create({
-        familyId: invite.familyId,
-        userId,
-        nickname: this.memberNickname(user),
-        role: 'member',
-        joinedAt: new Date()
-      })
-    );
+    try {
+      await this.memberRepo.save(
+        this.memberRepo.create({
+          familyId: invite.familyId,
+          userId,
+          nickname: this.memberNickname(user),
+          role: 'member',
+          joinedAt: new Date()
+        })
+      );
+    } catch (error) {
+      // 并发加入撞 (familyId,userId) 唯一索引时 DB 抛驱动错误，转成友好提示而非 500
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('UNIQUE') || message.includes('ER_DUP_ENTRY') || message.includes('duplicate key')) {
+        throw new BadRequestException('已加入该家庭');
+      }
+      throw error;
+    }
     await this.switchFamily(userId, invite.familyId);
     return { familyId: String(invite.familyId), name: invite.family.name, joined: true };
   }

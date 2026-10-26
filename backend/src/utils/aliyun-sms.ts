@@ -45,8 +45,7 @@ export async function sendSmsVerifyCode(params: {
   const response = await getClient().sendSmsWithOptions(request, runtime);
   const body = response.body;
   if (body?.code && body.code !== 'OK') {
-    console.log(request)
-    console.log('2222', body.message)
+    // 上游返回的业务错误（含手机号）不得打印到 stdout，直接抛给调用方记录
     throw new Error(body.message || body.code);
   }
   return body;

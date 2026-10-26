@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { sanitizeHtml } from '../../utils/sanitize';
 import { Button, Modal, Select, Space, Tag, Typography, message } from 'antd';
 import { AppTable } from '../../components/AppTable';
 import { Permission } from '../../components/permission/Permission';
@@ -149,7 +150,7 @@ export const InboxPage: React.FC = () => {
         <Typography.Paragraph type="secondary">
           模板：{selectedItem?.publish?.template?.name ?? '-'} | 消息ID：{selectedItem?.id ?? '-'}
         </Typography.Paragraph>
-        <div dangerouslySetInnerHTML={{ __html: selectedItem?.content ?? '' }} />
+        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedItem?.content) }} />
       </Modal>
     </div>
   );

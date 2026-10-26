@@ -793,7 +793,9 @@ export class SeedService implements OnModuleInit {
   }
 
   private async seedAdminUser(role: Role) {
-    const passwordHash = await bcrypt.hash('password', 10);
+    // 初始密码可经 SEED_ADMIN_PASSWORD 注入；默认弱口令仅限本地开发，生产必须在 compose 注入强密码
+    const initialPassword = process.env.SEED_ADMIN_PASSWORD || 'password';
+    const passwordHash = await bcrypt.hash(initialPassword, 10);
     const user = this.userRepo.create({
       username: 'admin',
       passwordHash,

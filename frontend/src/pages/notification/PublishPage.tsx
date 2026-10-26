@@ -1,5 +1,6 @@
 // 通知发布页面提供发布弹窗与发送记录查询。
 import React, { useEffect, useMemo, useState } from 'react';
+import { sanitizeHtml } from '../../utils/sanitize';
 import { Alert, Button, Descriptions, Drawer, Form, Input, Modal, Select, Space, Tag, Typography, message } from 'antd';
 import { AppTable } from '../../components/AppTable';
 import { Permission } from '../../components/permission/Permission';
@@ -520,7 +521,7 @@ export const PublishPage: React.FC = () => {
                     children: (
                       <div
                         className="preview-card-sm"
-                        dangerouslySetInnerHTML={{ __html: detail.template?.content ?? '-' }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(detail.template?.content ?? '-') }}
                       />
                     )
                   },
@@ -531,7 +532,7 @@ export const PublishPage: React.FC = () => {
                       <div
                         className="preview-card-sm"
                         dangerouslySetInnerHTML={{
-                          __html: renderContent(detail.template?.content, detail.payload?.variables)
+                          __html: sanitizeHtml(renderContent(detail.template?.content, detail.payload?.variables))
                         }}
                       />
                     )

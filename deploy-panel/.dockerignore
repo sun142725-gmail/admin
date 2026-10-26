@@ -1,0 +1,5 @@
+# 防止本地密钥与日志进入镜像层
+.env
+logs
+task.lock
+node_modules

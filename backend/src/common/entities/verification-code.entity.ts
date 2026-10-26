@@ -31,4 +31,8 @@ export class VerificationCode extends BaseEntity {
 
   @Column({ name: 'fail_reason', type: 'varchar', length: 255, nullable: true })
   failReason?: string;
+
+  // 校验失败次数：达到上限即作废该码，防止 6 位数字码被在线暴力枚举
+  @Column({ name: 'fail_count', type: 'int', default: 0 })
+  failCount!: number;
 }

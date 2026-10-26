@@ -7,23 +7,41 @@ import { UsersPage } from '../pages/users/UsersPage';
 import { RolesPage } from '../pages/roles/RolesPage';
 import { RolePermissionsPage } from '../pages/roles/RolePermissionsPage';
 import { PermissionsPage } from '../pages/permissions/PermissionsPage';
-import { DivinationPage } from '../pages/divination/DivinationPage';
-import { ModelsPage } from '../pages/ai/ModelsPage';
-import { AgentsPage } from '../pages/ai/AgentsPage';
-import { ChatPage } from '../pages/ai/ChatPage';
-import { ImagesPage } from '../pages/ai/ImagesPage';
 import { AuditCenterPage } from '../pages/audit-center/AuditCenterPage';
 import { ProfilePage } from '../pages/profile/ProfilePage';
 import { HomePage } from '../pages/home/HomePage';
 import { DictPage } from '../pages/dict/DictPage';
-import { TemplatePage } from '../pages/notification/TemplatePage';
-import { PublishPage } from '../pages/notification/PublishPage';
-import { InboxPage } from '../pages/notification/InboxPage';
-import { StockPage } from '../pages/stock/StockPage';
-import { FlowsPage } from '../pages/flow/FlowsPage';
-import { FlowRunsPage } from '../pages/flow/FlowRunsPage';
-import { NovelVideoPage } from '../pages/flow/NovelVideoPage';
 import { RequireAuth } from './RequireAuth';
+
+// 大页面按需加载：此前 20 个页面全部静态引入，echarts/react-quill 等重依赖全进首屏主包（3MB）。
+// 登录页与首页保持静态加载，保证首屏直出。
+const lazyPage = (loader: () => Promise<Record<string, unknown>>, name: string) => {
+  const Component = React.lazy(() =>
+    loader().then((module) => ({ default: module[name] as React.ComponentType }))
+  );
+  return (
+    <React.Suspense
+      fallback={
+        <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8' }}>页面加载中…</div>
+      }
+    >
+      <Component />
+    </React.Suspense>
+  );
+};
+
+const DivinationPage = lazyPage(() => import('../pages/divination/DivinationPage'), 'DivinationPage');
+const ModelsPage = lazyPage(() => import('../pages/ai/ModelsPage'), 'ModelsPage');
+const AgentsPage = lazyPage(() => import('../pages/ai/AgentsPage'), 'AgentsPage');
+const ChatPage = lazyPage(() => import('../pages/ai/ChatPage'), 'ChatPage');
+const ImagesPage = lazyPage(() => import('../pages/ai/ImagesPage'), 'ImagesPage');
+const StockPage = lazyPage(() => import('../pages/stock/StockPage'), 'StockPage');
+const FlowsPage = lazyPage(() => import('../pages/flow/FlowsPage'), 'FlowsPage');
+const FlowRunsPage = lazyPage(() => import('../pages/flow/FlowRunsPage'), 'FlowRunsPage');
+const NovelVideoPage = lazyPage(() => import('../pages/flow/NovelVideoPage'), 'NovelVideoPage');
+const TemplatePage = lazyPage(() => import('../pages/notification/TemplatePage'), 'TemplatePage');
+const PublishPage = lazyPage(() => import('../pages/notification/PublishPage'), 'PublishPage');
+const InboxPage = lazyPage(() => import('../pages/notification/InboxPage'), 'InboxPage');
 
 // 画布编辑器较重（React Flow），按需加载不进首屏包。
 const FlowEditorPage = React.lazy(async () => {

@@ -12,5 +12,16 @@ export default defineConfig({
       // 小说流水线产物（图片/视频片段/成片）走后端静态目录。
       '/uploads': 'http://localhost:3000'
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // antd/rc 生态拆为独立 vendor 包：业务代码迭代时 vendor 命中浏览器缓存
+        manualChunks: {
+          'antd-vendor': ['antd', '@ant-design/icons'],
+          'react-vendor': ['react', 'react-dom', 'react-router-dom']
+        }
+      }
+    }
   }
 });

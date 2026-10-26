@@ -1,6 +1,14 @@
+// 发布面板：接收带密钥的 HTTP 请求并执行部署脚本。
+// 安全设计：
+// 1. fail-closed：PUBLISH_SECRET 必须由环境注入；不再提供“先到先得”的初始化模式
+//    （该模式曾允许任何未认证请求抢占密钥，而面板挂载了 docker.sock 与 SSH 私钥）；
+// 2. 密钥比较用 crypto.timingSafeEqual，防时序侧信道；
+// 3. 部署锁用 openSync(,'wx') 原子创建消除 TOCTOU；崩溃残留的陈旧锁（>1 小时）启动自愈；
+// 4. 面板与页面同源，不做跨域放行（此前反射任意 Origin + 允许自定义头，构成 CSRF 面）。
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 function loadEnvFile(filePath) {
@@ -28,21 +36,19 @@ const SECRET_FILE = path.join(__dirname, 'logs/publish-secret.txt');
 
 loadEnvFile(ENV_FILE);
 
-let SECRET = process.env.PUBLISH_SECRET;
+let SECRET = process.env.PUBLISH_SECRET || (fs.existsSync(SECRET_FILE) ? fs.readFileSync(SECRET_FILE, 'utf8').trim() : '');
 const PORT = Number(process.env.PORT || 9090);
 const PROJECT_PATH = process.env.PROJECT_PATH || path.resolve(__dirname, '..');
 const LOG_DIR = path.join(__dirname, 'logs');
 const LOG_FILE = path.join(__dirname, './logs/deploy-logs.txt');
 const LOCK_FILE = path.join(__dirname, './task.lock');
+// 部署最长允许时长；超过视为崩溃残留锁，启动时自动清理
+const STALE_LOCK_MS = 60 * 60 * 1000;
 
 fs.mkdirSync(LOG_DIR, { recursive: true });
 
-if (!SECRET && fs.existsSync(SECRET_FILE)) {
-  SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
-}
-
 if (!SECRET) {
-  console.warn('未配置 PUBLISH_SECRET，发布面板将进入首次使用初始化模式');
+  console.error('未配置 PUBLISH_SECRET，所有写操作已禁用（fail-closed）。请在环境变量或 deploy-panel/.env 注入强随机密钥后重启。');
 }
 
 // 脚本映射
@@ -56,18 +62,12 @@ const SCRIPT_MAP = {
   'stock-agents': path.join(__dirname, 'scripts/sync-stock-agents.sh')
 };
 
-// 简易鉴权
+// 常量时间比较，防时序侧信道
 function checkSecret(token) {
-  return Boolean(token) && token === SECRET;
-}
-
-function initSecret(token) {
-  if (SECRET || !token) return false;
-
-  SECRET = token;
-  fs.writeFileSync(SECRET_FILE, token, { encoding: 'utf8', mode: 0o600 });
-  writeLog('发布密钥已完成首次初始化');
-  return true;
+  if (!SECRET || typeof token !== 'string') return false;
+  const a = crypto.createHash('sha256').update(String(token)).digest();
+  const b = crypto.createHash('sha256').update(SECRET).digest();
+  return crypto.timingSafeEqual(a, b);
 }
 
 // 追加日志到文件
@@ -81,13 +81,33 @@ function resetLog() {
   fs.writeFileSync(LOG_FILE, '', 'utf8');
 }
 
-// 判断是否正在执行
+// 启动自愈：上次进程崩溃可能残留陈旧锁，超时则清除，避免面板永久 409
+function recoverStaleLock() {
+  if (!fs.existsSync(LOCK_FILE)) return;
+  const lockedAt = Number(fs.readFileSync(LOCK_FILE, 'utf8').trim());
+  if (Number.isFinite(lockedAt) && Date.now() - lockedAt > STALE_LOCK_MS) {
+    fs.unlinkSync(LOCK_FILE);
+    writeLog('检测到陈旧部署锁，已自动清除');
+  }
+}
+
+// 原子加锁：openSync 'wx' 在文件已存在时抛 EEXIST，消除“检查-再写入”的并发窗口
+function tryLockTask() {
+  try {
+    const fd = fs.openSync(LOCK_FILE, 'wx');
+    fs.writeSync(fd, Date.now().toString());
+    fs.closeSync(fd);
+    return true;
+  } catch (error) {
+    if (error.code === 'EEXIST') return false;
+    throw error;
+  }
+}
+
 function isRunning() {
   return fs.existsSync(LOCK_FILE);
 }
-function lockTask() {
-  fs.writeFileSync(LOCK_FILE, Date.now().toString());
-}
+
 function unlockTask() {
   if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE);
 }
@@ -98,12 +118,8 @@ function sendJson(res, statusCode, payload) {
 }
 
 const server = http.createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,X-Publish-Token');
-
   if (req.method === 'OPTIONS') {
-    res.writeHead(200);
+    res.writeHead(204);
     return res.end();
   }
 
@@ -115,22 +131,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   const token = req.headers['x-publish-token'];
-  if (!SECRET) {
-    if (req.url === '/status' && req.method === 'GET') {
-      return sendJson(res, 200, { code: 200, data: { running: false, initialized: false } });
-    }
 
-    if (!initSecret(token)) {
-      return sendJson(res, 401, { code: 401, message: '请先输入发布密钥完成初始化' });
-    }
+  if (req.url === '/status' && req.method === 'GET') {
+    return sendJson(res, 200, { code: 200, data: { running: isRunning(), initialized: Boolean(SECRET) } });
+  }
+
+  // fail-closed：未配置密钥时拒绝一切业务操作
+  if (!SECRET) {
+    return sendJson(res, 503, { code: 503, message: '面板未配置 PUBLISH_SECRET，服务不可用' });
   }
 
   if (!checkSecret(token)) {
     return sendJson(res, 403, { code: 403, message: '密钥非法' });
-  }
-
-  if (req.url === '/status' && req.method === 'GET') {
-    return sendJson(res, 200, { code: 200, data: { running: isRunning(), initialized: true } });
   }
 
   // 触发发布接口 POST /deploy
@@ -151,11 +163,10 @@ const server = http.createServer(async (req, res) => {
       if (!scriptPath) {
         return sendJson(res, 400, { code: 400, message: '目标不存在' });
       }
-      if (isRunning()) {
+      if (!tryLockTask()) {
         return sendJson(res, 409, { code: 409, message: '正在执行发布任务，请勿重复触发' });
       }
 
-      lockTask();
       resetLog();
       writeLog(`===== 开始发布 target:${target} =====`);
 
@@ -196,6 +207,8 @@ const server = http.createServer(async (req, res) => {
 
   sendJson(res, 404, { code: 404, message: 'not found' });
 })
+
+recoverStaleLock();
 
 server.listen(PORT, () => {
   console.log(`发布面板启动：http://localhost:${PORT}`);

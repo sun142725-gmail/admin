@@ -126,6 +126,10 @@ export class UsersService {
       throw new NotFoundException('用户不存在');
     }
     const roles = await this.roleRepo.findBy({ id: In(dto.roleIds) });
+    // 静默丢弃不存在的 ID 会让调用方误以为分配成功（传错 ID 甚至清空全部角色），必须显式报错
+    if (new Set(dto.roleIds).size !== roles.length) {
+      throw new BadRequestException('部分角色不存在，请刷新后重试');
+    }
     user.roles = roles;
     await this.userRepo.save(user);
     await this.auditService.log('assign_roles', 'users', `分配角色给用户 ${user.username}`, operatorId, ip);
