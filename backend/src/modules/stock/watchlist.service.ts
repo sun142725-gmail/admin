@@ -3,7 +3,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { StockWatchlist } from '../../common/entities/stock-watchlist.entity';
-import { WatchlistAddDto } from './dto/watchlist.dto';
+import { WatchlistAddDto, WatchlistUpdateDto } from './dto/watchlist.dto';
 
 // 单用户自选上限：足够个人研究使用，也防止无限膨胀
 const MAX_WATCHLIST_SIZE = 100;
@@ -42,5 +42,20 @@ export class WatchlistService {
     }
     await this.watchRepo.delete({ id: existing.id });
     return { success: true };
+  }
+
+  /** 编辑备注/分组（只更新显式传入的字段）。 */
+  async update(userId: number, symbol: string, dto: WatchlistUpdateDto): Promise<StockWatchlist> {
+    const existing = await this.watchRepo.findOne({ where: { userId, symbol } });
+    if (!existing) {
+      throw new NotFoundException('该股票不在自选中');
+    }
+    if (dto.note !== undefined) {
+      existing.note = dto.note;
+    }
+    if (dto.group !== undefined) {
+      existing.group = dto.group.trim() || '默认';
+    }
+    return this.watchRepo.save(existing);
   }
 }

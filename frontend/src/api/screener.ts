@@ -59,3 +59,48 @@ export interface ScreenerScanPayload {
 // 大池扫描可能跨多批，放宽到 150 秒（后端分批限流 + K 线缓存兜底）
 export const scanScreener = (payload: ScreenerScanPayload) =>
   http.post<never, ScreenerScanResult>('/stock/screener/scan', payload, { timeout: 150000 });
+
+// ==================== 每日扫描运行记录 ====================
+
+export interface ScreenerRun {
+  id: number;
+  runDate: string;
+  poolType: string;
+  poolDesc: string;
+  config: string;
+  poolSize: number;
+  scanned: number;
+  failed: number;
+  matched: number;
+  durationMs: number;
+  status: 'running' | 'completed' | 'failed';
+  errorMessage?: string | null;
+  createdAt: string;
+}
+
+export interface ScreenerHit {
+  id: number;
+  runId: number;
+  symbol: string;
+  name: string;
+  freq: ScreenerFreq;
+  lastClose: number | null;
+  pct1d: number | null;
+  signalType: 'golden' | 'upcoming';
+  signalSource: 'kdj' | 'macd' | 'both';
+  barsAgo: number | null;
+  signalsJson: string | null;
+}
+
+export const listScreenerRuns = (page = 1, pageSize = 20) =>
+  http.get<never, { items: ScreenerRun[]; total: number; page: number; pageSize: number }>(
+    '/stock/screener/runs',
+    { params: { page, pageSize } }
+  );
+
+export const getScreenerRun = (id: number) =>
+  http.get<never, { run: ScreenerRun; hits: ScreenerHit[] } | null>(`/stock/screener/runs/${id}`);
+
+/** 手动触发一次带记录的扫描（后台执行），返回 runId。 */
+export const triggerScreenerRun = (payload?: Partial<ScreenerScanPayload>) =>
+  http.post<never, { runId: number }>('/stock/screener/runs/trigger', payload ?? {}, { timeout: 15000 });

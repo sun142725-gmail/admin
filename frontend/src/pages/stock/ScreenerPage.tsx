@@ -1,5 +1,6 @@
 // 选股器页面：按板块选池（市值 Top N）或手填代码，对候选池做 KDJ/MACD 金叉规则扫描。
 // 大池扫描由后端分批限流执行（50 任务/批，批间歇 1 秒），前端放宽超时等待结果。
+// 「每日扫描」Tab 展示收盘定时扫描的运行历史与命中清单。
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -13,6 +14,7 @@ import {
   Radio,
   Space,
   Table,
+  Tabs,
   Tag,
   Tooltip,
   message
@@ -30,8 +32,8 @@ import {
   scanScreener
 } from '../../api/screener';
 import { addToWatchlist, listWatchlist, removeFromWatchlist } from '../../api/watchlist';
-
-const FREQ_LABEL: Record<ScreenerFreq, string> = { day: '日线', week: '周线', month: '月线' };
+import { ScreenerRunsPanel } from './components/ScreenerRunsPanel';
+import { FREQ_LABEL, renderPct, renderSignal } from './components/screener-shared';
 
 /** 把用户粘贴的代码文本拆成代码数组：支持逗号/空格/换行/分号分隔与 600519.SH 后缀。 */
 const parseSymbols = (text: string): string[] =>
@@ -39,21 +41,6 @@ const parseSymbols = (text: string): string[] =>
     .split(/[\s,，;；]+/)
     .map((item) => item.trim())
     .filter(Boolean);
-
-const renderSignal = (signal: { status: 'golden' | 'upcoming' | null; barsAgo?: number; gap?: number }) => {
-  if (signal.status === 'golden') {
-    const ago = signal.barsAgo ?? 0;
-    return <Tag color="red">{ago === 0 ? '刚刚金叉' : `${ago} 根前金叉`}</Tag>;
-  }
-  if (signal.status === 'upcoming') {
-    return (
-      <Tooltip title={`快线在慢线下方，差距 ${signal.gap} 且持续收敛，按当前速度约 3 根内可能交叉`}>
-        <Tag color="orange">即将金叉</Tag>
-      </Tooltip>
-    );
-  }
-  return <Tag>无信号</Tag>;
-};
 
 export const ScreenerPage: React.FC = () => {
   const navigate = useNavigate();
@@ -238,6 +225,19 @@ export const ScreenerPage: React.FC = () => {
         </div>
       </div>
 
+      <Tabs
+        defaultActiveKey={searchParams.get('tab') === 'daily' ? 'daily' : 'manual'}
+        items={[
+          { key: 'manual', label: '手动扫描', children: <ManualScanPanel /> },
+          { key: 'daily', label: '每日扫描', children: <ScreenerRunsPanel favoriteSymbols={favoriteSymbols} onToggleFavorite={toggleFavorite} /> }
+        ]}
+      />
+    </div>
+  );
+
+  function ManualScanPanel() {
+    return (
+      <>
       <Card className="mb-4" size="small">
         <Form layout="vertical">
           <Form.Item label="候选池" className="!mb-3">
@@ -414,6 +414,7 @@ export const ScreenerPage: React.FC = () => {
         scroll={{ x: 'max-content' }}
         locale={{ emptyText: result ? '没有命中筛选条件的股票' : '选择候选池后点击「开始扫描」' }}
       />
-    </div>
-  );
+      </>
+    );
+  }
 };

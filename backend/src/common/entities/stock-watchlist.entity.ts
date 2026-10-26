@@ -20,4 +20,8 @@ export class StockWatchlist extends BaseEntity {
   // 用户的备注（为什么关注它），可空。
   @Column({ type: 'varchar', length: 255, nullable: true })
   note?: string | null;
+
+  // 自由分组标签（默认「默认」），前端按组筛选展示。
+  @Column({ type: 'varchar', length: 32, default: '默认' })
+  group!: string;
 }

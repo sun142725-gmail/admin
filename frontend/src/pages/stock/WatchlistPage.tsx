@@ -1,14 +1,15 @@
-// 自选股页面：收藏清单 + 实时行情快照 + 快捷入口（圆桌分析 / 选股扫描）。
+// 自选股页面：收藏清单（分组筛选）+ 实时行情快照 + 备注/分组编辑 + 快捷入口。
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Input, Popconfirm, Space, Table, Tag, Tooltip, message } from 'antd';
+import { Button, Form, Input, Modal, Popconfirm, Segmented, Space, Table, Tag, Tooltip, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { StarFilled, StarOutlined } from '@ant-design/icons';
+import { EditOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import {
   WatchlistItem,
   addToWatchlist,
   listWatchlist,
-  removeFromWatchlist
+  removeFromWatchlist,
+  updateWatchlist
 } from '../../api/watchlist';
 import { fetchQuotes } from '../../api/stock';
 
@@ -26,6 +27,12 @@ export const WatchlistPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [addSymbol, setAddSymbol] = useState('');
   const [adding, setAdding] = useState(false);
+  // 分组筛选：'全部' 或具体分组名
+  const [groupFilter, setGroupFilter] = useState<string>('全部');
+  // 编辑弹窗：正在编辑的股票 + 表单
+  const [editing, setEditing] = useState<WatchlistItem | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form] = Form.useForm();
   const favoriteSymbols = useMemo(() => new Set(items.map((item) => item.symbol)), [items]);
 
   const loadWatchlist = async () => {
@@ -131,14 +138,48 @@ export const WatchlistPage: React.FC = () => {
     }
   };
 
+  const groups = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((item) => set.add(item.group || '默认'));
+    return ['全部', ...[...set].sort()];
+  }, [items]);
+
   const dataSource = useMemo(
     () =>
-      items.map((item) => ({
-        ...item,
-        quote: quotes[item.symbol]
-      })),
-    [items, quotes]
+      items
+        .filter((item) => groupFilter === '全部' || (item.group || '默认') === groupFilter)
+        .map((item) => ({
+          ...item,
+          quote: quotes[item.symbol]
+        })),
+    [items, quotes, groupFilter]
   );
+
+  const openEdit = (item: WatchlistItem) => {
+    setEditing(item);
+    form.setFieldsValue({ note: item.note ?? '', group: item.group || '默认' });
+  };
+
+  const onSaveEdit = async () => {
+    if (!editing) {
+      return;
+    }
+    const values = await form.validateFields().catch(() => null);
+    if (!values) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateWatchlist(editing.symbol, { note: values.note, group: values.group });
+      message.success('已保存');
+      setEditing(null);
+      await loadWatchlist();
+    } catch (error) {
+      message.error(error instanceof Error && error.message ? error.message : '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const columns: ColumnsType<(typeof dataSource)[number]> = [
     {
@@ -190,7 +231,13 @@ export const WatchlistPage: React.FC = () => {
         return <span style={{ color: v > 0 ? '#cf1322' : v < 0 ? '#3f8600' : undefined }}>{v.toFixed(2)}%</span>;
       }
     },
-    { title: '备注', dataIndex: 'note', render: (v: string | null) => v || '-' },
+    { title: '备注', dataIndex: 'note', ellipsis: true, render: (v: string | null) => v || '-' },
+    {
+      title: '分组',
+      dataIndex: 'group',
+      width: 100,
+      render: (v: string | null) => <Tag>{v || '默认'}</Tag>
+    },
     {
       title: '收藏时间',
       dataIndex: 'createdAt',
@@ -214,6 +261,9 @@ export const WatchlistPage: React.FC = () => {
           </Button>
           <Button size="small" type="link" onClick={() => navigate('/stock/screener?pool=watchlist')}>
             去选股扫描
+          </Button>
+          <Button size="small" type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+            编辑
           </Button>
           <Popconfirm title="确认移出自选？" onConfirm={() => onRemove(record.symbol)}>
             <Button size="small" type="link" danger>
@@ -250,6 +300,16 @@ export const WatchlistPage: React.FC = () => {
         </Space>
       </div>
 
+      {groups.length > 2 && (
+        <div className="mb-3">
+          <Segmented
+            value={groupFilter}
+            onChange={(value) => setGroupFilter(value as string)}
+            options={groups}
+          />
+        </div>
+      )}
+
       <div className="page-table-card">
         <Table
           rowKey="id"
@@ -262,6 +322,24 @@ export const WatchlistPage: React.FC = () => {
           locale={{ emptyText: '还没有自选股：在上方输入代码，或在圆桌/选股结果里点星标收藏' }}
         />
       </div>
+
+      <Modal
+        title={editing ? `编辑：${editing.name}` : ''}
+        open={!!editing}
+        onOk={() => void onSaveEdit()}
+        onCancel={() => setEditing(null)}
+        confirmLoading={saving}
+        okText="保存"
+      >
+        <Form layout="vertical" form={form}>
+          <Form.Item label="备注（为什么关注它）" name="note">
+            <Input.TextArea rows={3} maxLength={255} placeholder="例：消费龙头，回调到 60 日线关注" />
+          </Form.Item>
+          <Form.Item label="分组" name="group" extra="自由命名（如 白酒/半导体/观察仓），用于页签筛选">
+            <Input maxLength={32} placeholder="默认" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

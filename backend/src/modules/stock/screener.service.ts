@@ -1,6 +1,7 @@
 // 股票选股服务：按板块选池或手填代码，逐股拉 K 线并按 KDJ/MACD 金叉规则筛选。
 // 复用 MarketDataService 的 K 线三级容灾与 TTL 缓存；单股失败跳过不中断整轮扫描。
-// 大池扫描采用分批限流：每批 50 个任务，批间歇 1 秒，对上游公开接口保持克制。
+// 交互扫描与每日定时扫描共用同一引擎：分批限流（每批 50 任务，批间歇 1 秒），
+// 定时扫描任务上限放宽（无 HTTP 超时约束），并带运行/命中两张记录表的落库生命周期。
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,6 +14,8 @@ import {
 } from './indicators.util';
 import { StockWatchlist } from '../../common/entities/stock-watchlist.entity';
 import { StockRoundtable } from '../../common/entities/stock-roundtable.entity';
+import { StockScreenerRun } from '../../common/entities/stock-screener-run.entity';
+import { StockScreenerHit } from '../../common/entities/stock-screener-hit.entity';
 import {
   EastmoneyBoard,
   EastmoneyClistResponse,
@@ -26,8 +29,10 @@ import { MarketDataService } from './market/market-data.service';
 import { normalizeSymbol } from './market/tencent-quote.api';
 import { ScreenerScanDto } from './dto/screener-scan.dto';
 
-// 单轮扫描任务（symbol×freq）上限：600 任务 ≈ 12 批，最坏 ~90 秒，在前端 120 秒超时内
-const MAX_SCAN_TASKS = 600;
+// 交互扫描任务（symbol×freq）上限：600 任务 ≈ 12 批，最坏 ~90 秒，在前端 150 秒超时内
+const MAX_INTERACTIVE_TASKS = 600;
+// 定时/触发扫描无 HTTP 超时约束，上限放宽（全市场 1500 只 × 1 周期绰绰有余）
+const MAX_SCHEDULED_TASKS = 5000;
 // 手填代码与板块候选池各自的容量上限
 const MAX_MANUAL_SYMBOLS = 50;
 const MAX_BOARD_SYMBOLS = 500;
@@ -71,6 +76,20 @@ export interface ScreenerScanResult {
   matches: ScreenerMatch[];
 }
 
+interface EngineOptions {
+  indicators: ScreenerIndicator[];
+  mode: ScreenerMode;
+  status: ScreenerStatusFilter;
+  withinBars: number;
+}
+
+/** 每日定时扫描配置（环境变量可覆盖，见 ScreenerScheduleService）。 */
+export interface ScheduledScanConfig {
+  dto: ScreenerScanDto;
+  poolType: string;
+  poolDesc: string;
+}
+
 @Injectable()
 export class ScreenerService {
   private readonly logger = new Logger(ScreenerService.name);
@@ -83,48 +102,204 @@ export class ScreenerService {
     @InjectRepository(StockWatchlist)
     private readonly watchRepo: Repository<StockWatchlist>,
     @InjectRepository(StockRoundtable)
-    private readonly roundtableRepo: Repository<StockRoundtable>
+    private readonly roundtableRepo: Repository<StockRoundtable>,
+    @InjectRepository(StockScreenerRun)
+    private readonly runRepo: Repository<StockScreenerRun>,
+    @InjectRepository(StockScreenerHit)
+    private readonly hitRepo: Repository<StockScreenerHit>
   ) {}
 
+  /** 交互扫描（HTTP 请求内完成，任务上限收紧）。 */
   async scan(dto: ScreenerScanDto, userId?: number): Promise<ScreenerScanResult> {
-    const freqs = this.resolveFreqs(dto.freqs);
-    const indicators: ScreenerIndicator[] = dto.indicators?.length ? dto.indicators : ['kdj', 'macd'];
-    const mode: ScreenerMode = dto.mode ?? 'any';
-    const status: ScreenerStatusFilter = dto.status ?? 'golden';
-    const withinBars = dto.withinBars ?? 3;
+    const pool = await this.resolvePool(dto, userId);
+    const options = this.resolveOptions(dto);
+    const { matches, scanned, failed } = await this.runEngine(
+      pool.symbols,
+      this.resolveFreqs(dto.freqs),
+      options,
+      pool.nameBySymbol,
+      MAX_INTERACTIVE_TASKS
+    );
+    return {
+      universe: pool.desc,
+      poolSize: pool.symbols.length,
+      scanned,
+      failed,
+      matches: this.sortMatches(matches)
+    };
+  }
 
-    // 候选池优先级：板块 > 个人池（自选/圆桌） > 手填代码
-    let symbols: string[];
-    let universe: string;
-    let poolSize: number;
-    // 个人池已知名称（K 线个别源不返回名称时兜底展示）
+  // ==================== 运行记录生命周期（定时扫描 / 手动触发共用） ====================
+
+  /** 是否有未完成的扫描运行（防止定时与触发重叠执行）。 */
+  async hasRunningRun(): Promise<boolean> {
+    const count = await this.runRepo.count({ where: { status: 'running' } });
+    return count > 0;
+  }
+
+  /** 扫描运行历史（分页，新的在前）。 */
+  async listRuns(page = 1, pageSize = 20) {
+    const [items, total] = await this.runRepo.findAndCount({
+      order: { id: 'DESC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    });
+    return { items, total, page, pageSize };
+  }
+
+  /** 运行详情：运行记录 + 命中清单（金叉在前，按涨跌幅排序）。 */
+  async getRun(id: number) {
+    const run = await this.runRepo.findOne({ where: { id } });
+    if (!run) {
+      return null;
+    }
+    const hits = await this.hitRepo.find({ where: { runId: id } });
+    hits.sort((a, b) => {
+      const typeRank = (t: string) => (t === 'golden' ? 0 : 1);
+      if (typeRank(a.signalType) !== typeRank(b.signalType)) {
+        return typeRank(a.signalType) - typeRank(b.signalType);
+      }
+      const srcRank = (s: string) => (s === 'both' ? 0 : 1);
+      if (srcRank(a.signalSource) !== srcRank(b.signalSource)) {
+        return srcRank(a.signalSource) - srcRank(b.signalSource);
+      }
+      return (b.pct1d ?? -999) - (a.pct1d ?? -999);
+    });
+    return { run, hits };
+  }
+
+  /**
+   * 创建一条 running 扫描记录并返回 runId（不执行扫描）。
+   * 执行由调用方决定：定时任务同步 await executeRunRecord；手动触发后台 void 执行。
+   * 若已有未完成运行则抛错（防重叠）。
+   */
+  async startRun(dto: ScreenerScanDto, userId?: number, poolType = 'manual', poolDesc = '手填代码'): Promise<number> {
+    if (await this.hasRunningRun()) {
+      throw new Error('已有扫描任务在运行中，请等待完成后再触发');
+    }
+    const run = await this.runRepo.save(
+      this.runRepo.create({
+        runDate: new Date().toISOString().slice(0, 10),
+        poolType,
+        poolDesc,
+        config: JSON.stringify(this.configSnapshot(dto)),
+        status: 'running'
+      })
+    );
+    return run.id;
+  }
+
+  /** 执行一次已建档的扫描：引擎跑完把命中落库并回写运行记录。 */
+  async executeRunRecord(runId: number, dto: ScreenerScanDto, userId?: number): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      const pool = await this.resolvePool(dto, userId);
+      const options = this.resolveOptions(dto);
+      const { matches, scanned, failed } = await this.runEngine(
+        pool.symbols,
+        this.resolveFreqs(dto.freqs),
+        options,
+        pool.nameBySymbol,
+        MAX_SCHEDULED_TASKS
+      );
+      await this.persistHits(runId, matches);
+      await this.runRepo.update(
+        { id: runId },
+        {
+          poolSize: pool.symbols.length,
+          scanned,
+          failed,
+          matched: matches.length,
+          durationMs: Date.now() - startedAt,
+          status: 'completed'
+        }
+      );
+      this.logger.log(
+        `扫描运行 ${runId} 完成：池 ${pool.symbols.length}，扫描 ${scanned}，命中 ${matches.length}，耗时 ${Date.now() - startedAt}ms`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await this.runRepo
+        .update({ id: runId }, { status: 'failed', errorMessage: message.slice(0, 250), durationMs: Date.now() - startedAt })
+        .catch(() => undefined);
+      this.logger.error(`扫描运行 ${runId} 失败: ${message}`);
+      throw error;
+    }
+  }
+
+  /** 覆盖式写入命中记录：重跑同一条运行不留旧数据。 */
+  private async persistHits(runId: number, matches: ScreenerMatch[]): Promise<void> {
+    await this.hitRepo.delete({ runId });
+    if (!matches.length) {
+      return;
+    }
+    const rows = matches.map((match) => {
+      const { signalType, signalSource, barsAgo } = summarizeSignals(match.signals);
+      return this.hitRepo.create({
+        runId,
+        symbol: match.symbol,
+        name: match.name,
+        freq: match.freq,
+        lastClose: match.lastClose,
+        pct1d: match.pct1d,
+        signalType,
+        signalSource,
+        barsAgo,
+        signalsJson: JSON.stringify(match.signals)
+      });
+    });
+    await this.hitRepo.save(rows);
+  }
+
+  /** 配置快照：写入运行记录供回溯（剔除空字段）。 */
+  private configSnapshot(dto: ScreenerScanDto): Record<string, unknown> {
+    return {
+      ...(dto.boards?.length ? { boards: dto.boards, limit: dto.limit } : {}),
+      ...(dto.pool ? { pool: dto.pool } : {}),
+      ...(dto.symbols?.length ? { symbols: dto.symbols } : {}),
+      freqs: this.resolveFreqs(dto.freqs),
+      indicators: dto.indicators?.length ? dto.indicators : ['kdj', 'macd'],
+      mode: dto.mode ?? 'any',
+      status: dto.status ?? 'golden',
+      withinBars: dto.withinBars ?? 3
+    };
+  }
+
+  // ==================== 池解析 ====================
+
+  private async resolvePool(
+    dto: ScreenerScanDto,
+    userId?: number
+  ): Promise<{ symbols: string[]; nameBySymbol: Map<string, string>; desc: string }> {
     const nameBySymbol = new Map<string, string>();
     if (dto.boards?.length) {
       const boards = [...new Set(dto.boards)];
       const limit = Math.min(Math.max(dto.limit ?? 100, 1), MAX_BOARD_SYMBOLS);
       const list = await this.resolveBoardPool(boards, limit);
-      symbols = list.map((item) => item.symbol);
       list.forEach((item) => {
         if (item.name) {
           nameBySymbol.set(item.symbol, item.name);
         }
       });
-      universe = boards.map((board) => BOARD_LABEL[board]).join(' + ');
-      poolSize = list.length;
-    } else if (dto.pool === 'watchlist') {
+      return {
+        symbols: list.map((item) => item.symbol),
+        nameBySymbol,
+        desc: boards.map((board) => BOARD_LABEL[board]).join(' + ')
+      };
+    }
+    if (dto.pool === 'watchlist') {
       if (!userId) {
         throw new Error('自选股候选池需要登录用户');
       }
       const items = await this.watchRepo.find({ where: { userId }, order: { id: 'DESC' } });
-      symbols = items.map((item) => item.symbol);
       items.forEach((item) => {
         if (item.name && item.name !== item.symbol) {
           nameBySymbol.set(item.symbol, item.name);
         }
       });
-      universe = '我的自选股';
-      poolSize = symbols.length;
-    } else if (dto.pool === 'roundtable') {
+      return { symbols: items.map((item) => item.symbol), nameBySymbol, desc: '我的自选股' };
+    }
+    if (dto.pool === 'roundtable') {
       if (!userId) {
         throw new Error('圆桌候选池需要登录用户');
       }
@@ -133,7 +308,7 @@ export class ScreenerService {
         where: { userId, subjectType: 'stock' },
         select: { subjectCode: true, subjectName: true }
       });
-      symbols = [
+      const symbols = [
         ...new Set(
           rows.map((row) => (row.subjectCode ?? '').toLowerCase()).filter((code) => /^(sh|sz)\d{6}$/.test(code))
         )
@@ -144,29 +319,49 @@ export class ScreenerService {
           nameBySymbol.set(code, row.subjectName);
         }
       });
-      universe = '圆桌分析过的股票';
-      poolSize = symbols.length;
-    } else {
-      symbols = [...new Set((dto.symbols ?? []).map((s) => this.normalizeInput(s)).filter(Boolean))].slice(
-        0,
-        MAX_MANUAL_SYMBOLS
-      );
-      universe = '手填代码';
-      poolSize = symbols.length;
+      return { symbols, nameBySymbol, desc: '圆桌分析过的股票' };
     }
-    if (!symbols.length) {
-      return { universe, poolSize: 0, scanned: 0, failed: 0, matches: [] };
-    }
+    const symbols = [...new Set((dto.symbols ?? []).map((s) => this.normalizeInput(s)).filter(Boolean))].slice(
+      0,
+      MAX_MANUAL_SYMBOLS
+    );
+    return { symbols, nameBySymbol, desc: '手填代码' };
+  }
 
+  private resolveOptions(dto: ScreenerScanDto): EngineOptions {
+    return {
+      indicators: dto.indicators?.length ? dto.indicators : ['kdj', 'macd'],
+      mode: dto.mode ?? 'any',
+      status: dto.status ?? 'golden',
+      withinBars: dto.withinBars ?? 3
+    };
+  }
+
+  private resolveFreqs(freqs?: Array<'day' | 'week' | 'month' | 'any'>): KlineFreq[] {
+    if (!freqs?.length || freqs.includes('any')) {
+      return ['day', 'week', 'month'];
+    }
+    return [...new Set(freqs)] as KlineFreq[];
+  }
+
+  // ==================== 扫描引擎（分批限流） ====================
+
+  private async runEngine(
+    symbols: string[],
+    freqs: KlineFreq[],
+    options: EngineOptions,
+    nameBySymbol: Map<string, string>,
+    maxTasks: number
+  ): Promise<{ matches: ScreenerMatch[]; scanned: number; failed: number }> {
     const tasks: Array<{ symbol: string; freq: KlineFreq }> = [];
     for (const symbol of symbols) {
       for (const freq of freqs) {
-        if (tasks.length >= MAX_SCAN_TASKS) {
+        if (tasks.length >= maxTasks) {
           break;
         }
         tasks.push({ symbol, freq });
       }
-      if (tasks.length >= MAX_SCAN_TASKS) {
+      if (tasks.length >= maxTasks) {
         break;
       }
     }
@@ -176,7 +371,6 @@ export class ScreenerService {
     let scanned = 0;
     let cursor = 0;
 
-    // 分批限流：每批 BATCH_SIZE 个任务并发消费，批间歇 BATCH_PAUSE_MS
     for (let batchStart = 0; batchStart < tasks.length; batchStart += BATCH_SIZE) {
       const batch = tasks.slice(batchStart, batchStart + BATCH_SIZE);
       cursor = 0;
@@ -192,7 +386,7 @@ export class ScreenerService {
             try {
               const { name, items } = await this.market.kline(symbol, FREQ_KLINE_LIMIT[freq], freq);
               scanned += 1;
-              const evaluation = evaluateScreener(items, { indicators, mode, status, withinBars });
+              const evaluation = evaluateScreener(items, options);
               if (!evaluation?.matched) {
                 continue;
               }
@@ -222,11 +416,13 @@ export class ScreenerService {
         await new Promise((resolve) => setTimeout(resolve, BATCH_PAUSE_MS));
       }
     }
+    return { matches, scanned, failed };
+  }
 
-    // 结果排序：金叉优先于即将金叉，金叉按时间新→旧，再按周期
+  private sortMatches(matches: ScreenerMatch[]): ScreenerMatch[] {
     const statusRank = (s: 'golden' | 'upcoming' | null) => (s === 'golden' ? 0 : s === 'upcoming' ? 1 : 2);
     const freqRank: Record<KlineFreq, number> = { day: 0, week: 1, month: 2 };
-    matches.sort((a, b) => {
+    return [...matches].sort((a, b) => {
       const bestA = Math.min(...['kdj', 'macd'].map((k) => statusRank(a.signals[k as ScreenerIndicator].status)));
       const bestB = Math.min(...['kdj', 'macd'].map((k) => statusRank(b.signals[k as ScreenerIndicator].status)));
       if (bestA !== bestB) {
@@ -245,9 +441,9 @@ export class ScreenerService {
       }
       return freqRank[a.freq] - freqRank[b.freq];
     });
-
-    return { universe, poolSize, scanned, failed, matches };
   }
+
+  // ==================== 板块列表 ====================
 
   /**
    * 板块候选池：按总市值从大到小取前 limit 只（大盘股 K 线数据质量与流动性更好，
@@ -303,12 +499,28 @@ export class ScreenerService {
     }
     return normalizeSymbol(trimmed);
   }
+}
 
-  /** freqs 归一化：any/缺省 → 三周期全扫。 */
-  private resolveFreqs(freqs?: Array<'day' | 'week' | 'month' | 'any'>): KlineFreq[] {
-    if (!freqs?.length || freqs.includes('any')) {
-      return ['day', 'week', 'month'];
+/** 双指标信号合并为一行命中的摘要：golden 优先，双同级命中记 both。 */
+export function summarizeSignals(signals: ScreenerMatch['signals']): {
+  signalType: 'golden' | 'upcoming';
+  signalSource: 'kdj' | 'macd' | 'both';
+  barsAgo: number | null;
+} {
+  const levels: Array<'kdj' | 'macd'> = ['kdj', 'macd'];
+  for (const type of ['golden', 'upcoming'] as const) {
+    const hit = levels.filter((k) => signals[k].status === type);
+    if (hit.length) {
+      const barsAgoList = hit
+        .map((k) => signals[k].barsAgo)
+        .filter((v): v is number => v != null);
+      return {
+        signalType: type,
+        signalSource: hit.length === 2 ? 'both' : hit[0],
+        barsAgo: barsAgoList.length ? Math.min(...barsAgoList) : null
+      };
     }
-    return [...new Set(freqs)] as KlineFreq[];
   }
+  // 引擎只推 matched 的结果，理论上不会走到这里；兜底记 upcoming
+  return { signalType: 'upcoming', signalSource: 'kdj', barsAgo: null };
 }
