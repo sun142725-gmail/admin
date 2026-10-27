@@ -20,6 +20,7 @@ import {
   EastmoneyBoard,
   EastmoneyClistResponse,
   StockListItem,
+  buildEastmoneyAmountRankUrl,
   buildEastmoneyStockListUrl,
   EASTMONEY_BOARD_FS,
   parseEastmoneyStockList
@@ -36,6 +37,8 @@ const MAX_SCHEDULED_TASKS = 5000;
 // 手填代码与板块候选池各自的容量上限
 const MAX_MANUAL_SYMBOLS = 50;
 const MAX_BOARD_SYMBOLS = 500;
+// 成交额排行候选池上限（每日全市场扫描默认 1500）
+const MAX_AMOUNT_SYMBOLS = 2000;
 // 分批限流：每批任务数与批间歇
 const BATCH_SIZE = 50;
 const BATCH_PAUSE_MS = 1000;
@@ -96,6 +99,9 @@ export class ScreenerService {
   // 板块股票列表缓存：列表变化慢，10 分钟内重复扫描不重复拉列表
   private readonly boardListCache = new Map<EastmoneyBoard, { at: number; items: StockListItem[] }>();
   private static readonly BOARD_LIST_TTL_MS = 10 * 60 * 1000;
+  // 成交额排行缓存：10 分钟内重复扫描/触发不重复拉 15 页列表
+  private amountRankCache: { at: number; items: StockListItem[] } | null = null;
+  private static readonly AMOUNT_RANK_TTL_MS = 10 * 60 * 1000;
 
   constructor(
     private readonly market: MarketDataService,
@@ -287,6 +293,20 @@ export class ScreenerService {
         desc: boards.map((board) => BOARD_LABEL[board]).join(' + ')
       };
     }
+    if (dto.pool === 'amount') {
+      const limit = Math.min(Math.max(dto.limit ?? 1500, 1), MAX_AMOUNT_SYMBOLS);
+      const list = await this.amountRankList(limit);
+      list.forEach((item) => {
+        if (item.name) {
+          nameBySymbol.set(item.symbol, item.name);
+        }
+      });
+      return {
+        symbols: list.map((item) => item.symbol),
+        nameBySymbol,
+        desc: `成交额 Top ${limit}`
+      };
+    }
     if (dto.pool === 'watchlist') {
       if (!userId) {
         throw new Error('自选股候选池需要登录用户');
@@ -444,6 +464,34 @@ export class ScreenerService {
   }
 
   // ==================== 板块列表 ====================
+
+  /**
+   * 全市场成交额排行候选池：按当日成交额从大到小取前 limit 只。
+   * 比市值排序更贴近实战——成交额反映当日活跃度与流动性，热门票自动入选，僵尸股天然排除。
+   * 列表 10 分钟缓存；盘中值持续变化，收盘扫描取 15:30 时点快照。
+   */
+  private async amountRankList(limit: number): Promise<StockListItem[]> {
+    const cached = this.amountRankCache;
+    if (cached && Date.now() - cached.at < ScreenerService.AMOUNT_RANK_TTL_MS && cached.items.length >= limit) {
+      return cached.items.slice(0, limit);
+    }
+    const items: StockListItem[] = [];
+    const pageSize = 100;
+    for (let page = 1; page <= Math.ceil(limit / pageSize) + 1; page += 1) {
+      const payload = await fetchJson<EastmoneyClistResponse>(
+        buildEastmoneyAmountRankUrl(page, pageSize)
+      );
+      const parsed = parseEastmoneyStockList(payload);
+      items.push(...parsed.items);
+      if (parsed.items.length < pageSize || items.length >= limit) {
+        break;
+      }
+    }
+    if (items.length) {
+      this.amountRankCache = { at: Date.now(), items };
+    }
+    return items.slice(0, limit);
+  }
 
   /**
    * 板块候选池：按总市值从大到小取前 limit 只（大盘股 K 线数据质量与流动性更好，

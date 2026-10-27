@@ -106,7 +106,7 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
     try {
       // 默认全市场配置（三大板块市值 Top 500 × 日线），后台执行
       await triggerScreenerRun();
-      message.success('扫描已启动：全市场市值 Top 1500，预计几分钟，完成后自动出现在列表');
+      message.success('扫描已启动：全市场成交额 Top 1500，预计几分钟，完成后自动出现在列表');
       await loadRuns();
     } catch (error) {
       message.error(error instanceof Error && error.message ? error.message : '触发失败');
@@ -182,7 +182,7 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
       <Alert
         type="info"
         showIcon
-        message="每个交易日收盘后（15:30）自动对全市场三大板块市值 Top 1500 做日线金叉扫描并留存结果，开盘前直接看结论。"
+        message="每个交易日收盘后（15:30）自动扫描全市场成交额 Top 1500 的日线金叉信号并留存结果，开盘前直接看结论。"
         action={
           <Space>
             <Button

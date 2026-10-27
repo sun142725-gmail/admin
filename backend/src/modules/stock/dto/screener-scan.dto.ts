@@ -15,10 +15,10 @@ export class ScreenerScanDto {
   @IsIn(['main', 'chinext', 'star'], { each: true })
   boards?: Array<'main' | 'chinext' | 'star'>;
 
-  /** 个人候选池：watchlist=我的自选股；roundtable=圆桌分析过的个股。与 boards/symbols 三选一。 */
+  /** 个人/市场候选池：watchlist=我的自选股；roundtable=圆桌分析过的个股；amount=全市场成交额排行 Top limit。与 boards/symbols 三选一。 */
   @IsOptional()
-  @IsIn(['watchlist', 'roundtable'])
-  pool?: 'watchlist' | 'roundtable';
+  @IsIn(['watchlist', 'roundtable', 'amount'])
+  pool?: 'watchlist' | 'roundtable' | 'amount';
 
   /** 板块候选数量：按总市值从大到小取前 N 只，1-500，默认 100。 */
   @IsOptional()

@@ -87,6 +87,7 @@ export interface SectorItem {
 interface EastmoneyClistRow {
   f2?: number | string;
   f3?: number | string;
+  f6?: number | string;
   f12?: string;
   f13?: number;
   f14?: string;
@@ -164,6 +165,8 @@ export interface StockListItem {
   name: string;
   /** 总市值（元）；停牌等为 null。 */
   marketCap: number | null;
+  /** 成交额（元）；停牌等为 null。 */
+  amount: number | null;
 }
 
 /** 股票列表：按总市值（f20）从大到小分页拉取。 */
@@ -185,11 +188,23 @@ export function parseEastmoneyStockList(payload: EastmoneyClistResponse): { tota
       return {
         symbol: `${row.f13 === 1 ? 'sh' : 'sz'}${code}`,
         name: row.f14 ?? '',
-        marketCap: rowNum(row.f20)
+        marketCap: rowNum(row.f20),
+        amount: rowNum(row.f6)
       };
     })
     .filter((item): item is StockListItem => item !== null);
   return { total: payload?.data?.total ?? items.length, items };
+}
+
+// 全市场 A 股过滤串：沪深主板 + 创业板 + 科创板（北交所 K 线源不支持，不纳入）。
+export const EASTMONEY_ALL_A_FS = 'm:1+t:2,m:0+t:6,m:0+t:80,m:1+t:23';
+
+/** 全市场成交额排行（f6 从大到小）：每日收盘扫描的候选池数据源。 */
+export function buildEastmoneyAmountRankUrl(page: number, pageSize = 100): string {
+  return (
+    `https://push2.eastmoney.com/api/qt/clist/get?pn=${page}&pz=${pageSize}&po=1&np=1&fltt=2&invt=2` +
+    `&fid=f6&fs=${EASTMONEY_ALL_A_FS}+f:!50&fields=f12,f13,f14,f6,f20`
+  );
 }
 
 export interface SearchItem {

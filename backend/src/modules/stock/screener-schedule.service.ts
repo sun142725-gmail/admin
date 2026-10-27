@@ -1,9 +1,10 @@
-// 每日收盘选股扫描调度：工作日收盘后对全市场（三大板块市值 Top N）跑金叉扫描并落库。
+// 每日收盘选股扫描调度：工作日收盘后对全市场成交额 Top N 跑金叉扫描并落库。
 // 配置（环境变量）：
 //   STOCK_SCAN_ENABLED=false 关闭（默认开启；NODE_ENV=test 自动不注册）
-//   STOCK_SCAN_CRON       cron 表达式，默认工作日 15:30（A 股 15:00 收盘留出数据结算余量）
-//   STOCK_SCAN_BOARDS     板块，默认 main,chinext,star
-//   STOCK_SCAN_LIMIT      每板块候选数，默认 500（按市值 Top N）
+//   STOCK_SCAN_CRON       cron 表达式，默认工作日 15:30（A 股 15:00 收盘留出数据结算余量；注意服务器时区）
+//   STOCK_SCAN_UNIVERSE   候选池：amount（默认，全市场成交额排行 Top N）/ board（按板块市值 Top N）
+//   STOCK_SCAN_LIMIT      amount 模式=成交额 Top N（默认 1500）；board 模式=每板块候选数（默认 500）
+//   STOCK_SCAN_BOARDS     board 模式的板块，默认 main,chinext,star
 //   STOCK_SCAN_FREQS      周期，默认 day（多周期耗时线性增加）
 //   STOCK_SCAN_STATUS     信号过滤，默认 both（已金叉 + 即将金叉都记录）
 import { Injectable, Logger } from '@nestjs/common';
@@ -34,15 +35,26 @@ export class ScreenerScheduleService {
 
   /** 执行一次收盘扫描（定时与手动触发共用）；返回 runId。override 只覆盖显式传入的字段。 */
   async execute(override?: Partial<ScreenerScanDto>, waitForCompletion = true): Promise<number> {
-    const dto: ScreenerScanDto = {
-      boards: this.boards(),
-      limit: Number(process.env.STOCK_SCAN_LIMIT ?? 500),
-      freqs: (process.env.STOCK_SCAN_FREQS ?? 'day').split(',').map((s) => s.trim()) as ScreenerScanDto['freqs'],
-      indicators: ['kdj', 'macd'],
-      mode: 'any',
-      status: (process.env.STOCK_SCAN_STATUS as NonNullable<ScreenerScanDto['status']>) ?? 'both',
-      withinBars: 3
-    };
+    const amountMode = (process.env.STOCK_SCAN_UNIVERSE ?? 'amount') === 'amount';
+    const dto: ScreenerScanDto = amountMode
+      ? {
+          pool: 'amount',
+          limit: Number(process.env.STOCK_SCAN_LIMIT ?? 1500),
+          freqs: (process.env.STOCK_SCAN_FREQS ?? 'day').split(',').map((s) => s.trim()) as ScreenerScanDto['freqs'],
+          indicators: ['kdj', 'macd'],
+          mode: 'any',
+          status: (process.env.STOCK_SCAN_STATUS as NonNullable<ScreenerScanDto['status']>) ?? 'both',
+          withinBars: 3
+        }
+      : {
+          boards: this.boards(),
+          limit: Number(process.env.STOCK_SCAN_LIMIT ?? 500),
+          freqs: (process.env.STOCK_SCAN_FREQS ?? 'day').split(',').map((s) => s.trim()) as ScreenerScanDto['freqs'],
+          indicators: ['kdj', 'macd'],
+          mode: 'any',
+          status: (process.env.STOCK_SCAN_STATUS as NonNullable<ScreenerScanDto['status']>) ?? 'both',
+          withinBars: 3
+        };
     if (override?.symbols?.length) {
       dto.boards = undefined;
       dto.pool = undefined;
@@ -88,6 +100,9 @@ export class ScreenerScheduleService {
   }
 
   private poolDesc(dto: ScreenerScanDto): string {
+    if (dto.pool === 'amount') {
+      return `成交额 Top ${dto.limit ?? 1500}`;
+    }
     if (dto.pool === 'watchlist') {
       return '我的自选股';
     }
