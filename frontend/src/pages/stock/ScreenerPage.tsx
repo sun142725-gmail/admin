@@ -33,6 +33,7 @@ import {
 } from '../../api/screener';
 import { addToWatchlist, listWatchlist, removeFromWatchlist } from '../../api/watchlist';
 import { ScreenerRunsPanel } from './components/ScreenerRunsPanel';
+import { KlineDrawer, isStockRowClickIgnored } from './components/KlineDrawer';
 import { FREQ_LABEL, renderPct, renderSignal } from './components/screener-shared';
 
 /** 把用户粘贴的代码文本拆成代码数组：支持逗号/空格/换行/分号分隔与 600519.SH 后缀。 */
@@ -53,6 +54,7 @@ export const ScreenerPage: React.FC = () => {
   );
   const [boards, setBoards] = useState<ScreenerBoard[]>(['chinext']);
   const [limit, setLimit] = useState(100);
+  const [sortBy, setSortBy] = useState<'marketCap' | 'amount' | 'volume' | 'random'>('marketCap');
   const [symbolsText, setSymbolsText] = useState('');
   const [freqs, setFreqs] = useState<ScreenerFreq[]>(['day']);
   const [indicators, setIndicators] = useState<ScreenerIndicator[]>(['kdj', 'macd']);
@@ -61,6 +63,8 @@ export const ScreenerPage: React.FC = () => {
   const [withinBars, setWithinBars] = useState(3);
   // 自选收藏状态：结果行星标切换用
   const [favoriteSymbols, setFavoriteSymbols] = useState<Set<string>>(new Set());
+  // K 线抽屉：点击命中股票行弹出日K
+  const [klineTarget, setKlineTarget] = useState<{ symbol: string; name: string } | null>(null);
 
   useEffect(() => {
     listWatchlist()
@@ -114,6 +118,7 @@ export const ScreenerPage: React.FC = () => {
         symbols: poolMode === 'manual' ? payloadSymbols : undefined,
         boards: poolMode === 'board' ? boards : undefined,
         limit: poolMode === 'board' ? limit : undefined,
+        sortBy: poolMode === 'board' ? sortBy : undefined,
         pool: poolMode === 'watchlist' ? 'watchlist' : poolMode === 'roundtable' ? 'roundtable' : undefined,
         freqs,
         indicators,
@@ -169,7 +174,11 @@ export const ScreenerPage: React.FC = () => {
       width: 110,
       render: (value: string) => <span className="font-mono">{value.toUpperCase()}</span>
     },
-    { title: '名称', dataIndex: 'name', width: 120, render: (value: string) => value || '-' },
+    { title: '名称', dataIndex: 'name', width: 120, render: (value: string, record: ScreenerMatch) => (
+      <Button type="link" size="small" className="!px-0" onClick={() => setKlineTarget({ symbol: record.symbol, name: value || record.symbol })}>
+        {value || '-'}
+      </Button>
+    ) },
     {
       title: '周期',
       dataIndex: 'freq',
@@ -268,11 +277,26 @@ export const ScreenerPage: React.FC = () => {
                   />
                 </Space>
                 <Space>
-                  <Tooltip title="按总市值从大到小取前 N 只：大盘股数据质量好、流动性高，也天然避开仙股与退市股">
+                  <span>排序：</span>
+                  <Radio.Group
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    optionType="button"
+                    buttonStyle="solid"
+                    options={[
+                      { value: 'marketCap', label: '市值' },
+                      { value: 'amount', label: '成交额' },
+                      { value: 'volume', label: '成交量' },
+                      { value: 'random', label: '随机' }
+                    ]}
+                  />
+                </Space>
+                <Space>
+                  <Tooltip title="按所选排序从大到小取前 N 只；随机模式从该板块前 800 只活跃股中等概率抽取">
                     <span>候选数量：</span>
                   </Tooltip>
                   <InputNumber min={10} max={500} step={50} value={limit} onChange={(v) => setLimit(v ?? 100)} />
-                  <span>只（市值 Top N）</span>
+                  <span>只（{sortBy === 'random' ? '随机抽' : 'Top N'}）</span>
                 </Space>
               </Space>
               <div className="mt-1 text-xs" style={{ color: '#94a3b8' }}>
@@ -409,10 +433,24 @@ export const ScreenerPage: React.FC = () => {
         columns={columns}
         dataSource={dataSource}
         loading={scanning}
+        onRow={(record) => ({
+          onClick: (event) => {
+            if (!isStockRowClickIgnored(event)) {
+              setKlineTarget({ symbol: record.symbol, name: record.name || record.symbol });
+            }
+          },
+          style: { cursor: 'pointer' }
+        })}
         pagination={dataSource.length > 50 ? { pageSize: 50, showTotal: (t) => `共 ${t} 条` } : false}
         size="middle"
         scroll={{ x: 'max-content' }}
         locale={{ emptyText: result ? '没有命中筛选条件的股票' : '选择候选池后点击「开始扫描」' }}
+      />
+      <KlineDrawer
+        open={!!klineTarget}
+        symbol={klineTarget?.symbol ?? null}
+        name={klineTarget?.name}
+        onClose={() => setKlineTarget(null)}
       />
       </>
     );

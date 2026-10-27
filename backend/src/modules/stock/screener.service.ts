@@ -2,7 +2,7 @@
 // 复用 MarketDataService 的 K 线三级容灾与 TTL 缓存；单股失败跳过不中断整轮扫描。
 // 交互扫描与每日定时扫描共用同一引擎：分批限流（每批 50 任务，批间歇 1 秒），
 // 定时扫描任务上限放宽（无 HTTP 超时约束），并带运行/命中两张记录表的落库生命周期。
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -19,13 +19,17 @@ import { StockScreenerHit } from '../../common/entities/stock-screener-hit.entit
 import {
   EastmoneyBoard,
   EastmoneyClistResponse,
+  EastmoneySortField,
   StockListItem,
   buildEastmoneyAmountRankUrl,
   buildEastmoneyStockListUrl,
+  buildSinaRankUrl,
   EASTMONEY_BOARD_FS,
-  parseEastmoneyStockList
+  parseEastmoneyStockList,
+  parseSinaRankList,
+  SINA_BOARD_NODES
 } from './market/eastmoney.api';
-import { fetchJson } from './market/http.util';
+import { fetchJson, fetchText } from './market/http.util';
 import { MarketDataService } from './market/market-data.service';
 import { normalizeSymbol } from './market/tencent-quote.api';
 import { ScreenerScanDto } from './dto/screener-scan.dto';
@@ -39,6 +43,8 @@ const MAX_MANUAL_SYMBOLS = 50;
 const MAX_BOARD_SYMBOLS = 500;
 // 成交额排行候选池上限（每日全市场扫描默认 1500）
 const MAX_AMOUNT_SYMBOLS = 2000;
+// 随机抽样的候选全集大小（每板块排序拉取前 N 只再洗牌抽样）
+const MAX_RANDOM_SAMPLE_BASE = 800;
 // 分批限流：每批任务数与批间歇
 const BATCH_SIZE = 50;
 const BATCH_PAUSE_MS = 1000;
@@ -97,7 +103,7 @@ export interface ScheduledScanConfig {
 export class ScreenerService {
   private readonly logger = new Logger(ScreenerService.name);
   // 板块股票列表缓存：列表变化慢，10 分钟内重复扫描不重复拉列表
-  private readonly boardListCache = new Map<EastmoneyBoard, { at: number; items: StockListItem[] }>();
+  private readonly boardListCache = new Map<string, { at: number; items: StockListItem[] }>();
   private static readonly BOARD_LIST_TTL_MS = 10 * 60 * 1000;
   // 成交额排行缓存：10 分钟内重复扫描/触发不重复拉 15 页列表
   private amountRankCache: { at: number; items: StockListItem[] } | null = null;
@@ -260,7 +266,9 @@ export class ScreenerService {
   /** 配置快照：写入运行记录供回溯（剔除空字段）。 */
   private configSnapshot(dto: ScreenerScanDto): Record<string, unknown> {
     return {
-      ...(dto.boards?.length ? { boards: dto.boards, limit: dto.limit } : {}),
+      ...(dto.boards?.length
+        ? { boards: dto.boards, limit: dto.limit, sortBy: dto.sortBy ?? 'marketCap' }
+        : {}),
       ...(dto.pool ? { pool: dto.pool } : {}),
       ...(dto.symbols?.length ? { symbols: dto.symbols } : {}),
       freqs: this.resolveFreqs(dto.freqs),
@@ -280,22 +288,46 @@ export class ScreenerService {
     const nameBySymbol = new Map<string, string>();
     if (dto.boards?.length) {
       const boards = [...new Set(dto.boards)];
+      const sortBy = dto.sortBy ?? 'marketCap';
       const limit = Math.min(Math.max(dto.limit ?? 100, 1), MAX_BOARD_SYMBOLS);
-      const list = await this.resolveBoardPool(boards, limit);
+      let list: StockListItem[];
+      try {
+        list = await this.resolveBoardPool(boards, limit, sortBy);
+      } catch (error) {
+        throw new ServiceUnavailableException(
+          `候选池数据源（东财）暂时不可用：${error instanceof Error ? error.message : '未知错误'}，请稍后重试`
+        );
+      }
       list.forEach((item) => {
         if (item.name) {
           nameBySymbol.set(item.symbol, item.name);
         }
       });
+      const sortLabel: Record<string, string> = {
+        marketCap: '市值',
+        amount: '成交额',
+        volume: '成交量',
+        random: '随机'
+      };
       return {
         symbols: list.map((item) => item.symbol),
         nameBySymbol,
-        desc: boards.map((board) => BOARD_LABEL[board]).join(' + ')
+        desc:
+          (sortBy === 'random'
+            ? `${boards.map((board) => BOARD_LABEL[board]).join(' + ')}·随机 ${limit} 只`
+            : `${boards.map((board) => BOARD_LABEL[board]).join(' + ')}·${sortLabel[sortBy]} Top ${limit}`)
       };
     }
     if (dto.pool === 'amount') {
       const limit = Math.min(Math.max(dto.limit ?? 1500, 1), MAX_AMOUNT_SYMBOLS);
-      const list = await this.amountRankList(limit);
+      let list: StockListItem[];
+      try {
+        list = await this.amountRankList(limit);
+      } catch (error) {
+        throw new ServiceUnavailableException(
+          `候选池数据源（东财）暂时不可用：${error instanceof Error ? error.message : '未知错误'}，请稍后重试`
+        );
+      }
       list.forEach((item) => {
         if (item.name) {
           nameBySymbol.set(item.symbol, item.name);
@@ -475,16 +507,33 @@ export class ScreenerService {
     if (cached && Date.now() - cached.at < ScreenerService.AMOUNT_RANK_TTL_MS && cached.items.length >= limit) {
       return cached.items.slice(0, limit);
     }
-    const items: StockListItem[] = [];
-    const pageSize = 100;
-    for (let page = 1; page <= Math.ceil(limit / pageSize) + 1; page += 1) {
-      const payload = await fetchJson<EastmoneyClistResponse>(
-        buildEastmoneyAmountRankUrl(page, pageSize)
-      );
-      const parsed = parseEastmoneyStockList(payload);
-      items.push(...parsed.items);
-      if (parsed.items.length < pageSize || items.length >= limit) {
-        break;
+    let items: StockListItem[] = [];
+    try {
+      const pageSize = 100;
+      for (let page = 1; page <= Math.ceil(limit / pageSize) + 1; page += 1) {
+        const payload = await fetchJson<EastmoneyClistResponse>(
+          buildEastmoneyAmountRankUrl(page, pageSize)
+        );
+        const parsed = parseEastmoneyStockList(payload);
+        items.push(...parsed.items);
+        if (parsed.items.length < pageSize || items.length >= limit) {
+          break;
+        }
+      }
+    } catch (error) {
+      // 东财不可达时回退新浪全市场成交额排行
+      this.logger.warn(`东财成交额排行失败，回退新浪: ${error instanceof Error ? error.message : String(error)}`);
+      items = [];
+      const num = 100;
+      for (let page = 1; page <= Math.ceil(limit / num); page += 1) {
+        const raw = await fetchText(buildSinaRankUrl('hs_a', page, num, 'amount'), {
+          Referer: 'https://finance.sina.com.cn'
+        });
+        const parsed = parseSinaRankList(raw);
+        items.push(...parsed);
+        if (parsed.length < num || items.length >= limit) {
+          break;
+        }
       }
     }
     if (items.length) {
@@ -494,45 +543,109 @@ export class ScreenerService {
   }
 
   /**
-   * 板块候选池：按总市值从大到小取前 limit 只（大盘股 K 线数据质量与流动性更好，
-   * 也天然避开仙股/退市股）。列表带 10 分钟缓存。
+   * 板块候选池：按排序字段从大到小取前 limit 只；random 模式从板块全量列表（最多 800 只/板块）
+   * 随机抽 limit 只。列表带 10 分钟缓存（按 板块×排序 分键）。
    */
-  private async resolveBoardPool(boards: EastmoneyBoard[], limit: number): Promise<StockListItem[]> {
+  private async resolveBoardPool(
+    boards: EastmoneyBoard[],
+    limit: number,
+    sortBy: 'marketCap' | 'amount' | 'volume' | 'random'
+  ): Promise<StockListItem[]> {
     const merged = new Map<string, StockListItem>();
     for (const board of boards) {
-      const list = await this.boardList(board, limit);
+      // 随机模式需要更大的候选全集（取该板块排序前 800 只再抽样）
+      const fetchLimit = sortBy === 'random' ? MAX_RANDOM_SAMPLE_BASE : limit;
+      const list = await this.boardList(board, fetchLimit, sortBy);
       for (const item of list) {
         if (!merged.has(item.symbol)) {
           merged.set(item.symbol, item);
         }
       }
     }
-    return [...merged.values()]
-      .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
-      .slice(0, limit);
+    const all = [...merged.values()];
+    if (sortBy === 'random') {
+      // 洗牌后取前 limit 只（等概率无重复抽样）
+      for (let i = all.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [all[i], all[j]] = [all[j], all[i]];
+      }
+      return all.slice(0, limit);
+    }
+    const sortValue = (item: StockListItem) =>
+      sortBy === 'amount' ? item.amount : sortBy === 'volume' ? item.volume : item.marketCap;
+    return all.sort((a, b) => (sortValue(b) ?? 0) - (sortValue(a) ?? 0)).slice(0, limit);
   }
 
-  private async boardList(board: EastmoneyBoard, limit: number): Promise<StockListItem[]> {
-    const cached = this.boardListCache.get(board);
+  private async boardList(
+    board: EastmoneyBoard,
+    limit: number,
+    sortBy: 'marketCap' | 'amount' | 'volume' | 'random'
+  ): Promise<StockListItem[]> {
+    // 随机模式的抽样基表按成交额排序拉取（任意排序的全集等价）；缓存也按排序分键
+    const cacheSort: EastmoneySortField = sortBy === 'random' ? 'f6' : sortBy === 'amount' ? 'f6' : sortBy === 'volume' ? 'f5' : 'f20';
+    const cacheKey = `${board}:${cacheSort}`;
+    const cached = this.boardListCache.get(cacheKey);
     if (cached && Date.now() - cached.at < ScreenerService.BOARD_LIST_TTL_MS && cached.items.length >= limit) {
       return cached.items.slice(0, limit);
     }
-    const items: StockListItem[] = [];
-    const pageSize = 100;
-    for (let page = 1; page <= Math.ceil(limit / pageSize) + 1; page += 1) {
-      const payload = await fetchJson<EastmoneyClistResponse>(
-        buildEastmoneyStockListUrl(EASTMONEY_BOARD_FS[board], page, pageSize)
-      );
-      const parsed = parseEastmoneyStockList(payload);
-      items.push(...parsed.items);
-      if (parsed.items.length < pageSize || items.length >= limit) {
-        break;
+    const sinaSort = sortBy === 'random' ? 'amount' : sortBy === 'volume' ? 'volume' : sortBy === 'amount' ? 'amount' : 'mktcap';
+    let items: StockListItem[] = [];
+    try {
+      const pageSize = 100;
+      for (let page = 1; page <= Math.ceil(limit / pageSize) + 1; page += 1) {
+        const payload = await fetchJson<EastmoneyClistResponse>(
+          buildEastmoneyStockListUrl(EASTMONEY_BOARD_FS[board], page, pageSize, cacheSort)
+        );
+        const parsed = parseEastmoneyStockList(payload);
+        items.push(...parsed.items);
+        if (parsed.items.length < pageSize || items.length >= limit) {
+          break;
+        }
       }
+    } catch (error) {
+      // 东财被限流/不可达时回退新浪行情中心（按板块节点 + 同语义排序），保持列表容灾与 K 线三级容灾对等
+      this.logger.warn(`东财板块列表失败，回退新浪（${board}@${sortBy}）: ${error instanceof Error ? error.message : String(error)}`);
+      items = await this.sinaBoardList(board, limit, sinaSort);
     }
     if (items.length) {
-      this.boardListCache.set(board, { at: Date.now(), items });
+      this.boardListCache.set(cacheKey, { at: Date.now(), items });
     }
     return items.slice(0, limit);
+  }
+
+  /** 新浪行情中心容灾：按板块节点拉排行，主板需按 60/00 前缀过滤。 */
+  private async sinaBoardList(
+    board: EastmoneyBoard,
+    limit: number,
+    sinaSort: 'amount' | 'volume' | 'mktcap'
+  ): Promise<StockListItem[]> {
+    const prefixFilter =
+      board === 'main' ? (symbol: string) => /^(sh60|sz00)/.test(symbol) : () => true;
+    const merged: StockListItem[] = [];
+    const seen = new Set<string>();
+    const num = 100;
+    // 主板要拉沪/深两个节点，各取 limit 只再过滤合并
+    for (const node of SINA_BOARD_NODES[board]) {
+      for (let page = 1; page <= Math.ceil(limit / num) + 1; page += 1) {
+        const raw = await fetchText(buildSinaRankUrl(node, page, num, sinaSort), {
+          Referer: 'https://finance.sina.com.cn'
+        });
+        const parsed = parseSinaRankList(raw).filter((item) => prefixFilter(item.symbol));
+        for (const item of parsed) {
+          if (!seen.has(item.symbol)) {
+            seen.add(item.symbol);
+            merged.push(item);
+          }
+        }
+        if (parsed.length < num || merged.length >= limit * SINA_BOARD_NODES[board].length) {
+          break;
+        }
+      }
+    }
+    // 主板跨节点合并后需按排序字段重排再截取
+    const sortValue = (item: StockListItem) =>
+      sinaSort === 'amount' ? item.amount : sinaSort === 'volume' ? item.volume : item.marketCap;
+    return merged.sort((a, b) => (sortValue(b) ?? 0) - (sortValue(a) ?? 0)).slice(0, limit);
   }
 
   /** 归一化用户输入：600519.SH → sh600519；裸 6 位按交易所推断。 */

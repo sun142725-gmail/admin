@@ -38,7 +38,8 @@ export async function fetchJson<T>(
     }
     text = await response.text();
   } else {
-    text = await fetchText(url);
+    // GET 也透传 headers（新浪行情接口要求 Referer）
+    text = await fetchText(url, init?.headers);
   }
   // 部分接口（如东财 suggest）会返回 jQuery...( {...} ) 的 JSONP 包装，剥离后解析。
   const firstBrace = text.indexOf('{');

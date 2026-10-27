@@ -12,6 +12,7 @@ import {
   updateWatchlist
 } from '../../api/watchlist';
 import { fetchQuotes } from '../../api/stock';
+import { KlineDrawer, isStockRowClickIgnored } from './components/KlineDrawer';
 
 interface QuoteRow {
   symbol: string;
@@ -27,6 +28,8 @@ export const WatchlistPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [addSymbol, setAddSymbol] = useState('');
   const [adding, setAdding] = useState(false);
+  // K 线抽屉：点击股票行弹出日K
+  const [klineTarget, setKlineTarget] = useState<{ symbol: string; name: string } | null>(null);
   // 分组筛选：'全部' 或具体分组名
   const [groupFilter, setGroupFilter] = useState<string>('全部');
   // 编辑弹窗：正在编辑的股票 + 表单
@@ -160,6 +163,12 @@ export const WatchlistPage: React.FC = () => {
     form.setFieldsValue({ note: item.note ?? '', group: item.group || '默认' });
   };
 
+  const openKline = (record: { symbol: string; name: string }) => {
+    const q = quotes[record.symbol];
+    const known = q?.name && q.name !== record.symbol;
+    setKlineTarget({ symbol: record.symbol, name: known ? (q.name as string) : record.name });
+  };
+
   const onSaveEdit = async () => {
     if (!editing) {
       return;
@@ -210,7 +219,11 @@ export const WatchlistPage: React.FC = () => {
       render: (_: unknown, record) => {
         const q = record.quote;
         const known = q?.name && q.name !== record.symbol;
-        return known ? q.name : record.name;
+        return (
+          <Button type="link" size="small" className="!px-0" onClick={() => openKline(record)}>
+            {known ? q.name : record.name}
+          </Button>
+        );
       }
     },
     {
@@ -280,7 +293,7 @@ export const WatchlistPage: React.FC = () => {
       <div className="page-toolbar">
         <div>
           <div className="page-toolbar-title">自选股</div>
-          <div className="page-toolbar-subtitle">收藏关注的股票，可作为选股器候选池，一键发起圆桌分析。</div>
+          <div className="page-toolbar-subtitle">收藏关注的股票，点击股票行查看日K线图；可作为选股器候选池，一键发起圆桌分析。</div>
         </div>
         <Space>
           <Input
@@ -316,12 +329,27 @@ export const WatchlistPage: React.FC = () => {
           columns={columns}
           dataSource={dataSource}
           loading={loading}
+          onRow={(record) => ({
+            onClick: (event) => {
+              if (!isStockRowClickIgnored(event)) {
+                openKline(record);
+              }
+            },
+            style: { cursor: 'pointer' }
+          })}
           pagination={items.length > 50 ? { pageSize: 50, showTotal: (t) => `共 ${t} 只` } : false}
           size="middle"
           scroll={{ x: 'max-content' }}
           locale={{ emptyText: '还没有自选股：在上方输入代码，或在圆桌/选股结果里点星标收藏' }}
         />
       </div>
+
+      <KlineDrawer
+        open={!!klineTarget}
+        symbol={klineTarget?.symbol ?? null}
+        name={klineTarget?.name}
+        onClose={() => setKlineTarget(null)}
+      />
 
       <Modal
         title={editing ? `编辑：${editing.name}` : ''}

@@ -88,6 +88,7 @@ interface EastmoneyClistRow {
   f2?: number | string;
   f3?: number | string;
   f6?: number | string;
+  f5?: number | string;
   f12?: string;
   f13?: number;
   f14?: string;
@@ -167,13 +168,23 @@ export interface StockListItem {
   marketCap: number | null;
   /** 成交额（元）；停牌等为 null。 */
   amount: number | null;
+  /** 成交量（手）；停牌等为 null。 */
+  volume: number | null;
 }
 
-/** 股票列表：按总市值（f20）从大到小分页拉取。 */
-export function buildEastmoneyStockListUrl(fs: string, page: number, pageSize = 100): string {
+/** 股票列表排序字段：f20 总市值 / f6 成交额 / f5 成交量。 */
+export type EastmoneySortField = 'f20' | 'f6' | 'f5';
+
+/** 股票列表：按指定字段从大到小分页拉取（板块候选池数据源）。 */
+export function buildEastmoneyStockListUrl(
+  fs: string,
+  page: number,
+  pageSize = 100,
+  sortField: EastmoneySortField = 'f20'
+): string {
   return (
     `https://push2.eastmoney.com/api/qt/clist/get?pn=${page}&pz=${pageSize}&po=1&np=1&fltt=2&invt=2` +
-    `&fid=f20&fs=${fs}+f:!50&fields=f12,f13,f14,f20`
+    `&fid=${sortField}&fs=${fs}+f:!50&fields=f12,f13,f14,f5,f6,f20`
   );
 }
 
@@ -189,7 +200,8 @@ export function parseEastmoneyStockList(payload: EastmoneyClistResponse): { tota
         symbol: `${row.f13 === 1 ? 'sh' : 'sz'}${code}`,
         name: row.f14 ?? '',
         marketCap: rowNum(row.f20),
-        amount: rowNum(row.f6)
+        amount: rowNum(row.f6),
+        volume: rowNum(row.f5)
       };
     })
     .filter((item): item is StockListItem => item !== null);
@@ -203,8 +215,71 @@ export const EASTMONEY_ALL_A_FS = 'm:1+t:2,m:0+t:6,m:0+t:80,m:1+t:23';
 export function buildEastmoneyAmountRankUrl(page: number, pageSize = 100): string {
   return (
     `https://push2.eastmoney.com/api/qt/clist/get?pn=${page}&pz=${pageSize}&po=1&np=1&fltt=2&invt=2` +
-    `&fid=f6&fs=${EASTMONEY_ALL_A_FS}+f:!50&fields=f12,f13,f14,f6,f20`
+    `&fid=f6&fs=${EASTMONEY_ALL_A_FS}+f:!50&fields=f12,f13,f14,f5,f6,f20`
   );
+}
+
+// ---------- 新浪排行列表（东财被限流时的容灾源） ----------
+
+/** 板块 → 新浪行情中心节点（主板需按 60/00 前缀过滤，故沪/深分开拉）。 */
+export const SINA_BOARD_NODES: Record<EastmoneyBoard, string[]> = {
+  main: ['sh_a', 'sz_a'],
+  chinext: ['cyb'],
+  star: ['kcb']
+};
+
+export type SinaSortField = 'amount' | 'volume' | 'mktcap';
+
+/** 新浪 A 股排行（按 sort 字段从大到小）。 */
+export function buildSinaRankUrl(node: string, page: number, num = 100, sort: SinaSortField = 'amount'): string {
+  return (
+    `https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData` +
+    `?page=${page}&num=${num}&sort=${sort}&asc=0&node=${node}&symbol=&_s_r_a=page`
+  );
+}
+
+export interface SinaRankRow {
+  symbol?: string;
+  code?: string;
+  name?: string;
+  /** 成交额（元）。 */
+  amount?: number | string;
+  /** 成交量（股）。 */
+  volume?: number | string;
+  /** 总市值（万元）。 */
+  mktcap?: number | string;
+}
+
+export function parseSinaRankList(raw: string): StockListItem[] {
+  let rows: SinaRankRow[] = [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      rows = parsed as SinaRankRow[];
+    }
+  } catch {
+    return [];
+  }
+  return rows
+    .map((row) => {
+      const symbol = (row.symbol ?? '').toLowerCase();
+      if (!/^(sh|sz)\d{6}$/.test(symbol)) {
+        return null;
+      }
+      const toNumber = (v: number | string | undefined): number | null => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      };
+      return {
+        symbol,
+        name: row.name ?? '',
+        // 新浪 mktcap 单位万元 → 元；volume 单位股 → 手（与东财口径一致）
+        marketCap: row.mktcap != null ? toNumber(row.mktcap) === null ? null : toNumber(row.mktcap)! * 10000 : null,
+        amount: toNumber(row.amount),
+        volume: row.volume != null ? toNumber(row.volume) === null ? null : Math.round(toNumber(row.volume)! / 100) : null
+      };
+    })
+    .filter((item): item is StockListItem => item !== null);
 }
 
 export interface SearchItem {

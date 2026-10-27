@@ -45,10 +45,12 @@ export interface ScreenerScanResult {
 export interface ScreenerScanPayload {
   symbols?: string[];
   boards?: ScreenerBoard[];
-  /** 个人候选池：watchlist=我的自选股；roundtable=圆桌分析过的个股。 */
-  pool?: 'watchlist' | 'roundtable';
-  /** 板块候选数量：按总市值从大到小取前 N。 */
+  /** 个人候选池：watchlist=我的自选股；roundtable=圆桌分析过的个股；amount=全市场成交额排行 Top limit。 */
+  pool?: 'watchlist' | 'roundtable' | 'amount';
+  /** 板块候选数量：按排序字段从大到小取前 N。 */
   limit?: number;
+  /** 板块池排序：marketCap 市值 / amount 成交额 / volume 成交量 / random 随机。 */
+  sortBy?: 'marketCap' | 'amount' | 'volume' | 'random';
   freqs?: Array<ScreenerFreq | 'any'>;
   indicators?: ScreenerIndicator[];
   mode?: ScreenerMode;

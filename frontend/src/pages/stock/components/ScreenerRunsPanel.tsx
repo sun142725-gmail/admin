@@ -12,6 +12,7 @@ import {
   triggerScreenerRun
 } from '../../../api/screener';
 import { FREQ_LABEL, renderPct, renderPrice, renderSignal, starColumn } from './screener-shared';
+import { isStockRowClickIgnored, KlineDrawer } from './KlineDrawer';
 
 const RUN_STATUS: Record<ScreenerRun['status'], { color: string; label: string }> = {
   running: { color: 'processing', label: '运行中' },
@@ -32,6 +33,8 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
   const [detail, setDetail] = useState<{ run: ScreenerRun; hits: ScreenerHit[] } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [triggering, setTriggering] = useState(false);
+  // K 线抽屉：点击命中股票行弹出日K
+  const [klineTarget, setKlineTarget] = useState<{ symbol: string; name: string } | null>(null);
   const pollTimer = useRef<number | null>(null);
 
   const loadRuns = useCallback(async () => {
@@ -124,7 +127,11 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
         width: 110,
         render: (v: string) => <span className="font-mono">{v.toUpperCase()}</span>
       },
-      { title: '名称', dataIndex: 'name', width: 120, render: (v: string) => v || '-' },
+      { title: '名称', dataIndex: 'name', width: 120, render: (v: string, record: ScreenerHit) => (
+        <Button type="link" size="small" className="!px-0" onClick={() => setKlineTarget({ symbol: record.symbol, name: v || record.symbol })}>
+          {v || '-'}
+        </Button>
+      ) },
       {
         title: '周期',
         dataIndex: 'freq',
@@ -264,12 +271,27 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
             loading={detailLoading}
             dataSource={detail.hits}
             columns={hitColumns}
+            onRow={(record: ScreenerHit) => ({
+              onClick: (event) => {
+                if (!isStockRowClickIgnored(event)) {
+                  setKlineTarget({ symbol: record.symbol, name: record.name || record.symbol });
+                }
+              },
+              style: { cursor: 'pointer' }
+            })}
             pagination={detail.hits.length > 50 ? { pageSize: 50, showTotal: (t) => `共 ${t} 条` } : false}
             scroll={{ x: 'max-content' }}
             locale={{ emptyText: '该次运行没有命中（或尚未完成）' }}
           />
         </div>
       )}
+
+      <KlineDrawer
+        open={!!klineTarget}
+        symbol={klineTarget?.symbol ?? null}
+        name={klineTarget?.name}
+        onClose={() => setKlineTarget(null)}
+      />
     </div>
   );
 };

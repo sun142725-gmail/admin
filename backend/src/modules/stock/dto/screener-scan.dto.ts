@@ -20,13 +20,18 @@ export class ScreenerScanDto {
   @IsIn(['watchlist', 'roundtable', 'amount'])
   pool?: 'watchlist' | 'roundtable' | 'amount';
 
-  /** 板块候选数量：按总市值从大到小取前 N 只，1-500，默认 100。 */
+  /** 板块候选数量：按排序字段从大到小取前 N 只，1-500，默认 100。 */
   @IsOptional()
   @IsInt()
   @Min(1)
   @Max(500)
   @Type(() => Number)
   limit?: number;
+
+  /** 板块池排序：marketCap 市值（默认）/ amount 成交额 / volume 成交量 / random 随机（仅 boards 模式生效）。 */
+  @IsOptional()
+  @IsIn(['marketCap', 'amount', 'volume', 'random'])
+  sortBy?: 'marketCap' | 'amount' | 'volume' | 'random';
 
   /** 扫描周期：日线/周线/月线，可多选；缺省或含 any 时扫全部三周期。 */
   @IsOptional()
