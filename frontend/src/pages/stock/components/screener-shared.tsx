@@ -1,9 +1,9 @@
 // 选股信号展示工具：KDJ/MACD 信号 Tag 与命中摘要列（手动扫描结果与每日扫描面板共用）。
 import React from 'react';
 import { Button, Popconfirm, Tag, Tooltip } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import type { ColumnType, ColumnsType } from 'antd/es/table';
 import { StarFilled, StarOutlined } from '@ant-design/icons';
-import type { ScreenerFreq } from '../../api/screener';
+import type { ScreenerFreq } from '../../../api/screener';
 
 export interface SignalLike {
   status: 'golden' | 'upcoming' | null;
@@ -45,14 +45,14 @@ export const renderPrice = (v: number | string | null | undefined) => {
   return n != null && Number.isFinite(n) ? n.toFixed(2) : '-';
 };
 
-export const starColumn = (
+export const starColumn = <T extends { symbol: string; name: string }>(
   favoriteSymbols: Set<string>,
   onToggle: (symbol: string, name: string) => void
-): ColumnsType<{ symbol: string; name: string }>[number] => ({
+): ColumnType<T> => ({
   title: '',
   key: 'star',
   width: 50,
-  render: (_: unknown, record: { symbol: string; name: string }) => {
+  render: (_: unknown, record: T) => {
     const isFavorite = favoriteSymbols.has(record.symbol);
     // 加自选直接执行；移除需二次确认（Popconfirm 包裹）
     if (isFavorite) {

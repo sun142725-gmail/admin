@@ -17,6 +17,7 @@ import { listUsers } from '../../api/users';
 interface TemplateItem {
   id: number;
   name: string;
+  content?: string;
   channelTypes: string[];
   variables?: Array<{ key: string; label: string; required?: boolean }>;
 }

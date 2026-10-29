@@ -5,6 +5,9 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as request from 'supertest';
+import { ResponseInterceptor } from '../../src/common/interceptors/response.interceptor';
+import { Reflector } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from '../../src/app.module';
 import { User } from '../../src/common/entities/user.entity';
 import { Role } from '../../src/common/entities/role.entity';
@@ -32,6 +35,12 @@ describe('Notification Template Render (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    // 与 main.ts 引导保持一致：全局前缀 + 统一响应拦截器 + 校验管道（规矩唯一，别处漂移测试就 404）
+    app.setGlobalPrefix('api');
+    app.useGlobalInterceptors(new ResponseInterceptor(new Reflector()));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })
+    );
     await app.init();
 
     userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));

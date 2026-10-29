@@ -1,5 +1,5 @@
 // Axios 封装用于统一请求与自动刷新令牌。
-import axios from 'axios';
+import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { store } from '../store';
 import { clearTokens, setTokens } from '../store/authSlice';
 import { enqueueLogEvent } from '../utils/logBatcher';
@@ -14,6 +14,22 @@ const http = axios.create({
   baseURL: '/api',
   timeout: 10000
 });
+
+// 类型契约：响应拦截器已把返回值解包为统一响应结构的 data（运行时如此，类型此前没跟上）。
+// 因此方法泛型 = 业务数据类型，而非 AxiosResponse。兼容两种写法：
+//   http.get<User[]>(url)                      单泛型（推荐，T 即业务数据）
+//   http.get<never, FlowDetail>(url)           存量双泛型（R 指定返回类型）
+//   http.get(url)                              无泛型 = any（存量页面，逐步迁移）
+interface HttpClient {
+  get<T = any, R = T>(url: string, config?: AxiosRequestConfig): Promise<R>;
+  post<T = any, R = T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<R>;
+  put<T = any, R = T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<R>;
+  patch<T = any, R = T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<R>;
+  delete<T = any, R = T>(url: string, config?: AxiosRequestConfig): Promise<R>;
+  // 保留 AxiosInstance 自身能力（拦截器/默认值配置）供本文件与极端场景使用
+  interceptors: AxiosInstance['interceptors'];
+  defaults: AxiosInstance['defaults'];
+}
 
 let isRefreshing = false;
 let pending: Array<(token: string | null) => void> = [];
@@ -166,4 +182,4 @@ http.interceptors.response.use(
   }
 );
 
-export default http;
+export default http as HttpClient;

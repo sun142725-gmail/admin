@@ -22,6 +22,10 @@ process.on('unhandledRejection', (reason) => {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: false });
   app.setGlobalPrefix('api');
+  // JSON body 上限调到 10MB：Go 流水线的图生图参考图以 base64 data URL 走 JSON（4 张可达 ~8MB）；
+  // 前端业务请求远小于此，上限放宽只影响恶意请求的内存占用，限流与鉴权仍兜底
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   // 经 nginx 反代时信任第一层代理，req.ip 取 X-Forwarded-For 里的真实客户端 IP：
   // 否则全站限流/登录限流按代理 IP 共享一个桶（单用户可 429 全站），审计日志也全是代理 IP
   const httpAdapter = app.getHttpAdapter().getInstance();

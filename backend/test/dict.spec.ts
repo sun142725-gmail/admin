@@ -1,6 +1,9 @@
 // Dict 模块测试覆盖批量查询与管理接口。
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
+import { Reflector } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -29,6 +32,12 @@ describe('Dict (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    // 与 main.ts 引导保持一致：全局前缀 + 统一响应拦截器 + 校验管道（规矩唯一，别处漂移测试就 404）
+    app.setGlobalPrefix('api');
+    app.useGlobalInterceptors(new ResponseInterceptor(new Reflector()));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })
+    );
     await app.init();
 
     userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));

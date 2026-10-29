@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc --noEmit && node scripts/check-imports.mjs && vite build",
+    "check": "tsc --noEmit && node scripts/check-imports.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

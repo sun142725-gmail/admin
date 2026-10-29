@@ -220,7 +220,7 @@ const buildOption = (result: KlineResult, sub: SubIndicator) => {
                 span('MID: ', fmt(indicators.boll.mid[i]), '#ffffff'),
                 span('LOW: ', fmt(indicators.boll.lower[i]), '#31c6c6')
               ].join('')
-            : ['ma5', 'ma10', 'ma20', 'ma60']
+            : (['ma5', 'ma10', 'ma20', 'ma60'] as const)
                 .map((key) =>
                   span(`${key.toUpperCase()}: `, fmt(indicators?.[key]?.[i] ?? null), MA_COLORS[key])
                 )

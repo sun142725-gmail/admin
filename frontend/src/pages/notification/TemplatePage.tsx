@@ -142,7 +142,7 @@ export const TemplatePage: React.FC = () => {
     }
     const rawContent = form.getFieldValue('content') ?? '';
     const html = toEditorVariableHtml(rawContent, variableMetaMap);
-    editor.setContents([], 'silent');
+    editor.deleteText(0, editor.getLength(), 'silent');
     editor.clipboard.dangerouslyPasteHTML(0, html, 'silent');
     form.setFieldValue('content', editor.root.innerHTML);
     editorInitRef.current = true;
@@ -313,7 +313,7 @@ export const TemplatePage: React.FC = () => {
       <Drawer
         title={editItem ? '编辑模板' : '新增模板'}
         open={open}
-        onCancel={() => setOpen(false)}
+        onClose={() => setOpen(false)}
         width="66vw"
         destroyOnHidden
         extra={

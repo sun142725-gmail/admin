@@ -42,6 +42,8 @@ const WatchlistPage = lazyPage(() => import('../pages/stock/WatchlistPage'), 'Wa
 const FlowsPage = lazyPage(() => import('../pages/flow/FlowsPage'), 'FlowsPage');
 const FlowRunsPage = lazyPage(() => import('../pages/flow/FlowRunsPage'), 'FlowRunsPage');
 const NovelVideoPage = lazyPage(() => import('../pages/flow/NovelVideoPage'), 'NovelVideoPage');
+const GraphicPage = lazyPage(() => import('../pages/graphic/GraphicPage'), 'GraphicPage');
+const PromptLibraryPage = lazyPage(() => import('../pages/prompt/PromptLibraryPage'), 'PromptLibraryPage');
 const TemplatePage = lazyPage(() => import('../pages/notification/TemplatePage'), 'TemplatePage');
 const PublishPage = lazyPage(() => import('../pages/notification/PublishPage'), 'PublishPage');
 const InboxPage = lazyPage(() => import('../pages/notification/InboxPage'), 'InboxPage');
@@ -100,6 +102,8 @@ export const router = createBrowserRouter([
       { path: '/flow', element: <FlowsPage /> },
       { path: '/flow/runs', element: <FlowRunsPage /> },
       { path: '/flow/novel', element: <NovelVideoPage /> },
+      { path: '/graphic', element: <GraphicPage /> },
+      { path: '/prompts', element: <PromptLibraryPage /> },
       { path: '/notifications/templates', element: <TemplatePage /> },
       { path: '/notifications/publish', element: <PublishPage /> },
       { path: '/notifications/publishes', element: <Navigate to="/notifications/publish" replace /> },

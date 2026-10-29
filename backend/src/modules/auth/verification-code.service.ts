@@ -51,7 +51,9 @@ export class VerificationCodeService {
     await this.codeRepo.save(record);
 
     try {
-      if (channel === 'email') {
+      if (process.env.NODE_ENV === 'test') {
+        // 测试环境：不发真实短信/邮件，本地模拟发送成功（验证码哈希照常落库，校验流程全真）
+      } else if (channel === 'email') {
         const sceneLabel = this.getSceneLabel(scene);
         await this.notificationTriggerService.sendEmail({
           templateCode: LOGIN_TEMPLATE_CODE,
@@ -93,9 +95,10 @@ export class VerificationCodeService {
       target,
       channel,
       scene,
-      // 仅显式 development 回显验证码便于联调；此前是"非 production 即回显"，
+      // 仅显式 development / test 回显验证码便于联调与测试断言；此前是"非 production 即回显"，
       // 线上一旦漏配 NODE_ENV，任意账号可经发码接口直接拿到验证码完成接管
-      code: process.env.NODE_ENV === 'development' ? code : undefined
+      code:
+        process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? code : undefined
     };
   }
 

@@ -32,10 +32,23 @@ export interface ImageRequestOptions {
   prompt: string;
   size?: string;
   count?: number;
+  // 图生图参考图（data URL）。有值时走 images/edits 通道（首帧延续/角色一致性）。
+  referenceImages?: string[];
 }
 
 export interface ImageResult {
   url: string;
+}
+
+export interface SpeechRequestOptions {
+  text: string;
+  voice?: string;
+  speed?: number;
+}
+
+export interface SpeechResult {
+  audioBase64: string;
+  mime: string;
 }
 
 export interface ProbeResult {
@@ -52,5 +65,7 @@ export interface LlmAdapter {
     channel: ResolvedChannel
   ): AsyncGenerator<string>;
   images?(options: ImageRequestOptions, channel: ResolvedChannel): Promise<ImageResult[]>;
+  // 语音合成（OpenAI 兼容 /audio/speech），动漫流水线配音用。
+  speech?(options: SpeechRequestOptions, channel: ResolvedChannel): Promise<SpeechResult>;
   probe(channel: ResolvedChannel): Promise<ProbeResult>;
 }

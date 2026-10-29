@@ -6,6 +6,7 @@ export interface WatchlistItem {
   symbol: string;
   name: string;
   note?: string | null;
+  group?: string;
   createdAt: string;
 }
 

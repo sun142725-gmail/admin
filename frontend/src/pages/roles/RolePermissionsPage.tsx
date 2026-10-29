@@ -80,15 +80,15 @@ export const RolePermissionsPage: React.FC = () => {
     setLoading(true);
     try {
       const [roleRes, permissionRes] = await Promise.all([listRoles(1, 200), listPermissions(1, 500)]);
-      const currentRole = (roleRes.items ?? []).find((item: RoleItem) => item.id === roleId) ?? null;
+      const currentRole = ((roleRes.items ?? []) as RoleItem[]).find((item) => item.id === roleId) ?? null;
       if (!currentRole) {
         message.error('角色不存在或已被删除');
         navigate('/roles');
         return;
       }
       setRole(currentRole);
-      setPermissions(permissionRes.items ?? []);
-      setSelectedIds(currentRole.permissions?.map((item) => item.id) ?? []);
+      setPermissions((permissionRes.items ?? []) as PermissionItem[]);
+      setSelectedIds((currentRole.permissions ?? []).map((item) => item.id));
       setCollapsedGroupKeys([]);
     } finally {
       setLoading(false);

@@ -42,7 +42,7 @@ export const WatchlistPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await listWatchlist();
-      setItems(res.items ?? []);
+      setItems(res);
     } catch {
       message.error('自选股加载失败');
     } finally {

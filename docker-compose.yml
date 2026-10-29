@@ -41,6 +41,20 @@ services:
       GIN_MODE: release
       # 与 backend 共用同一 JWT 密钥：网关转发的 accessToken 在 Go 侧同样可验签（纵深防御）
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?请在根目录 .env 配置强随机 JWT_ACCESS_SECRET}
+      # 图文流水线：共用 backend 的 MySQL 与内部接口令牌；上传目录与 backend 同卷（/app/uploads）
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USERNAME: rbac
+      DB_PASSWORD: ${MYSQL_PASSWORD:?请在根目录 .env 配置 MYSQL_PASSWORD}
+      DB_NAME: rbac
+      NODE_BASE_URL: http://backend:3000
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?请在根目录 .env 配置强随机 INTERNAL_API_TOKEN}
+      UPLOAD_DIR: /app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
     ports:
       # 仅回环绑定供直连调试；backend 在 compose 网络内走 http://core:8081
       - "127.0.0.1:8081:8081"
@@ -83,6 +97,8 @@ services:
       LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-7}
       # 微服务网关：/api/svc/core/* 转发到 Go 服务（compose 网络内走服务名）
       PROXY_CORE_TARGET: http://core:8081/api/v1
+      # 内部接口令牌：Go 流水线回调 /api/internal/ai/*（chat/image/提示词模板）用
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?请在根目录 .env 配置强随机 INTERNAL_API_TOKEN}
       AI_ENCRYPTION_KEY: ${AI_ENCRYPTION_KEY:-}
       # 股市圆桌消息面联网检索（可选，不配自动降级）
       BOCHA_API_KEY: ${BOCHA_API_KEY:-}

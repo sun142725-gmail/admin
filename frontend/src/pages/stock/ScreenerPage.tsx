@@ -31,7 +31,7 @@ import {
   ScreenerScanResult,
   scanScreener
 } from '../../api/screener';
-import { addToWatchlist, listWatchlist, removeFromWatchlist } from '../../api/watchlist';
+import { addToWatchlist, listWatchlist, removeFromWatchlist, type WatchlistItem } from '../../api/watchlist';
 import { ScreenerRunsPanel } from './components/ScreenerRunsPanel';
 import { KlineDrawer, isStockRowClickIgnored } from './components/KlineDrawer';
 import { FREQ_LABEL, renderPct, renderSignal } from './components/screener-shared';
@@ -69,7 +69,7 @@ export const ScreenerPage: React.FC = () => {
   useEffect(() => {
     listWatchlist()
       .then((res) => {
-        setFavoriteSymbols(new Set((res.items ?? []).map((item) => item.symbol)));
+        setFavoriteSymbols(new Set(((res as WatchlistItem[]) ?? []).map((item) => item.symbol)));
       })
       .catch(() => undefined);
   }, []);

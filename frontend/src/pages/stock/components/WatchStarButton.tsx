@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Popconfirm, message } from 'antd';
 import { StarFilled, StarOutlined } from '@ant-design/icons';
-import { addToWatchlist, listWatchlist, removeFromWatchlist } from '../../../api/watchlist';
+import { addToWatchlist, listWatchlist, removeFromWatchlist, type WatchlistItem } from '../../../api/watchlist';
 
 interface WatchStarButtonProps {
   symbol: string;
@@ -19,7 +19,7 @@ export const WatchStarButton: React.FC<WatchStarButtonProps> = ({ symbol, name, 
     listWatchlist()
       .then((res) => {
         if (!stopped) {
-          setIsFavorite((res.items ?? []).some((item) => item.symbol === symbol));
+          setIsFavorite(((res as WatchlistItem[]) ?? []).some((item) => item.symbol === symbol));
           setReady(true);
         }
       })

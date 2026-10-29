@@ -1,4 +1,4 @@
-// 服务入口：装配配置与路由，监听信号优雅停机。业务代码不写在这里。
+// 服务入口：装配配置/数据库/内部客户端与路由，监听信号优雅停机。业务代码不写在这里。
 package main
 
 import (
@@ -13,16 +13,24 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"rbac-core/internal/aiclient"
 	"rbac-core/internal/config"
 	"rbac-core/internal/router"
+	"rbac-core/internal/store"
 )
 
 func main() {
 	cfg := config.Load()
 	gin.SetMode(cfg.GinMode)
 
+	db, err := store.Open(cfg)
+	if err != nil {
+		log.Fatalf("数据库连接失败: %v", err)
+	}
+	client := aiclient.New(cfg)
+
 	engine := gin.New()
-	router.Register(engine, cfg)
+	router.Register(engine, cfg, router.Deps{DB: db, Client: client})
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -31,7 +39,8 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("core service listening on :%s (jwt auth: %v)", cfg.Port, cfg.JWTAccessSecret != "")
+		log.Printf("core service listening on :%s (jwt auth: %v, db: %v, node: %s)",
+			cfg.Port, cfg.JWTAccessSecret != "", db != nil, cfg.NodeBaseURL)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen: %v", err)
 		}
