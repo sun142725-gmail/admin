@@ -1,13 +1,32 @@
-// 审计中心页面提供审计日志与前端日志查询。
-import React, { useEffect, useMemo, useState } from 'react';
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tabs, Tag, message } from 'antd';
+// 审计中心页面提供审计日志与前端日志查询、traceId 链路聚合展示。
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Button,
+  DatePicker,
+  Drawer,
+  Empty,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Spin,
+  Tabs,
+  Tag,
+  Timeline,
+  Typography,
+  message
+} from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { listAuditLogs, getAuditLogDetail } from '../../api/auditCenter';
-import { listLogCenter, getLogCenterDetail, LogEventType } from '../../api/logCenter';
+import { listLogCenter, getLogCenterDetail, getLogTrace, LogEventType, TraceResult } from '../../api/logCenter';
 import { batchDicts } from '../../api/dict';
 import { AppTable } from '../../components/AppTable';
+import { JsonView } from '../../components/JsonView';
 
 interface AuditItem {
   id: number;
@@ -27,6 +46,8 @@ interface AuditItem {
   message?: string;
   stack?: string;
   meta?: Record<string, unknown>;
+  userAgent?: string;
+  referrer?: string;
 }
 
 type TabKey = 'audit' | LogEventType;
@@ -47,6 +68,28 @@ const LEVEL_COLOR: Record<string, string> = {
   error: 'red'
 };
 
+// 字典接口异常时的来源筛选兜底项（与服务端 seed 的 source_type 字典保持一致）
+const SOURCE_FALLBACK_OPTIONS = [
+  { value: 'web', label: 'Web' },
+  { value: 'server', label: '服务端' }
+];
+
+// 文本字段若本身就是 JSON（审计 detail 等自由文本），解析后走 JSON 视图展示
+const parseMaybeJson = (text?: string): unknown | undefined => {
+  if (!text) {
+    return undefined;
+  }
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return undefined;
+  }
+};
+
 export const AuditCenterPage: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams();
@@ -62,6 +105,15 @@ export const AuditCenterPage: React.FC = () => {
   const [filters, setFilters] = useState<Record<string, any>>({});
   const [activeTab, setActiveTab] = useState<TabKey>(defaultTab);
   const [sourceLabelMap, setSourceLabelMap] = useState<Record<string, string>>({});
+  const [retentionDays, setRetentionDays] = useState(7);
+  const [traceState, setTraceState] = useState<{
+    open: boolean;
+    traceId: string;
+    loading: boolean;
+    data?: TraceResult;
+  }>({ open: false, traceId: '', loading: false });
+  // 同一查询条件只提示一次"范围被收敛"，翻页不重复弹
+  const lastClampWarnRef = useRef('');
   const [form] = Form.useForm();
 
   const fetchData = async () => {
@@ -74,6 +126,14 @@ export const AuditCenterPage: React.FC = () => {
           : await listLogCenter({ type: activeTab, ...queryParams });
       setData(res.items ?? []);
       setTotal(res.total ?? 0);
+      if (activeTab !== 'audit') {
+        setRetentionDays(res.retentionDays ?? 7);
+        const clampKey = `${activeTab}:${filters.start ?? ''}`;
+        if (res.clamped && lastClampWarnRef.current !== clampKey) {
+          lastClampWarnRef.current = clampKey;
+          message.warning(`日志仅保留最近 ${res.retentionDays ?? 7} 天，查询范围已按保留窗口收敛`);
+        }
+      }
     } catch {
       message.error('日志查询失败，请稍后重试');
     } finally {
@@ -116,6 +176,7 @@ export const AuditCenterPage: React.FC = () => {
       userId: values.userId,
       traceId: values.traceId,
       sessionId: values.sessionId,
+      source: values.source,
       module: values.module,
       action: values.action,
       pageCode: values.pageCode,
@@ -132,18 +193,36 @@ export const AuditCenterPage: React.FC = () => {
     setFilters({});
   };
 
-  const showDetail = async (item: AuditItem) => {
+  const showDetail = async (type: TabKey, item: AuditItem) => {
     setDetailLoading(true);
     try {
       const res =
-        activeTab === 'audit'
-          ? await getAuditLogDetail(item.id)
-          : await getLogCenterDetail(activeTab, item.id);
+        type === 'audit' ? await getAuditLogDetail(item.id) : await getLogCenterDetail(type, item.id);
       setDetail(res);
     } catch {
       message.error('日志详情加载失败');
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const openTrace = async (traceId: string) => {
+    setTraceState({ open: true, traceId, loading: true });
+    try {
+      const res = await getLogTrace(traceId);
+      setTraceState({ open: true, traceId, loading: false, data: res });
+    } catch {
+      message.error('链路查询失败，请稍后重试');
+      setTraceState((state) => ({ ...state, loading: false }));
+    }
+  };
+
+  const copyToClipboard = async (text: string, tip = '已复制') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      message.success(tip);
+    } catch {
+      message.error('复制失败，请手动选择复制');
     }
   };
 
@@ -161,26 +240,41 @@ export const AuditCenterPage: React.FC = () => {
     return sourceLabelMap[value] ?? value;
   };
 
-  const copyTraceId = async (traceId?: string) => {
-    if (!traceId) {
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(traceId);
-      message.success('TraceId 已复制');
-    } catch {
-      message.error('复制失败，请手动选择复制');
-    }
-  };
+  // 字段行：值 + 可选复制按钮，详情弹窗与链路抽屉共用
+  const FieldRow: React.FC<{ label: string; copyText?: string; children: React.ReactNode }> = ({
+    label,
+    copyText,
+    children
+  }) => (
+    <p style={{ wordBreak: 'break-all' }}>
+      {label}: {children}
+      {copyText && (
+        <Button type="link" size="small" onClick={() => copyToClipboard(copyText)}>
+          复制
+        </Button>
+      )}
+    </p>
+  );
+
+  const sourceOptions = Object.keys(sourceLabelMap).length
+    ? Object.entries(sourceLabelMap).map(([value, label]) => ({ value, label }))
+    : SOURCE_FALLBACK_OPTIONS;
 
   const actionColumn: ColumnsType<AuditItem> = [
     {
       title: '操作',
-      width: 120,
+      width: 150,
       render: (_: unknown, record) => (
-        <Button size="small" onClick={() => showDetail(record)}>
-          详情
-        </Button>
+        <Space size={0}>
+          {activeTab !== 'audit' && record.traceId && (
+            <Button type="link" size="small" className="!px-1" onClick={() => openTrace(record.traceId!)}>
+              链路
+            </Button>
+          )}
+          <Button type="link" size="small" className="!px-1" onClick={() => showDetail(activeTab, record)}>
+            详情
+          </Button>
+        </Space>
       )
     }
   ];
@@ -260,38 +354,59 @@ export const AuditCenterPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, sourceLabelMap]);
 
-  const detailRows = (item: AuditItem) => {
-    if (activeTab === 'audit') {
+  const detailRows = (type: TabKey, item: AuditItem) => {
+    if (type === 'audit') {
+      const detailJson = parseMaybeJson(item.detail);
       return (
         <>
-          <p>用户: {item.userId ?? '-'}</p>
-          <p>模块: {item.module ?? '-'}</p>
-          <p>动作: {item.action ?? '-'}</p>
-          <p>IP: {item.ip ?? '-'}</p>
-          <p>时间: {formatTime(item.createdAt)}</p>
-          <p>详情: {item.detail ?? '-'}</p>
+          <FieldRow label="用户" copyText={item.userId != null ? String(item.userId) : undefined}>
+            {item.userId ?? '-'}
+          </FieldRow>
+          <FieldRow label="模块">{item.module ?? '-'}</FieldRow>
+          <FieldRow label="动作">{item.action ?? '-'}</FieldRow>
+          <FieldRow label="IP" copyText={item.ip}>
+            {item.ip ?? '-'}
+          </FieldRow>
+          <FieldRow label="时间">{formatTime(item.createdAt)}</FieldRow>
+          {detailJson !== undefined ? (
+            <div>
+              详情（JSON）:
+              <JsonView value={detailJson} />
+            </div>
+          ) : (
+            <FieldRow label="详情">{item.detail ?? '-'}</FieldRow>
+          )}
         </>
       );
     }
     return (
       <>
-        <p>用户: {item.userId ?? '-'}</p>
-        <p>
-          TraceId: {item.traceId ?? '-'}
-          {item.traceId && (
-            <Button type="link" size="small" onClick={() => copyTraceId(item.traceId)}>
-              复制
-            </Button>
-          )}
-        </p>
-        <p>SessionId: {item.sessionId ?? '-'}</p>
-        <p>来源: {formatSource(item.source)}</p>
-        <p>时间: {formatTime(item.createdAt)}</p>
-        {'pageCode' in item && <p>页面码: {item.pageCode}</p>}
-        {'path' in item && <p>路径: {item.path}</p>}
-        {'level' in item && <p>级别: {item.level}</p>}
-        {'category' in item && <p>分类: {item.category}</p>}
-        {'message' in item && <p>消息: {item.message}</p>}
+        <FieldRow label="用户" copyText={item.userId != null ? String(item.userId) : undefined}>
+          {item.userId ?? '-'}
+        </FieldRow>
+        <FieldRow label="TraceId" copyText={item.traceId}>
+          {item.traceId ?? '-'}
+        </FieldRow>
+        <FieldRow label="SessionId" copyText={item.sessionId}>
+          {item.sessionId ?? '-'}
+        </FieldRow>
+        <FieldRow label="来源">{formatSource(item.source)}</FieldRow>
+        <FieldRow label="时间">{formatTime(item.createdAt)}</FieldRow>
+        {'pageCode' in item && <FieldRow label="页面码">{item.pageCode ?? '-'}</FieldRow>}
+        {'path' in item && (
+          <FieldRow label="路径" copyText={item.path}>
+            {item.path ?? '-'}
+          </FieldRow>
+        )}
+        {'userAgent' in item && <FieldRow label="UserAgent">{item.userAgent ?? '-'}</FieldRow>}
+        {'referrer' in item && <FieldRow label="Referrer">{item.referrer ?? '-'}</FieldRow>}
+        {'level' in item && <FieldRow label="级别">{item.level ?? '-'}</FieldRow>}
+        {'category' in item && <FieldRow label="分类">{item.category ?? '-'}</FieldRow>}
+        {'message' in item && (
+          <FieldRow label="消息" copyText={item.message}>
+            {item.message ?? '-'}
+          </FieldRow>
+        )}
         {Boolean(item.stack) && (
           <div>
             堆栈:
@@ -300,13 +415,70 @@ export const AuditCenterPage: React.FC = () => {
         )}
         {item.meta && (
           <div>
-            元数据:
-            <pre className="log-detail-pre">{JSON.stringify(item.meta, null, 2)}</pre>
+            元数据（JSON）:
+            <JsonView value={item.meta} />
           </div>
         )}
       </>
     );
   };
+
+  // 链路时间线：三类日志按时间正序合并，颜色区分类型/级别
+  const traceTimelineItems = useMemo(() => {
+    const trace = traceState.data;
+    if (!trace) {
+      return [];
+    }
+    const entries: Array<{ type: LogEventType; item: AuditItem }> = [
+      ...trace.track.map((raw) => ({ type: 'track' as const, item: raw as unknown as AuditItem })),
+      ...trace.frontend.map((raw) => ({ type: 'frontend' as const, item: raw as unknown as AuditItem })),
+      ...trace.error.map((raw) => ({ type: 'error' as const, item: raw as unknown as AuditItem }))
+    ];
+    entries.sort(
+      (a, b) => new Date(a.item.createdAt).getTime() - new Date(b.item.createdAt).getTime()
+    );
+    return entries.map(({ type, item }) => {
+      const color =
+        type === 'error'
+          ? 'red'
+          : type === 'track'
+            ? 'green'
+            : LEVEL_COLOR[item.level ?? 'info'] === 'default'
+              ? 'gray'
+              : LEVEL_COLOR[item.level ?? 'info'] === 'orange'
+                ? 'orange'
+                : 'blue';
+      const typeLabel =
+        type === 'error' ? '错误' : type === 'track' ? '打点' : (item.level ?? '前端');
+      const summary =
+        type === 'track' ? `${item.pageCode ?? ''} ${item.path ?? ''}`.trim() : (item.message ?? '');
+      return {
+        color,
+        children: (
+          <div>
+            <Space size={8} wrap>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {formatTime(item.createdAt)}
+              </Typography.Text>
+              <Tag color={type === 'frontend' ? LEVEL_COLOR[item.level ?? 'info'] : type === 'error' ? 'red' : 'green'}>
+                {typeLabel}
+              </Tag>
+              <Tag>{formatSource(item.source)}</Tag>
+              <Button type="link" size="small" className="!px-0" onClick={() => showDetail(type, item)}>
+                详情
+              </Button>
+            </Space>
+            <div style={{ fontSize: 13, wordBreak: 'break-all' }}>{summary || '-'}</div>
+          </div>
+        )
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traceState.data, sourceLabelMap]);
+
+  const traceEventCount = traceState.data
+    ? traceState.data.track.length + traceState.data.frontend.length + traceState.data.error.length
+    : 0;
 
   return (
     <div className="app-page-flat">
@@ -346,9 +518,14 @@ export const AuditCenterPage: React.FC = () => {
             </>
           )}
           {(activeTab === 'frontend' || activeTab === 'error') && (
-            <Form.Item label="关键字" name="keyword">
-              <Input placeholder="消息关键字" maxLength={200} />
-            </Form.Item>
+            <>
+              <Form.Item label="来源" name="source">
+                <Select placeholder="来源" allowClear options={sourceOptions} style={{ width: 120 }} />
+              </Form.Item>
+              <Form.Item label="关键字" name="keyword">
+                <Input placeholder="消息关键字" maxLength={200} />
+              </Form.Item>
+            </>
           )}
           <Form.Item label="时间范围" name="range">
             <DatePicker.RangePicker showTime />
@@ -371,6 +548,13 @@ export const AuditCenterPage: React.FC = () => {
           onChange={(key) => navigate(`/logs/${key}`)}
           items={TAB_ITEMS}
           style={{ marginBottom: 8 }}
+          tabBarExtraContent={
+            activeTab !== 'audit' ? (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                日志仅保留最近 {retentionDays} 天
+              </Typography.Text>
+            ) : undefined
+          }
         />
         <AppTable
           rowKey="id"
@@ -400,9 +584,51 @@ export const AuditCenterPage: React.FC = () => {
         {detailLoading && !detail ? (
           <p>加载中…</p>
         ) : (
-          detail && <div>{detailRows(detail)}</div>
+          detail && (
+            <div>
+              <Space style={{ marginBottom: 8 }}>
+                <Button
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={() => copyToClipboard(JSON.stringify(detail, null, 2), '已复制整条 JSON')}
+                >
+                  复制整条 JSON
+                </Button>
+                {detail.traceId && (
+                  <Button size="small" onClick={() => openTrace(detail.traceId!)}>
+                    查看链路
+                  </Button>
+                )}
+              </Space>
+              {detailRows(activeTab, detail)}
+            </div>
+          )
         )}
       </Modal>
+
+      <Drawer
+        width={560}
+        open={traceState.open}
+        onClose={() => setTraceState((state) => ({ ...state, open: false }))}
+        title={
+          <Space size={4} wrap>
+            链路
+            <Typography.Text copyable={{ text: traceState.traceId }} style={{ fontSize: 14 }}>
+              {traceState.traceId}
+            </Typography.Text>
+          </Space>
+        }
+      >
+        {traceState.loading ? (
+          <div style={{ textAlign: 'center', padding: 32 }}>
+            <Spin />
+          </div>
+        ) : traceEventCount > 0 ? (
+          <Timeline items={traceTimelineItems} />
+        ) : (
+          <Empty description="该 TraceId 暂无日志" />
+        )}
+      </Drawer>
     </div>
   );
 };

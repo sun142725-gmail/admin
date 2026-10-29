@@ -25,3 +25,15 @@ export const listLogCenter = (params: Record<string, unknown>) => {
 export const getLogCenterDetail = (type: LogEventType, id: number) => {
   return http.get(`/log-center/${type}/${id}`);
 };
+
+// 链路聚合结果：同一 traceId 下三类日志按时间正序返回
+export interface TraceResult {
+  traceId: string;
+  track: Record<string, unknown>[];
+  frontend: Record<string, unknown>[];
+  error: Record<string, unknown>[];
+}
+
+export const getLogTrace = (traceId: string) => {
+  return http.get<never, TraceResult>(`/log-center/trace/${traceId}`);
+};

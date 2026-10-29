@@ -878,3 +878,31 @@ a {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* 日志详情：JSON 视图（语法高亮 + 悬浮复制按钮） */
+.json-view-wrap {
+  position: relative;
+  margin: 4px 0 8px;
+}
+
+.json-view-copy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.json-view-pre {
+  max-height: 240px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f7faff;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

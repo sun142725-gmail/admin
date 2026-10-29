@@ -36,6 +36,11 @@ export class QueryLogDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
+  source?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(128)
   pageCode?: string;
 

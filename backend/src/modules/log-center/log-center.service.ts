@@ -16,6 +16,8 @@ const MAX_PAYLOAD_CHARS = 4000;
 const MAX_BATCH_EVENTS = 50;
 // 清理任务单批删除条数：避免大表一次性删除造成长事务锁表
 const CLEANUP_BATCH_SIZE = 500;
+// 链路聚合单类日志返回上限：一条请求链路的事件数远小于此，兜底防止单 traceId 刷屏拖垮响应
+const TRACE_TAKE = 200;
 
 // 保留期（天）统一读取环境变量：查询窗口与清理任务必须一致，否则会出现"查得到但已清理/清理了却查不到"的错位
 const retentionDays = () => {
@@ -134,7 +136,7 @@ export class LogCenterService {
   async list(query: QueryLogDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
-    const { start, end } = this.normalizeRange(query.start, query.end);
+    const { start, end, clamped } = this.normalizeRange(query.start, query.end);
     const skip = (page - 1) * pageSize;
 
     if (query.type === 'track') {
@@ -142,6 +144,7 @@ export class LogCenterService {
         ...(query.userId ? { userId: query.userId } : {}),
         ...(query.traceId ? { traceId: query.traceId } : {}),
         ...(query.sessionId ? { sessionId: query.sessionId } : {}),
+        ...(query.source ? { source: query.source } : {}),
         ...(query.pageCode ? { pageCode: query.pageCode } : {}),
         ...(start && end ? { createdAt: Between(start, end) } : {})
       };
@@ -151,7 +154,7 @@ export class LogCenterService {
         skip,
         take: pageSize
       });
-      return { items, total };
+      return { items, total, retentionDays: retentionDays(), clamped };
     }
 
     if (query.type === 'frontend') {
@@ -159,6 +162,7 @@ export class LogCenterService {
         ...(query.userId ? { userId: query.userId } : {}),
         ...(query.traceId ? { traceId: query.traceId } : {}),
         ...(query.sessionId ? { sessionId: query.sessionId } : {}),
+        ...(query.source ? { source: query.source } : {}),
         ...(query.level ? { level: query.level } : {}),
         ...(query.keyword ? { message: Like(`%${query.keyword}%`) } : {}),
         ...(start && end ? { createdAt: Between(start, end) } : {})
@@ -169,13 +173,14 @@ export class LogCenterService {
         skip,
         take: pageSize
       });
-      return { items, total };
+      return { items, total, retentionDays: retentionDays(), clamped };
     }
 
     const where: FindOptionsWhere<ErrorLog> = {
       ...(query.userId ? { userId: query.userId } : {}),
       ...(query.traceId ? { traceId: query.traceId } : {}),
       ...(query.sessionId ? { sessionId: query.sessionId } : {}),
+      ...(query.source ? { source: query.source } : {}),
       ...(query.keyword ? { message: Like(`%${query.keyword}%`) } : {}),
       ...(start && end ? { createdAt: Between(start, end) } : {})
     };
@@ -185,7 +190,31 @@ export class LogCenterService {
       skip,
       take: pageSize
     });
-    return { items, total };
+    return { items, total, retentionDays: retentionDays(), clamped };
+  }
+
+  // 链路聚合：同一 traceId 串联打点/前端/服务端错误三类日志，按时间正序返回，
+  // 供前端一次拉取全链路时间线（审计日志无 traceId 列，不参与聚合）
+  async trace(traceId: string) {
+    const take = TRACE_TAKE;
+    const [track, frontend, error] = await Promise.all([
+      this.trackRepo.find({
+        where: { traceId },
+        order: { createdAt: 'ASC' },
+        take
+      }),
+      this.frontendRepo.find({
+        where: { traceId },
+        order: { createdAt: 'ASC' },
+        take
+      }),
+      this.errorRepo.find({
+        where: { traceId },
+        order: { createdAt: 'ASC' },
+        take
+      })
+    ]);
+    return { traceId, track, frontend, error };
   }
 
   async detail(type: LogType, id: number) {
@@ -230,6 +259,8 @@ export class LogCenterService {
     return summary;
   }
 
+  // 返回值带 clamped 标记：调用方显式传入早于保留窗口的 start 时告知前端"范围已被收敛"，
+  // 否则用户会误把"查不到"当成"没发生"
   private normalizeRange(start?: string, end?: string) {
     const now = new Date();
     const days = retentionDays();
@@ -243,12 +274,13 @@ export class LogCenterService {
     if (Number.isNaN(rangeEnd.getTime())) {
       rangeEnd = now;
     }
+    const clamped = rangeStart < limitStart;
     if (rangeStart < limitStart) {
       rangeStart = limitStart;
     }
     if (rangeEnd > now) {
       rangeEnd = now;
     }
-    return { start: rangeStart, end: rangeEnd };
+    return { start: rangeStart, end: rangeEnd, clamped };
   }
 }

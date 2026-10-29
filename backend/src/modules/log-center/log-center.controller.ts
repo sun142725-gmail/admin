@@ -46,6 +46,17 @@ export class LogCenterController {
     return this.logCenterService.list(query);
   }
 
+  // 链路聚合必须声明在 :type/:id 之前，否则 "trace/xxx" 会被通配路由当成 type=trace 命中详情
+  @Get('trace/:traceId')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('system:audit:center')
+  async trace(@Param('traceId') traceId: string) {
+    if (!traceId || traceId.length > 128) {
+      throw new BadRequestException('traceId 不合法');
+    }
+    return this.logCenterService.trace(traceId);
+  }
+
   @Get(':type/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions('system:audit:center')
