@@ -17,7 +17,7 @@ import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { RequestUser } from '../../../common/interfaces/auth.interface';
 import { NovelPipelineService } from './novel-pipeline.service';
-import { CreateNovelProjectDto, UpdateNovelProjectDto } from './novel-video.dto';
+import { CreateNovelProjectDto, RegenerateShotDto, UpdateNovelProjectDto, UpdateShotDto } from './novel-video.dto';
 
 @ApiTags('Novel Video')
 @ApiBearerAuth()
@@ -73,6 +73,49 @@ export class NovelVideoController {
   @Permissions('flow:run:execute')
   cancel(@Param('id', ParseIntPipe) id: number) {
     return this.pipeline.cancel(id);
+  }
+
+  // ---------- 单镜创作控制（片段级配置 / AI 重新规划 / 单镜重生成 / 字幕） ----------
+
+  @Put(':id/shots/:shotId')
+  @UseGuards(PermissionsGuard)
+  @Permissions('flow:define:manage')
+  updateShot(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('shotId', ParseIntPipe) shotId: number,
+    @Body() dto: UpdateShotDto
+  ) {
+    return this.pipeline.updateShot(id, shotId, dto);
+  }
+
+  @Post(':id/shots/:shotId/replan')
+  @UseGuards(PermissionsGuard)
+  @Permissions('flow:run:execute')
+  replanShot(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('shotId', ParseIntPipe) shotId: number
+  ) {
+    return this.pipeline.replanShot(user.id, id, shotId);
+  }
+
+  @Post(':id/shots/:shotId/regenerate')
+  @UseGuards(PermissionsGuard)
+  @Permissions('flow:run:execute')
+  regenerateShot(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('shotId', ParseIntPipe) shotId: number,
+    @Body() dto: RegenerateShotDto
+  ) {
+    return this.pipeline.regenerateShot(user.id, id, shotId, dto.step);
+  }
+
+  @Post(':id/subtitle')
+  @UseGuards(PermissionsGuard)
+  @Permissions('flow:run:execute')
+  regenerateSubtitle(@Param('id', ParseIntPipe) id: number) {
+    return this.pipeline.regenerateSubtitle(id);
   }
 
   @Delete(':id')

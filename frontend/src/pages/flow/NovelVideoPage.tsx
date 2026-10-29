@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Drawer,
+  Dropdown,
   Empty,
   Form,
   Image,
@@ -21,28 +22,40 @@ import {
   Upload,
   message
 } from 'antd';
+import type { MenuProps } from 'antd';
 import type { UploadFile } from 'antd';
 import {
   BookOutlined,
   DeleteOutlined,
+  EditOutlined,
+  PictureOutlined,
   PlayCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SoundOutlined,
   StopOutlined,
-  UploadOutlined
+  ThunderboltOutlined,
+  UploadOutlined,
+  VideoCameraOutlined
 } from '@ant-design/icons';
 import { Permission } from '../../components/permission/Permission';
 import {
   NovelProjectDetail,
   NovelProjectSummary,
+  NovelShotRegenerateStep,
+  NovelShotVo,
   cancelNovelProject,
   createNovelProject,
   deleteNovelProject,
+  generateNovelSubtitle,
   getNovelProject,
   listNovelProjects,
   reSplitNovelProject,
+  regenerateNovelShot,
+  replanNovelShot,
   runNovelProject
 } from '../../api/novelVideo';
+import { NovelShotEditModal } from './NovelShotEditModal';
 import { formatDuration } from './flowRunUI';
 import './flow-pages.css';
 
@@ -57,6 +70,7 @@ const PROJECT_STATUS_META: Record<string, { label: string; color: string }> = {
 const SHOT_STATUS_META: Record<string, { label: string; color: string }> = {
   pending: { label: '待生成', color: 'default' },
   image_done: { label: '已出图', color: 'blue' },
+  audio_done: { label: '已配音', color: 'geekblue' },
   video_done: { label: '已出片', color: 'success' },
   failed: { label: '失败', color: 'error' }
 };
@@ -70,7 +84,7 @@ interface CreateFormValues {
 }
 
 export const NovelVideoPage: React.FC = () => {
-  const { message: antMessage } = AntApp.useApp();
+  const { message: antMessage, modal } = AntApp.useApp();
   const [projects, setProjects] = useState<NovelProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -80,6 +94,9 @@ export const NovelVideoPage: React.FC = () => {
   const [form] = Form.useForm<CreateFormValues>();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const detailIdRef = useRef<number | null>(null);
+  // 单镜编辑弹窗（非 null 即打开）与字幕重生成 loading。
+  const [editingShot, setEditingShot] = useState<NovelShotVo | null>(null);
+  const [subtitleLoading, setSubtitleLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -225,6 +242,95 @@ export const NovelVideoPage: React.FC = () => {
       }
     },
     [antMessage, load]
+  );
+
+  // 单镜产物/配置变化：只替换 detail 里对应分镜（避免整页 refetch 打断抽屉浏览）。
+  const applyShot = useCallback((updated: NovelShotVo) => {
+    setDetail((prev) =>
+      prev ? { ...prev, shots: prev.shots.map((shot) => (shot.id === updated.id ? updated : shot)) } : prev
+    );
+  }, []);
+
+  const shotSaved = useCallback(
+    (updated: NovelShotVo) => {
+      applyShot(updated);
+      setEditingShot(null);
+      antMessage.success('分镜配置已保存');
+    },
+    [applyShot, antMessage]
+  );
+
+  // AI 重新规划：重写画面/运动提示词（旁白锁定时保持原文），产物状态回到待生成。
+  const replan = useCallback(
+    (projectId: number, shot: NovelShotVo) => {
+      const narrationLocked = Boolean((shot.lockedSourceText ?? '').trim());
+      modal.confirm({
+        title: `AI 重新规划分镜 #${shot.idx}？`,
+        content: narrationLocked
+          ? '已锁定原文：只优化画面与镜头运动，旁白保持原文不改写。'
+          : '将用 LLM 重写画面/运动提示词与旁白，产物状态回到待生成。',
+        okText: '重新规划',
+        cancelText: '取消',
+        onOk: async () => {
+          try {
+            applyShot(await replanNovelShot(projectId, shot.id));
+            antMessage.success('已重新规划，产物待重做');
+          } catch (error) {
+            antMessage.error(error instanceof Error ? error.message : '重新规划失败');
+          }
+        }
+      });
+    },
+    [applyShot, antMessage, modal]
+  );
+
+  const regenerate = useCallback(
+    async (projectId: number, shot: NovelShotVo, step: NovelShotRegenerateStep) => {
+      try {
+        applyShot(await regenerateNovelShot(projectId, shot.id, step));
+        antMessage.success(
+          step === 'image' ? '首帧图已重新生成' : step === 'video' ? '视频片段已重新生成' : '配音已生成'
+        );
+        void load(); // 单镜状态影响项目进度统计
+      } catch (error) {
+        antMessage.error(error instanceof Error ? error.message : '重新生成失败');
+      }
+    },
+    [applyShot, antMessage, load]
+  );
+
+  // 重生成菜单：首帧（锁定时禁用）/视频/配音（audio_done 状态镜头用「补配音」不回退状态）。
+  const regenerateMenu = useCallback(
+    (projectId: number, shot: NovelShotVo): MenuProps => ({
+      items: [
+        {
+          key: 'image',
+          icon: <PictureOutlined />,
+          disabled: Boolean(shot.firstFrameLocked && shot.imageUrl),
+          label: <span title={shot.firstFrameLocked && shot.imageUrl ? '首帧已锁定，请先在编辑里解锁' : undefined}>重出首帧图</span>
+        },
+        { key: 'video', icon: <VideoCameraOutlined />, label: '重出视频片段' },
+        { key: 'audio', icon: <SoundOutlined />, label: '补配音' }
+      ],
+      onClick: ({ key }) => void regenerate(projectId, shot, key as NovelShotRegenerateStep)
+    }),
+    [regenerate]
+  );
+
+  const regenerateSubtitle = useCallback(
+    async (projectId: number) => {
+      setSubtitleLoading(true);
+      try {
+        const { subtitlePath } = await generateNovelSubtitle(projectId);
+        setDetail((prev) => (prev && prev.project.id === projectId ? { ...prev, project: { ...prev.project, finalSubtitlePath: subtitlePath } } : prev));
+        antMessage.success('字幕已重新生成');
+      } catch (error) {
+        antMessage.error(error instanceof Error ? error.message : '字幕生成失败');
+      } finally {
+        setSubtitleLoading(false);
+      }
+    },
+    [antMessage]
   );
 
   const shotsByChapter = useMemo(() => {
@@ -436,6 +542,19 @@ export const NovelVideoPage: React.FC = () => {
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 {detail.project.stageMessage ?? detail.project.error ?? `共 ${detail.chapters.length} 章 · ${detail.progress.total} 个分镜`}
               </Typography.Text>
+              {/* 字幕路径后端已存 /uploads/... 完整静态路径，直接用，不做前缀拼接 */}
+              {detail.project.finalSubtitlePath && (
+                <a href={detail.project.finalSubtitlePath} download style={{ fontSize: 12 }}>
+                  下载字幕（SRT）
+                </a>
+              )}
+              {detail.progress.done > 0 && (
+                <Permission code="flow:run:execute">
+                  <Button size="small" type="link" loading={subtitleLoading} onClick={() => void regenerateSubtitle(detail.project.id)}>
+                    重新生成字幕
+                  </Button>
+                </Permission>
+              )}
             </Space>
             <Progress
               percent={detail.progress.total > 0 ? Math.round((detail.progress.done / detail.progress.total) * 100) : 0}
@@ -491,9 +610,22 @@ export const NovelVideoPage: React.FC = () => {
                           <Tag color={shotMeta.color} style={{ marginRight: 0 }}>
                             #{shot.idx} {shotMeta.label}
                           </Tag>
+                          {shot.firstFrameLocked && (
+                            <Tag style={{ marginRight: 0, fontSize: 11 }} color="volcano">
+                              首帧锁定
+                            </Tag>
+                          )}
+                          {shot.shotMode === 't2v' && (
+                            <Tag style={{ marginRight: 0, fontSize: 11 }}>文生视频</Tag>
+                          )}
                           {shot.durationMs ? (
                             <Typography.Text type="secondary" style={{ fontSize: 11 }}>
                               {formatDuration(shot.durationMs)}
+                            </Typography.Text>
+                          ) : null}
+                          {shot.audioDurationMs ? (
+                            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                              配音 {(shot.audioDurationMs / 1000).toFixed(1)}s
                             </Typography.Text>
                           ) : null}
                         </Space>
@@ -506,11 +638,55 @@ export const NovelVideoPage: React.FC = () => {
                           </Typography.Text>
                         )}
                       </div>
-                      {shot.videoUrl && (
-                        <a href={shot.videoUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
-                          看片段
-                        </a>
-                      )}
+                      <div
+                        style={{
+                          flexShrink: 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-end',
+                          gap: 4
+                        }}
+                      >
+                        <Space size={4}>
+                          <Permission code="flow:define:manage">
+                            <Button
+                              size="small"
+                              type="text"
+                              icon={<EditOutlined />}
+                              onClick={() => setEditingShot(shot)}
+                            >
+                              编辑
+                            </Button>
+                          </Permission>
+                          <Permission code="flow:run:execute">
+                            <Button
+                              size="small"
+                              type="text"
+                              icon={<ThunderboltOutlined />}
+                              onClick={() => replan(detail.project.id, shot)}
+                            >
+                              AI 重新规划
+                            </Button>
+                          </Permission>
+                          <Permission code="flow:run:execute">
+                            <Dropdown menu={regenerateMenu(detail.project.id, shot)} trigger={['click']}>
+                              <Button size="small">重新生成</Button>
+                            </Dropdown>
+                          </Permission>
+                        </Space>
+                        <Space size={8} style={{ fontSize: 11 }}>
+                          {shot.audioUrl && (
+                            <a href={shot.audioUrl} target="_blank" rel="noreferrer">
+                              听配音
+                            </a>
+                          )}
+                          {shot.videoUrl && (
+                            <a href={shot.videoUrl} target="_blank" rel="noreferrer">
+                              看片段
+                            </a>
+                          )}
+                        </Space>
+                      </div>
                     </div>
                   );
                 })}
@@ -519,6 +695,15 @@ export const NovelVideoPage: React.FC = () => {
           </>
         )}
       </Drawer>
+
+      <NovelShotEditModal
+        open={Boolean(editingShot)}
+        projectId={detail?.project.id ?? 0}
+        shot={editingShot}
+        onCancel={() => setEditingShot(null)}
+        onSaved={shotSaved}
+        onError={(error) => antMessage.error(error instanceof Error ? error.message : '保存失败')}
+      />
     </div>
   );
 };

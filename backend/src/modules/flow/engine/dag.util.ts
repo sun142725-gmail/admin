@@ -2,7 +2,8 @@
 import { FlowDag } from '../../../common/entities/flow-definition.entity';
 
 // 引擎支持的节点类型。note 为画布备注节点，不参与执行与连线。
-export const EXECUTABLE_NODE_TYPES = ['start', 'llm', 'image', 'video', 'http', 'delay', 'end'] as const;
+// tts：OpenAI 兼容 /audio/speech 文本转语音（模型行 capabilities 含 tts 即被路由）。
+export const EXECUTABLE_NODE_TYPES = ['start', 'llm', 'image', 'video', 'http', 'delay', 'tts', 'end'] as const;
 export const ALL_NODE_TYPES = [...EXECUTABLE_NODE_TYPES, 'note'] as const;
 
 export interface GraphNode {
@@ -23,6 +24,12 @@ export interface ParsedGraph {
 }
 
 export class DagValidationError extends Error {}
+
+// 节点 ID 白名单：字母/数字/下划线/连字符，1-64 位。
+// 节点 ID 会被拼进落盘文件路径（如 tts 节点 `tts/${id}-<ts>.mp3`，见 node-handlers.writeNodeUpload），
+// 放行 `../`、`/` 等字符会构成路径穿越，parseGraph 处统一拦截。
+// 兼容现有来源：前端 genNodeId（`tts-<base36时间戳><随机>`）与既有测试 id（start1/tts1 等）。
+const NODE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 const asString = (value: unknown): string => (typeof value === 'string' ? value : '');
 
@@ -47,6 +54,10 @@ export function parseGraph(dag: unknown): ParsedGraph {
     if (nodeById.has(raw.id)) {
       throw new DagValidationError(`节点 ID 重复: ${raw.id}`);
     }
+    if (!NODE_ID_PATTERN.test(raw.id)) {
+      throw new DagValidationError(`节点 ID 仅允许字母/数字/下划线/连字符（1-64 位）: ${raw.id}`);
+    }
+
     if (!ALL_NODE_TYPES.includes(raw.type as (typeof ALL_NODE_TYPES)[number])) {
       throw new DagValidationError(`不支持的节点类型: ${raw.type}`);
     }

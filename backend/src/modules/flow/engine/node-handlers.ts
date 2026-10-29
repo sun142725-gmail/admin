@@ -1,9 +1,12 @@
 // 节点处理器：按类型执行单个节点（输入渲染 → 上游调用 → 结构化输出）。
 // 上下文 context = { 节点ID: 输出对象 }，模板 {{nodeId.field}} 从中取值。
+import { mkdir, writeFile } from 'fs/promises';
+import { join, resolve, sep } from 'path';
 import { ChatMessagePayload, ChatRequestOptions } from '../../ai/core/llm-adapter.interface';
 import { ModelRouterService, RoutedCandidate } from '../../ai/core/model-router.service';
 import { UsageLogService } from '../../ai/core/usage-log.service';
 import { GraphNode, renderTemplate } from './dag.util';
+import { normalizeTtsText } from './tts.util';
 import { VideoUpstreamService } from './video-upstream.service';
 
 export interface NodeExecInput {
@@ -318,6 +321,97 @@ const delayHandler = async (input: NodeExecInput): Promise<NodeExecResult> => {
   return { output: { waited: seconds } };
 };
 
+// ---------- tts：文本转语音（OpenAI 兼容 /audio/speech），音频落盘后输出 URL ----------
+// 与 imageHandler 同模式：按 tts 能力路由候选（capabilities CSV），adapter.speech 逐个故障转移。
+const TTS_FALLBACK_VOICE = 'alloy';
+
+const mimeToExtension = (mime: string): string => {
+  if (mime.includes('wav')) {
+    return 'wav';
+  }
+  if (mime.includes('ogg')) {
+    return 'ogg';
+  }
+  if (mime.includes('flac')) {
+    return 'flac';
+  }
+  return 'mp3';
+};
+
+/** 节点产物统一落盘：写入 uploads/ 下并返回相对路径（/uploads/ 静态访问，见 main.ts）。 */
+const writeNodeUpload = async (relative: string, buffer: Buffer): Promise<void> => {
+  // 路径穿越防御（纵深兜底，parseGraph 已对 node.id 做白名单）：relative 拼进路径前先校验
+  // 规范化结果仍位于 uploads/ 内，`../` 逃逸直接拒绝。
+  const uploadsRoot = join(process.cwd(), 'uploads');
+  const absolute = resolve(uploadsRoot, relative);
+  if (!absolute.startsWith(uploadsRoot + sep)) {
+    throw new Error(`上传路径越界: ${relative}`);
+  }
+  await mkdir(join(absolute, '..'), { recursive: true });
+  await writeFile(absolute, buffer);
+};
+
+const ttsHandler = async (input: NodeExecInput): Promise<NodeExecResult> => {
+  const text = normalizeTtsText(render(str(input.node.config.text), input.context));
+  if (!text) {
+    throw new Error('TTS 节点文本为空：检查 text 配置或上游节点输出');
+  }
+  const voice = str(input.node.config.voice) || process.env.TTS_DEFAULT_VOICE || TTS_FALLBACK_VOICE;
+  const speed = num(input.node.config.speed, 1);
+  const modelId = input.node.config.modelId as number | undefined;
+  const candidates = modelId
+    ? await input.deps.router.candidatesByModel(modelId)
+    : await input.deps.router.candidatesByCapability('tts');
+  const usable = candidates.filter((candidate) => candidate.adapter.speech);
+  if (usable.length === 0) {
+    throw new Error('没有可用的语音合成模型，请在 AI 模型管理里配置 tts 能力模型');
+  }
+
+  const timeoutMs = Number(process.env.TTS_TIMEOUT_MS ?? 60000);
+  const startedAt = Date.now();
+  let lastError: Error | null = null;
+  for (const candidate of usable) {
+    const speak = candidate.adapter.speech?.bind(candidate.adapter);
+    if (!speak) {
+      continue;
+    }
+    try {
+      const result = await speak(
+        { text, voice, speed: speed !== 1 ? speed : undefined, timeoutMs },
+        candidate.channel
+      );
+      const buffer = Buffer.from(result.audioBase64, 'base64');
+      if (buffer.length === 0) {
+        throw new Error('语音合成结果为空');
+      }
+      const relative = `tts/${input.node.id}-${Date.now()}.${mimeToExtension(result.mime)}`;
+      await writeNodeUpload(relative, buffer);
+      input.deps.usageLog.record({
+        userId: input.userId,
+        modelId: candidate.model.id,
+        kind: 'tts',
+        latencyMs: Date.now() - startedAt,
+        status: 'ok'
+      });
+      return {
+        output: { url: `/uploads/${relative}`, audioFile: relative, chars: text.length, voice },
+        modelId: candidate.model.id
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      input.deps.usageLog.record({
+        userId: input.userId,
+        modelId: candidate.model.id,
+        kind: 'tts',
+        latencyMs: Date.now() - startedAt,
+        status: 'failed',
+        errorMessage: lastError.message
+      });
+    }
+  }
+  throw lastError ?? new Error('语音合成失败');
+};
+
 // ---------- end：按字段模板汇总产物，写入 run.outputs ----------
 const endHandler = async (input: NodeExecInput): Promise<NodeExecResult> => {
   const fields = Array.isArray(input.node.config.fields) ? input.node.config.fields : [];
@@ -346,5 +440,6 @@ export const NODE_HANDLERS: Record<string, (input: NodeExecInput) => Promise<Nod
   video: videoHandler,
   http: httpHandler,
   delay: delayHandler,
+  tts: ttsHandler,
   end: endHandler
 };

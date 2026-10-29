@@ -2,6 +2,7 @@
 import type { ComponentType } from 'react';
 import {
   ApiOutlined,
+  AudioOutlined,
   ClockCircleOutlined,
   FlagOutlined,
   PictureOutlined,
@@ -79,6 +80,17 @@ export const NODE_META: NodeMeta[] = [
     defaultConfig: () => ({ prompt: '', firstFrame: '', seconds: 5, size: '' })
   },
   {
+    key: 'tts',
+    label: 'TTS',
+    icon: AudioOutlined,
+    color: '#eb2f96',
+    description: '文本转语音配音（tts 能力模型，OpenAI 兼容 /audio/speech）',
+    hasSource: true,
+    hasTarget: true,
+    defaultName: 'TTS 节点',
+    defaultConfig: () => ({ text: '', voice: '', speed: 1 })
+  },
+  {
     key: 'http',
     label: 'HTTP',
     icon: ApiOutlined,
@@ -153,6 +165,8 @@ export const outputFieldsOf = (type: string, config?: Record<string, unknown>): 
       return ['url', 'images'];
     case 'video':
       return ['url', 'taskId'];
+    case 'tts':
+      return ['url', 'audioFile', 'chars'];
     case 'http':
       return ['status', 'data'];
     case 'delay':

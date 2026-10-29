@@ -185,7 +185,7 @@ export class OpenAiCompatibleAdapter implements LlmAdapter {
         speed: options.speed,
         response_format: 'mp3'
       }),
-      signal: AbortSignal.timeout(STREAM_TIMEOUT_MS)
+      signal: AbortSignal.timeout(options.timeoutMs ?? STREAM_TIMEOUT_MS)
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => '');

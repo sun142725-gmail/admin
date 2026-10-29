@@ -1,15 +1,5 @@
 // 小说转视频 DTO。
-import {
-  IsIn,
-  IsInt,
-  IsObject,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-  MinLength
-} from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class NovelPipelineConfigDto {
   @IsInt()
@@ -29,6 +19,19 @@ export class NovelPipelineConfigDto {
   @IsString()
   @MaxLength(32)
   videoSize!: string;
+
+  @IsOptional()
+  @IsInt()
+  storyboardModelId?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  ttsVoice?: string;
+
+  @IsOptional()
+  @IsInt()
+  ttsModelId?: number;
 }
 
 export class CreateNovelProjectDto {
@@ -67,4 +70,43 @@ export class UpdateNovelProjectDto {
   @IsOptional()
   @IsObject()
   config?: Partial<NovelPipelineConfigDto>;
+}
+
+// 单镜创作控制：锁定原文（旁白不被 AI 改写）/ 视觉任务 / 推进方式 / 生成模式 / 首帧锁定。
+export class UpdateShotDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  lockedSourceText?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  visualTask?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  progression?: string | null;
+
+  // i2v = 用首帧图生视频；t2v = 纯文生视频。
+  @IsOptional()
+  @IsIn(['i2v', 't2v'])
+  shotMode?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  firstFrameLocked?: boolean;
+
+  // 旁白/台词（配音与字幕依据）；不传保持原值，传 null 清空。
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  narration?: string | null;
+}
+
+// 单镜重生成步骤：image 首帧 / video 片段 / audio 配音。
+export class RegenerateShotDto {
+  @IsIn(['image', 'video', 'audio'])
+  step!: 'image' | 'video' | 'audio';
 }

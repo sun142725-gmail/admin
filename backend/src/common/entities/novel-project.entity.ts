@@ -11,6 +11,12 @@ export interface NovelPipelineConfig {
   imageSize: string;
   // 视频分辨率（如 1280x720）。
   videoSize: string;
+  // 分镜/重新规划 LLM 模型行 id（空则按 chat 能力路由）。
+  storyboardModelId?: number;
+  // 配音音色（OpenAI 兼容 /audio/speech 的 voice 参数，空则用 TTS_DEFAULT_VOICE）。
+  ttsVoice?: string;
+  // 配音模型行 id（空则按 tts 能力路由）。
+  ttsModelId?: number;
 }
 
 export const DEFAULT_NOVEL_CONFIG: NovelPipelineConfig = {
@@ -48,6 +54,10 @@ export class NovelProject extends BaseEntity {
   // 合成成片的静态访问路径（/uploads/...）。
   @Column({ name: 'final_video_path', type: 'varchar', length: 255, nullable: true })
   finalVideoPath?: string | null;
+
+  // 字幕文件静态访问路径（/uploads/...，SRT 与成片同目录）。
+  @Column({ name: 'final_subtitle_path', type: 'varchar', length: 255, nullable: true })
+  finalSubtitlePath?: string | null;
 
   @Column({ type: 'text', nullable: true })
   error?: string | null;

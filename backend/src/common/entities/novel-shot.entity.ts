@@ -27,7 +27,27 @@ export class NovelShot extends BaseEntity {
 
   // 旁白/台词（中文，供配音或字幕参考）。
   @Column({ type: 'text', nullable: true })
-  narration?: string;
+  narration?: string | null;
+
+  // 锁定的原文片段：非空时 AI 重新规划只改画面，旁白以原文为准不被改写。
+  @Column({ name: 'locked_source_text', type: 'text', nullable: true })
+  lockedSourceText?: string | null;
+
+  // 视觉任务（该镜画面要传达的关键信息），出图时并入首帧提示词。
+  @Column({ name: 'visual_task', type: 'text', nullable: true })
+  visualTask?: string | null;
+
+  // 推进方式（如「缓慢推进/快速拉远」），出视频时并入运动提示词。
+  @Column({ type: 'text', nullable: true })
+  progression?: string | null;
+
+  // 视频生成模式：i2v 用首帧图生视频 / t2v 纯文生视频。
+  @Column({ name: 'shot_mode', type: 'varchar', length: 16, default: 'i2v' })
+  shotMode!: string;
+
+  // 首帧锁定：开启后管线重跑与单镜重生成不再覆盖既有首帧图。
+  @Column({ name: 'first_frame_locked', type: 'boolean', default: false })
+  firstFrameLocked!: boolean;
 
   @Column({ name: 'image_url', type: 'varchar', length: 255, nullable: true })
   imageUrl?: string | null;
@@ -38,6 +58,18 @@ export class NovelShot extends BaseEntity {
   // 本地片段文件相对 uploads 的路径（合成输入；OSS 外链会过期，落盘保 permanence）。
   @Column({ name: 'video_file', type: 'varchar', length: 255, nullable: true })
   videoFile?: string | null;
+
+  // 配音音频静态访问路径（/uploads/...）。
+  @Column({ name: 'audio_url', type: 'varchar', length: 255, nullable: true })
+  audioUrl?: string | null;
+
+  // 配音音频相对 uploads 的路径（SRT/后续混流输入）。
+  @Column({ name: 'audio_file', type: 'varchar', length: 255, nullable: true })
+  audioFile?: string | null;
+
+  // 配音实测时长毫秒（ffprobe 实测；无 ffprobe 时回落估算），字幕时间轴依据。
+  @Column({ name: 'audio_duration_ms', type: 'int', nullable: true })
+  audioDurationMs?: number | null;
 
   @Column({ length: 16, default: 'pending' })
   status!: string;

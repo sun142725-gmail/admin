@@ -44,6 +44,8 @@ export interface SpeechRequestOptions {
   text: string;
   voice?: string;
   speed?: number;
+  // 上游调用超时毫秒（缺省用适配器内建超时；TTS 节点按 TTS_TIMEOUT_MS 传入）。
+  timeoutMs?: number;
 }
 
 export interface SpeechResult {

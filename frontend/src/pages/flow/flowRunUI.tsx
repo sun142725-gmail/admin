@@ -43,22 +43,28 @@ export const formatDuration = (ms?: number | null): string => {
 
 const VIDEO_EXT = /\.(mp4|mov|webm|m3u8)(\?|$)/i;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i;
+const AUDIO_EXT = /\.(mp3|wav|ogg|flac|m4a)(\?|$)/i;
 
-/** 产物渲染：视频/图片直接预览，其余 JSON 折叠展示。 */
+/** 产物渲染：视频/音频/图片直接预览，其余 JSON 折叠展示。 */
 export const RunOutputsView: React.FC<{ outputs?: Record<string, unknown> | null }> = ({ outputs }) => {
   if (!outputs || Object.keys(outputs).length === 0) {
     return null;
   }
-  const medias: Array<{ key: string; kind: 'video' | 'image'; url: string }> = [];
+  const medias: Array<{ key: string; kind: 'video' | 'image' | 'audio'; url: string }> = [];
   const rest: Array<[string, unknown]> = [];
   for (const [key, value] of Object.entries(outputs)) {
-    if (typeof value === 'string' && value.startsWith('http')) {
+    // tts 等落盘产物是 /uploads/... 站内相对路径，与上游 http(s) 外链同样可预览。
+    if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('/uploads/'))) {
       if (VIDEO_EXT.test(value)) {
         medias.push({ key, kind: 'video', url: value });
         continue;
       }
       if (IMAGE_EXT.test(value)) {
         medias.push({ key, kind: 'image', url: value });
+        continue;
+      }
+      if (AUDIO_EXT.test(value)) {
+        medias.push({ key, kind: 'audio', url: value });
         continue;
       }
     }
@@ -69,6 +75,9 @@ export const RunOutputsView: React.FC<{ outputs?: Record<string, unknown> | null
       {medias.map((media) =>
         media.kind === 'video' ? (
           <video key={media.key} src={media.url} controls preload="metadata" />
+        ) : media.kind === 'audio' ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <audio key={media.key} src={media.url} controls preload="metadata" style={{ width: '100%' }} />
         ) : (
           <img key={media.key} src={media.url} alt={media.key} />
         )

@@ -16,11 +16,56 @@ import { UsageLogService } from '../../ai/core/usage-log.service';
 import { ChatMessagePayload } from '../../ai/core/llm-adapter.interface';
 import { VideoUpstreamService } from '../engine/video-upstream.service';
 import { NodeHandlerDependencies, parseJsonBlock, runLlm } from '../engine/node-handlers';
+import { estimateSpeechMs, normalizeTtsText, parseFfprobeDuration } from '../engine/tts.util';
+import { buildSrt } from './subtitle.util';
+import { composeShotImagePrompt, composeShotMotionPrompt } from './shot-prompt.util';
+import { UpdateShotDto } from './novel-video.dto';
 
 const execFileAsync = promisify(execFile);
 const UPLOAD_ROOT = join(process.cwd(), 'uploads', 'novel-video');
 // 章节内容送入 LLM 的长度上限（超出截断，避免上下文溢出）。
 const CHAPTER_CONTEXT_LIMIT = 3000;
+
+// ---------- 模块级导出：供控制器/e2e 复用的互斥与二进制探测 ----------
+
+/** 项目级互斥断言：运行中的项目禁止单镜编辑/重规划/重生成（与 run/cancel 共用 active 集合）。 */
+export const assertProjectIdle = (active: Set<number>, projectId: number): void => {
+  if (active.has(projectId)) {
+    throw new BadRequestException('项目正在运行中，请等待完成或先取消');
+  }
+};
+
+// ffmpeg/ffprobe 存在性探测缓存（Promise 记忆化）：合成与时长实测前各探测一次，失败结果也缓存。
+let ffmpegProbe: Promise<boolean> | null = null;
+let ffprobeProbe: Promise<boolean> | null = null;
+
+/** 清空二进制探测缓存（仅测试用：模拟「未安装 ffmpeg」前后需要重置）。 */
+export const resetBinaryProbeCache = (): void => {
+  ffmpegProbe = null;
+  ffprobeProbe = null;
+};
+
+const probeBinary = (bin: string, cached: Promise<boolean> | null): Promise<boolean> => {
+  if (cached) {
+    return cached;
+  }
+  return execFileAsync(bin, ['-version'])
+    .then(() => true)
+    .catch(() => false);
+};
+
+/** ffmpeg 是否可用（缓存）；不可用说明主机未安装，合成直接失败。 */
+export const probeFfmpeg = (): Promise<boolean> => {
+  ffmpegProbe = probeBinary('ffmpeg', ffmpegProbe);
+  return ffmpegProbe;
+};
+
+/** 合成前置断言：主机未安装 ffmpeg 时抛出明确错误（而非 exec 报 ENOENT 谜语）。 */
+export const assertFfmpegAvailable = async (): Promise<void> => {
+  if (!(await probeFfmpeg())) {
+    throw new Error('主机未安装 ffmpeg，无法合成视频，请先安装后重试');
+  }
+};
 
 interface StoryboardShot {
   scenePrompt: string;
@@ -225,7 +270,11 @@ export class NovelPipelineService implements OnModuleDestroy {
         }
       }
 
-      // 2) 出图出视频：逐分镜顺序执行。
+      // 2) 配音：narration 非空且尚无音频的镜头逐个补配音。
+      //    目标集只含 pending/image_done/failed；video_done 镜头绝不重配、不回退状态（保断点续跑语义）。
+      await this.produceAudios(userId, project, projectId);
+
+      // 3) 出图出视频：逐分镜顺序执行。
       chapters = await this.chapterRepo.find({ where: { projectId }, order: { idx: 'ASC' } });
       const chapterById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
       const shots = await this.shotRepo.find({ where: { projectId }, order: { id: 'ASC' } });
@@ -243,7 +292,9 @@ export class NovelPipelineService implements OnModuleDestroy {
         });
         const startedShotAt = Date.now();
         try {
-          const imageUrl = await this.produceImage(project, shot);
+          // 首帧锁定：已有图且锁定时不重绘（单镜重生成同理，见 regenerateShot）。
+          const imageUrl =
+            shot.firstFrameLocked && shot.imageUrl ? shot.imageUrl : await this.produceImage(project, shot);
           await this.shotRepo.update(shot.id, { imageUrl, status: 'image_done', error: null });
           const videoFile = await this.produceVideo(userId, project, shot);
           await this.shotRepo.update(shot.id, {
@@ -265,7 +316,7 @@ export class NovelPipelineService implements OnModuleDestroy {
         }
       }
 
-      // 3) 合成。
+      // 4) 合成。
       const finalShots = await this.shotRepo.find({
         where: { projectId, status: 'video_done' },
         order: { id: 'ASC' }
@@ -281,14 +332,19 @@ export class NovelPipelineService implements OnModuleDestroy {
         return;
       }
       await this.projectRepo.update(projectId, { stage: 'merging', stageMessage: `合成 ${finalShots.length} 段视频…` });
+      // 字幕：按 concat 顺序（id ASC）生成 SRT 落盘；时间轴 = 分段视频时长（videoSeconds），与成片逐段对齐。
+      const subtitlePath = await this.writeSubtitle(projectId, finalShots, project.config.videoSeconds);
       const finalPath = await this.mergeVideos(projectId, finalShots);
       const failedShots = (await this.shotRepo.count({ where: { projectId, status: 'failed' } })) ?? 0;
       const cancelledNow = this.cancelled(projectId);
+      // 口径提示：成片当前为分段视频直拼，配音音轨未混入（音画混流属阶段2）；字幕时间轴按分段视频时长对齐。
+      const synthNote = '成片为分段视频直拼（配音音轨混流属阶段2），字幕时间轴按分段视频时长对齐';
       await this.projectRepo.update(projectId, {
         status: cancelledNow ? 'cancelled' : 'completed',
         stage: 'done',
-        stageMessage: failedShots > 0 ? `完成（${failedShots} 个分镜失败已跳过）` : '全部完成',
+        stageMessage: failedShots > 0 ? `完成（${failedShots} 个分镜失败已跳过）；${synthNote}` : `全部完成；${synthNote}`,
         finalVideoPath: finalPath,
+        finalSubtitlePath: subtitlePath,
         finishedAt: new Date(),
         durationMs: Date.now() - startedAt
       });
@@ -349,7 +405,11 @@ export class NovelPipelineService implements OnModuleDestroy {
     if (usable.length === 0) {
       throw new Error('没有可用的生图模型');
     }
-    const prompt = project.stylePrompt ? `${shot.scenePrompt}, ${project.stylePrompt}` : shot.scenePrompt;
+    const prompt = composeShotImagePrompt({
+      scenePrompt: shot.scenePrompt,
+      visualTask: shot.visualTask,
+      stylePrompt: project.stylePrompt
+    });
     let lastError: Error | null = null;
     for (const candidate of usable) {
       const generate = candidate.adapter.images?.bind(candidate.adapter);
@@ -377,8 +437,26 @@ export class NovelPipelineService implements OnModuleDestroy {
 
   /** 生成分镜视频片段并下载落盘，返回相对 uploads 路径（OSS 外链会过期，必须本地化）。 */
   private async produceVideo(userId: number, project: NovelProject, shot: NovelShot): Promise<string> {
+    // i2v 衔接：首帧图存的是 /uploads/ 相对路径，上游（尤其百炼 i2v 系列）要求公网 URL；
+    // 未配置 APP_PUBLIC_BASE_URL 时回落文生视频并写 stage_message 提示。
+    let firstFrameUrl: string | undefined;
+    const publicBase = (process.env.APP_PUBLIC_BASE_URL ?? '').replace(/\/+$/, '');
+    if ((shot.shotMode ?? 'i2v') === 'i2v' && shot.imageUrl) {
+      if (publicBase) {
+        firstFrameUrl = `${publicBase}${shot.imageUrl}`;
+      } else {
+        await this.projectRepo.update(project.id, {
+          stageMessage: `分镜 #${shot.idx} 未配置 APP_PUBLIC_BASE_URL，首帧图无法公网访问，回落文生视频`
+        });
+      }
+    }
     const result = await this.video.generate(userId, {
-      prompt: shot.motionPrompt,
+      prompt: composeShotMotionPrompt({
+        motionPrompt: shot.motionPrompt,
+        progression: shot.progression,
+        shotMode: shot.shotMode
+      }),
+      firstFrameUrl,
       seconds: project.config.videoSeconds,
       size: project.config.videoSize || undefined
     });
@@ -386,6 +464,159 @@ export class NovelPipelineService implements OnModuleDestroy {
     const relative = `novel-video/p${project.id}/seg-c${await this.chapterIdxOf(shot)}-s${shot.idx}.mp4`;
     await this.writeUploadFile(relative, buffer);
     return relative;
+  }
+
+  // ---------- 配音（TTS）与字幕 ----------
+
+  /** TTS 候选（指定模型行优先 + 按 tts 能力兜底），只保留实现了 speech 的适配器。 */
+  private async ttsCandidates(modelId?: number) {
+    const candidates = await this.deps.router.candidatesByCapability('tts');
+    if (!modelId) {
+      return candidates.filter((candidate) => candidate.adapter.speech);
+    }
+    const preferred = await this.deps.router.candidatesByModel(modelId);
+    const preferredIds = new Set(preferred.map((candidate) => candidate.model.id));
+    return [...preferred, ...candidates.filter((candidate) => !preferredIds.has(candidate.model.id))].filter(
+      (candidate) => candidate.adapter.speech
+    );
+  }
+
+  /** 管线配音阶段：为待配音镜头生成旁白音频；无 tts 候选时整段跳过，不阻塞出片。 */
+  private async produceAudios(userId: number, project: NovelProject, projectId: number): Promise<void> {
+    const shots = await this.shotRepo.find({ where: { projectId }, order: { id: 'ASC' } });
+    // 配音目标集：未完成出片的镜头 + 旁白非空 + 还没有音频。video_done 镜头由单镜端点补配。
+    const targets = shots.filter(
+      (shot) =>
+        ['pending', 'image_done', 'failed'].includes(shot.status) &&
+        (shot.narration ?? '').trim() &&
+        !shot.audioFile
+    );
+    if (targets.length === 0) {
+      return;
+    }
+    const usable = await this.ttsCandidates(project.config.ttsModelId);
+    await this.projectRepo.update(projectId, { stage: 'tts' });
+    if (usable.length === 0) {
+      await this.projectRepo.update(projectId, {
+        stageMessage: '未配置 tts 能力模型，跳过配音（可用单镜重新生成补配）'
+      });
+      return;
+    }
+    for (const [index, shot] of targets.entries()) {
+      if (this.cancelled(projectId)) {
+        throw new Error('用户取消');
+      }
+      await this.projectRepo.update(projectId, {
+        stageMessage: `配音：第 ${index + 1}/${targets.length} 个分镜`
+      });
+      try {
+        const audio = await this.produceAudio(userId, project, shot);
+        await this.shotRepo.update(shot.id, {
+          audioUrl: audio.audioUrl,
+          audioFile: audio.audioFile,
+          audioDurationMs: audio.audioDurationMs,
+          status: 'audio_done',
+          error: null
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`分镜 ${shot.id} 配音失败: ${message}`); // 继续后续分镜，不阻塞出片
+      }
+    }
+  }
+
+  /** 单镜配音：TTS 合成 → 落盘 → ffprobe 实测时长（无 ffprobe 回落估算，再兜底视频时长）。 */
+  private async produceAudio(
+    userId: number,
+    project: NovelProject,
+    shot: NovelShot
+  ): Promise<{ audioFile: string; audioUrl: string; audioDurationMs: number }> {
+    const narration = normalizeTtsText(shot.narration ?? '');
+    if (!narration) {
+      throw new Error('旁白为空，无法配音');
+    }
+    const usable = await this.ttsCandidates(project.config.ttsModelId);
+    if (usable.length === 0) {
+      throw new Error('没有可用的语音合成模型（tts 能力），请在 AI 模型管理里配置');
+    }
+    const voice = project.config.ttsVoice || process.env.TTS_DEFAULT_VOICE || 'alloy';
+    const timeoutMs = Number(process.env.TTS_TIMEOUT_MS ?? 60000);
+    const startedAt = Date.now();
+    let lastError: Error | null = null;
+    for (const candidate of usable) {
+      const speak = candidate.adapter.speech?.bind(candidate.adapter);
+      if (!speak) {
+        continue;
+      }
+      try {
+        const result = await speak({ text: narration, voice, timeoutMs }, candidate.channel);
+        const buffer = Buffer.from(result.audioBase64, 'base64');
+        if (buffer.length === 0) {
+          throw new Error('语音合成结果为空');
+        }
+        const relative = `novel-video/p${project.id}/audio-c${await this.chapterIdxOf(shot)}-s${shot.idx}.mp3`;
+        await this.writeUploadFile(relative, buffer);
+        const absolute = join(process.cwd(), 'uploads', relative);
+        const probed = await this.probeAudioDurationMs(absolute);
+        const audioDurationMs = probed ?? (estimateSpeechMs(narration) || project.config.videoSeconds * 1000);
+        this.deps.usageLog.record({
+          userId,
+          modelId: candidate.model.id,
+          kind: 'tts',
+          latencyMs: Date.now() - startedAt,
+          status: 'ok'
+        });
+        return { audioFile: relative, audioUrl: `/uploads/${relative}`, audioDurationMs };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        this.deps.usageLog.record({
+          userId,
+          modelId: candidate.model.id,
+          kind: 'tts',
+          latencyMs: Date.now() - startedAt,
+          status: 'failed',
+          errorMessage: lastError.message
+        });
+      }
+    }
+    throw lastError ?? new Error('配音失败');
+  }
+
+  /** ffprobe 实测音频时长毫秒；无 ffprobe / 解析失败返回 null（调用方回落估算）。 */
+  private async probeAudioDurationMs(absolutePath: string): Promise<number | null> {
+    ffprobeProbe = probeBinary('ffprobe', ffprobeProbe);
+    if (!(await ffprobeProbe)) {
+      return null;
+    }
+    try {
+      const { stdout } = await execFileAsync(
+        'ffprobe',
+        ['-v', 'quiet', '-print_format', 'json', '-show_format', absolutePath],
+        { timeout: 15000 }
+      );
+      return parseFfprobeDuration(stdout);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 生成项目字幕并落盘，返回 /uploads/ 静态路径。
+   * 时间轴口径：按「分段视频时长」（videoSeconds）逐段累加，与 mergeVideos 的 concat 成片
+   * 逐段对齐——每段视频按 seconds: videoSeconds 生成（见 produceVideo），concat 后总长 =
+   * 分镜数 × videoSeconds。配音音轨尚未混入成片（音画混流/字幕烧录属阶段2，
+   * 见 plan/go-taskflow-evaluation-20261028.md「阶段 2」），故不按 audioDurationMs 累加
+   * （那会与成片错位）；audioDurationMs 仅落库供展示与阶段2混流使用。
+   */
+  private async writeSubtitle(projectId: number, shots: NovelShot[], videoSeconds: number): Promise<string> {
+    const segments = shots.map((shot) => ({
+      text: (shot.narration ?? '').trim(),
+      durationMs: videoSeconds * 1000
+    }));
+    const srt = buildSrt(segments);
+    const relative = `novel-video/p${projectId}/subtitle.srt`;
+    await this.writeUploadFile(relative, Buffer.from(srt, 'utf8'));
+    return `/uploads/${relative}`;
   }
 
   private async chapterIdxOf(shot: NovelShot): Promise<number> {
@@ -413,6 +644,8 @@ export class NovelPipelineService implements OnModuleDestroy {
 
   /** ffmpeg 合成：concat demuxer 直拷贝，失败回落重编码。 */
   private async mergeVideos(projectId: number, shots: NovelShot[]): Promise<string> {
+    // 主机无 ffmpeg 时直接报明确错误，而不是让 execFile 抛 ENOENT。
+    await assertFfmpegAvailable();
     const projectDir = join(UPLOAD_ROOT, `p${projectId}`);
     await mkdir(projectDir, { recursive: true });
     const listFile = join(projectDir, 'concat.txt');
@@ -440,6 +673,160 @@ export class NovelPipelineService implements OnModuleDestroy {
       );
     }
     return `/uploads/novel-video/p${projectId}/final.mp4`;
+  }
+
+  // ---------- 单镜创作控制（片段级配置 / AI 重新规划 / 单镜重生成 / 字幕重生成） ----------
+
+  private async requireShot(projectId: number, shotId: number): Promise<NovelShot> {
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project) {
+      throw new NotFoundException('项目不存在');
+    }
+    assertProjectIdle(this.active, projectId);
+    const shot = await this.shotRepo.findOne({ where: { id: shotId, projectId } });
+    if (!shot) {
+      throw new NotFoundException('分镜不存在');
+    }
+    return shot;
+  }
+
+  /** 更新单镜创作控制字段（锁定原文/视觉任务/推进/生成模式/首帧锁定/旁白）。 */
+  async updateShot(projectId: number, shotId: number, dto: UpdateShotDto): Promise<NovelShot> {
+    const shot = await this.requireShot(projectId, shotId);
+    await this.shotRepo.update(shot.id, {
+      lockedSourceText: dto.lockedSourceText !== undefined ? dto.lockedSourceText : shot.lockedSourceText,
+      visualTask: dto.visualTask !== undefined ? dto.visualTask : shot.visualTask,
+      progression: dto.progression !== undefined ? dto.progression : shot.progression,
+      shotMode: dto.shotMode ?? shot.shotMode,
+      firstFrameLocked: dto.firstFrameLocked ?? shot.firstFrameLocked,
+      narration: dto.narration !== undefined ? dto.narration : shot.narration
+    });
+    return (await this.shotRepo.findOne({ where: { id: shot.id } }))!;
+  }
+
+  /** 单镜 AI 重新规划：LLM 优化画面/运动提示词；锁定原文时旁白不改写（代码兜底，不信任 LLM）。 */
+  async replanShot(userId: number, projectId: number, shotId: number): Promise<NovelShot> {
+    const shot = await this.requireShot(projectId, shotId);
+    const project = (await this.projectRepo.findOne({ where: { id: projectId } }))!;
+    const chapter = await this.chapterRepo.findOne({ where: { id: shot.chapterId } });
+    // 旁白锁定：lockedSourceText 非空 = 旁白以原文为准，仅改画面。
+    const narrationLocked = Boolean((shot.lockedSourceText ?? '').trim());
+    const system =
+      '你是专业的短视频编导。重新规划这一个分镜，让画面描述与镜头运动更连贯、更有镜头感。' +
+      '只输出 JSON，不要任何其他文字。格式：{"scenePrompt":"英文首帧画面提示词","motionPrompt":"英文镜头运动提示词","narration":"中文旁白，30字以内"}' +
+      (narrationLocked ? ' 旁白已锁定（以用户提供的原文片段为准），仅优化画面与镜头运动，narration 保持原文不改写。' : '');
+    const user = [
+      chapter ? `章节标题：${chapter.title}` : '',
+      shot.lockedSourceText ? `锁定原文（旁白以此为准）：${shot.lockedSourceText}` : '',
+      `当前画面提示词：${shot.scenePrompt}`,
+      `当前运动提示词：${shot.motionPrompt}`,
+      shot.visualTask ? `视觉任务：${shot.visualTask}` : '',
+      shot.progression ? `推进方式：${shot.progression}` : '',
+      `当前旁白：${shot.narration ?? ''}`
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const { text } = await runLlm(this.deps, [
+      { role: 'system', content: system },
+      { role: 'user', content: user }
+    ], {
+      temperature: 0.7,
+      userId,
+      modelId: project.config.storyboardModelId
+    });
+    const parsed = parseJsonBlock(text) as Partial<StoryboardShot> | undefined;
+    if (!parsed || typeof parsed.scenePrompt !== 'string' || typeof parsed.motionPrompt !== 'string') {
+      throw new Error('重新规划失败：LLM 未返回有效的 scenePrompt/motionPrompt JSON');
+    }
+    const nextNarration = narrationLocked
+      ? shot.narration ?? ''
+      : typeof parsed.narration === 'string'
+        ? parsed.narration
+        : shot.narration ?? '';
+    await this.shotRepo.update(shot.id, {
+      scenePrompt: parsed.scenePrompt,
+      motionPrompt: parsed.motionPrompt,
+      narration: nextNarration,
+      status: 'pending', // 提示词已变，产物待重做
+      error: null
+    });
+    return (await this.shotRepo.findOne({ where: { id: shot.id } }))!;
+  }
+
+  /** 单镜重生成：image 重绘首帧（锁定时拒绝）、video 重出片段、audio 补配音（不回退状态）。 */
+  async regenerateShot(
+    userId: number,
+    projectId: number,
+    shotId: number,
+    step: 'image' | 'video' | 'audio'
+  ): Promise<NovelShot> {
+    const shot = await this.requireShot(projectId, shotId);
+    const project = (await this.projectRepo.findOne({ where: { id: projectId } }))!;
+    if (step === 'image') {
+      if (shot.firstFrameLocked && shot.imageUrl) {
+        throw new BadRequestException('该分镜已锁定首帧，请先解除锁定再重新生成');
+      }
+      const startedAt = Date.now();
+      try {
+        const imageUrl = await this.produceImage(project, shot);
+        await this.shotRepo.update(shot.id, {
+          imageUrl,
+          error: null,
+          // video_done 镜头只换首帧不回退状态；其余推进到 image_done。
+          status: shot.status === 'video_done' ? 'video_done' : 'image_done',
+          durationMs: Date.now() - startedAt
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await this.shotRepo.update(shot.id, { error: message, durationMs: Date.now() - startedAt });
+        throw error;
+      }
+    } else if (step === 'video') {
+      const startedAt = Date.now();
+      try {
+        const videoFile = await this.produceVideo(userId, project, shot);
+        await this.shotRepo.update(shot.id, {
+          videoUrl: `/uploads/${videoFile}`,
+          videoFile,
+          status: 'video_done',
+          error: null,
+          durationMs: Date.now() - startedAt
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await this.shotRepo.update(shot.id, { error: message, durationMs: Date.now() - startedAt });
+        throw error;
+      }
+    } else {
+      // 补配音：只写音频三列，绝不回退 status（video_done 补音后仍为 video_done，成片复用不受影响）。
+      const audio = await this.produceAudio(userId, project, shot);
+      await this.shotRepo.update(shot.id, {
+        audioUrl: audio.audioUrl,
+        audioFile: audio.audioFile,
+        audioDurationMs: audio.audioDurationMs,
+        error: null
+      });
+    }
+    return (await this.shotRepo.findOne({ where: { id: shot.id } }))!;
+  }
+
+  /** 手动重生成字幕：按当前成片镜头顺序重建 SRT 并落盘。 */
+  async regenerateSubtitle(projectId: number): Promise<{ subtitlePath: string }> {
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project) {
+      throw new NotFoundException('项目不存在');
+    }
+    assertProjectIdle(this.active, projectId);
+    const finalShots = await this.shotRepo.find({
+      where: { projectId, status: 'video_done' },
+      order: { id: 'ASC' }
+    });
+    if (finalShots.length === 0) {
+      throw new BadRequestException('没有已出片的分镜，无法生成字幕');
+    }
+    const subtitlePath = await this.writeSubtitle(projectId, finalShots, project.config.videoSeconds);
+    await this.projectRepo.update(projectId, { finalSubtitlePath: subtitlePath });
+    return { subtitlePath };
   }
 
   // ---------- 查询与管理 ----------

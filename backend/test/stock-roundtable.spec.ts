@@ -1,5 +1,7 @@
 // Stock Roundtable 模块测试：mock 行情数据源，验证发起会议 → SSE 事件流 → 落库 → 历史列表的完整链路。
 // 测试库无 AI 模型渠道，专家全部走本地规则兜底（与生产降级路径一致）。
+// 用例顺序无关：共享会话夹具（创建 + SSE 流式至 done）在 beforeAll 里完成，
+// 各用例只消费 createdId，互不依赖执行顺序（jest --randomize 会打乱文件内用例顺序）。
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -140,6 +142,26 @@ describe('Stock Roundtable (e2e)', () => {
       .send({ username: 'stock-tester', password: 'password' })
       .expect(201);
     accessToken = loginResponse.body.data.accessToken;
+
+    // 共享夹具会话：创建 + SSE 流式至 done。后续用例（落库/重放/列表/越权）只消费 createdId，
+    // 不依赖任何 it 的执行顺序（--randomize 兼容）。
+    const created = await request(app.getHttpServer())
+      .post('/api/stock/roundtable')
+      .set(auth())
+      .send({ subjectType: 'stock', symbol: 'sh600519', mode: 'quick', question: '下周能加仓吗' })
+      .expect(201);
+    createdId = created.body.data.id;
+    await request(app.getHttpServer())
+      .get(`/api/stock/roundtable/${createdId}/stream`)
+      .set(auth())
+      .expect(200)
+      .buffer(false)
+      .parse((res, callback) => {
+        res.on('data', (chunk: Buffer) => {
+          streamRaw += chunk.toString();
+        });
+        res.on('end', () => callback(null, streamRaw));
+      });
   });
 
   afterAll(async () => {
@@ -182,24 +204,26 @@ describe('Stock Roundtable (e2e)', () => {
   });
 
   it('should create roundtable and stream full session via SSE', async () => {
+    // 自含会话：本用例自己创建并流式，不消费 beforeAll 夹具（用例顺序无关）。
     const created = await request(app.getHttpServer())
       .post('/api/stock/roundtable')
       .set(auth())
       .send({ subjectType: 'stock', symbol: 'sh600519', mode: 'quick', question: '下周能加仓吗' })
       .expect(201);
-    createdId = created.body.data.id;
-    expect(createdId).toBeDefined();
+    const sessionId = created.body.data.id;
+    expect(sessionId).toBeDefined();
 
+    let raw = '';
     await request(app.getHttpServer())
-      .get(`/api/stock/roundtable/${createdId}/stream`)
+      .get(`/api/stock/roundtable/${sessionId}/stream`)
       .set(auth())
       .expect(200)
       .buffer(false)
       .parse((res, callback) => {
         res.on('data', (chunk: Buffer) => {
-          streamRaw += chunk.toString();
+          raw += chunk.toString();
         });
-        res.on('end', () => callback(null, streamRaw));
+        res.on('end', () => callback(null, raw));
       });
 
     for (const event of [
@@ -213,10 +237,10 @@ describe('Stock Roundtable (e2e)', () => {
       'event: summary_done',
       'event: done'
     ]) {
-      expect(streamRaw).toContain(event);
+      expect(raw).toContain(event);
     }
     // 五位专家在 quick 模式下都应有立场。
-    const stanceCount = (streamRaw.match(/event: expert_done/g) ?? []).length;
+    const stanceCount = (raw.match(/event: expert_done/g) ?? []).length;
     expect(stanceCount).toBe(5);
   });
 

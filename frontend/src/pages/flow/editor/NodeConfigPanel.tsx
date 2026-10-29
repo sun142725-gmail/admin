@@ -36,11 +36,13 @@ interface FormValues {
   body?: string;
   timeoutMs?: number;
   text?: string;
+  voice?: string;
+  speed?: number;
   variables?: Array<{ name?: string; label?: string; defaultValue?: string; required?: number }>;
   fields?: Array<{ key?: string; value?: string }>;
 }
 
-const MODEL_CAPABILITY: Record<string, string> = { llm: 'chat', image: 'image', video: 'video' };
+const MODEL_CAPABILITY: Record<string, string> = { llm: 'chat', image: 'image', video: 'video', tts: 'tts' };
 const SIZE_OPTIONS = ['1024x1024', '1280x720', '720x1280', '1664x928'].map((value) => ({ value }));
 
 export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
@@ -319,6 +321,30 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
               </Form.Item>
               <Form.Item name="size" label="分辨率（如 1280x720，可空）">
                 <Input placeholder="跟随上游/默认" />
+              </Form.Item>
+            </>
+          )}
+
+          {flowType === 'tts' && (
+            <>
+              {canManageModels && modelOptions.length > 0 && (
+                <Form.Item name="modelId" label="指定模型（可选）">
+                  <Select allowClear placeholder="自动路由" options={modelOptions} />
+                </Form.Item>
+              )}
+              <Form.Item
+                name="text"
+                label={<Space size={2}>朗读文本模板{varPopover('text')}</Space>}
+                rules={[{ required: true, message: '请输入朗读文本' }]}
+                extra="支持 {{节点.字段}} 引用上游输出，如 LLM 生成的旁白"
+              >
+                <Input.TextArea rows={4} placeholder="如：{{llm1.text}}" />
+              </Form.Item>
+              <Form.Item name="voice" label="音色（可空）" extra="留空用服务端默认音色（TTS_DEFAULT_VOICE / alloy）">
+                <Input placeholder="如：alloy / echo / nova" maxLength={64} />
+              </Form.Item>
+              <Form.Item name="speed" label="语速" extra="0.25 ~ 4.0，1 为正常语速">
+                <InputNumber min={0.25} max={4} step={0.25} />
               </Form.Item>
             </>
           )}

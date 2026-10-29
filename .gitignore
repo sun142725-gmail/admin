@@ -58,6 +58,10 @@ backend/.env.local
 deploy/.env.production
 deploy/generated/
 backend/uploads/
+# 从仓库根 cwd 跑 backend e2e（经 test 符号链接）时产物落在根 uploads/
+/uploads/
+# 仓库根 test 符号链接（jest 兼容层用，见 backend/jest.config.js 头注释，不入库，缺失时兼容层自动关闭）
+/test
 
 # 临时探针/验证脚本
 *.tmp.js
