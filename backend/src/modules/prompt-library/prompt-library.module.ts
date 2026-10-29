@@ -4,12 +4,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PromptTemplate } from '../../common/entities/prompt-template.entity';
 import { PromptLibraryService } from './prompt-library.service';
 import { PromptLibraryController } from './prompt-library.controller';
+import { PromptLibraryGuardedController } from './prompt-library-guarded.controller';
 import { InternalPromptLibraryController } from './internal-prompt-library.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([PromptTemplate])],
   providers: [PromptLibraryService],
-  controllers: [PromptLibraryController, InternalPromptLibraryController],
+  controllers: [PromptLibraryController, PromptLibraryGuardedController, InternalPromptLibraryController],
   exports: [PromptLibraryService]
 })
 export class PromptLibraryModule {}

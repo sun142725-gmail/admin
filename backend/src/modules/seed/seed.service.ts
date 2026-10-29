@@ -119,7 +119,9 @@ export class SeedService implements OnModuleInit {
       { name: '股市圆桌', code: 'stock:roundtable:use' },
       { name: '任务流管理', code: 'flow:define:manage' },
       { name: '任务流执行', code: 'flow:run:execute' },
-      { name: '运行历史查看', code: 'flow:run:view' }
+      { name: '运行历史查看', code: 'flow:run:view' },
+      { name: '提示词库查看', code: 'flow:prompt:view' },
+      { name: '提示词库管理', code: 'flow:prompt:manage' }
     ];
     const entities = this.permissionRepo.create(items);
     return this.permissionRepo.save(entities);
@@ -753,7 +755,9 @@ export class SeedService implements OnModuleInit {
     const codes: Array<{ code: string; name: string }> = [
       { code: 'flow:define:manage', name: '任务流管理' },
       { code: 'flow:run:execute', name: '任务流执行' },
-      { code: 'flow:run:view', name: '运行历史查看' }
+      { code: 'flow:run:view', name: '运行历史查看' },
+      { code: 'flow:prompt:view', name: '提示词库查看' },
+      { code: 'flow:prompt:manage', name: '提示词库管理' }
     ];
     for (const item of codes) {
       const permission = await this.ensurePermissionByCode(item.code, item.name);
@@ -773,7 +777,7 @@ export class SeedService implements OnModuleInit {
       { path: '/flow/runs', name: '运行历史', code: 'flow:run:view' },
       { path: '/flow/novel', name: '小说转视频', code: 'flow:run:view' },
       { path: '/graphic', name: '小说生图', code: 'flow:run:view' },
-      { path: '/prompts', name: '图片提示词库', code: 'flow:run:view' }
+      { path: '/prompts', name: '图片提示词库', code: 'flow:prompt:view' }
     ];
     for (const page of pages) {
       const exists = await this.resourceRepo.findOne({ where: { path: page.path } });

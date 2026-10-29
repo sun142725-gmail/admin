@@ -24,6 +24,7 @@ import {
   PictureOutlined,
   RobotOutlined,
   StockOutlined,
+  FileImageOutlined,
 } from '@ant-design/icons';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMenuTree } from '../api/resources';
@@ -60,6 +61,7 @@ const getMenuIcon = (item: MenuItem) => {
       '/notifications/templates': <BookOutlined />,
       '/notifications/publish': <FileTextOutlined />,
       '/notifications/inbox': <IdcardOutlined />,
+      '/prompts': <FileImageOutlined />,
       '/profile': <IdcardOutlined />
     };
     return pathIconMap[item.path];
@@ -120,6 +122,7 @@ const PAGE_CODE_MAP: Record<string, string> = {
   '/notifications/templates': 'notification_template',
   '/notifications/publish': 'notification_publish',
   '/notifications/inbox': 'notification_inbox',
+  '/prompts': 'prompt_library',
   '/profile': 'profile'
 };
 
