@@ -13,8 +13,8 @@ export class InternalPromptLibraryController {
   @Get(':id')
   async detail(@Param('id', ParseIntPipe) id: number) {
     const template = await this.service.detail(id);
-    // 引用计数异步累加，不阻塞调用方
-    this.service.recordUse(id);
+    // 引用计数异步累加，不阻塞调用方；increment 失败吞掉（best-effort），避免 unhandledRejection 噪音。
+    void this.service.recordUse(id).catch(() => undefined);
     return {
       id: template.id,
       name: template.name,

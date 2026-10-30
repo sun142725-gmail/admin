@@ -1,6 +1,7 @@
 // 图片提示词库页：风格模板卡片墙（分类/来源工具筛选 + 模糊搜索 + 复制 Prompt + 新建/编辑/批量同步）。
 // 图文流水线按 category 引用模板，模板正文中 {{content}} 会被场景文本替换。
-// 浏览走 /prompt-library（分页 + 细粒度权限 flow:prompt:view），增删改走 /prompt-templates CRUD。
+// 单轨权限口径：查看 flow:prompt:view（/prompt-library 分页），写操作（新建/编辑/删除/批量同步）
+// 统一 flow:prompt:manage——按钮显隐与后端 /prompt-templates CRUD、菜单(/prompts) 同码。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
@@ -20,6 +21,7 @@ import {
 } from 'antd';
 import { CopyOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PlusOutlined, ReloadOutlined, SyncOutlined } from '@ant-design/icons';
 import { Permission } from '../../components/permission/Permission';
+import { useAppSelector } from '../../store/hooks';
 import {
   PROMPT_CATEGORIES,
   PromptImageVo,
@@ -78,6 +80,10 @@ export const PromptLibraryPage: React.FC = () => {
   const [syncing, setSyncing] = useState(false);
   const [form] = Form.useForm<TemplateFormValues>();
   const [syncForm] = Form.useForm<SyncFormValues>();
+  // 写权限（新建/编辑/删除/同步）：与 Permission 组件同一数据源（profile.permissions）。
+  const canManage = useAppSelector((state) =>
+    (state.auth.profile?.permissions ?? []).includes('flow:prompt:manage')
+  );
 
   // 分类来源：固定枚举 + 库里实际出现的分类（同步允许自由扩展，stats.byCategory 是精确口径）。
   const categoryOptions = useMemo(() => {
@@ -281,9 +287,11 @@ export const PromptLibraryPage: React.FC = () => {
               批量同步
             </Button>
           </Permission>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建模板
-          </Button>
+          <Permission code="flow:prompt:manage">
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              新建模板
+            </Button>
+          </Permission>
         </Space>
       }
     >
@@ -317,10 +325,16 @@ export const PromptLibraryPage: React.FC = () => {
                 }
                 actions={[
                   <CopyOutlined key="copy" onClick={() => void handleCopy(tpl)} />,
-                  <EditOutlined key="edit" onClick={() => openEdit(tpl)} />,
-                  <Popconfirm key="del" title="确定删除该模板？" onConfirm={() => void handleDelete(tpl)}>
-                    <DeleteOutlined />
-                  </Popconfirm>
+                  // 无 manage 权限时整体不渲染编辑/删除；antd Card actions 会给每个数组项留 <li> 格子，
+                  // 不能放 null 占位，故按 canManage 条件拼数组（与 <Permission> 同一权限数据源）。
+                  ...(canManage
+                    ? [
+                        <EditOutlined key="edit" onClick={() => openEdit(tpl)} />,
+                        <Popconfirm key="del" title="确定删除该模板？" onConfirm={() => void handleDelete(tpl)}>
+                          <DeleteOutlined />
+                        </Popconfirm>
+                      ]
+                    : [])
                 ]}
               >
                 <Card.Meta

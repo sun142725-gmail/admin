@@ -1,5 +1,5 @@
 // 提示词库 DTO：创建/更新/查询 + 批量同步/筛选分页。
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -62,7 +62,8 @@ export class CreatePromptTemplateDto {
   modelId?: number;
 }
 
-export class UpdatePromptTemplateDto extends CreatePromptTemplateDto {}
+// PATCH 语义：所有字段可选（曾误用全必填继承导致 PATCH 只传 name 报 422）。
+export class UpdatePromptTemplateDto extends PartialType(CreatePromptTemplateDto) {}
 
 export class QueryPromptTemplateDto {
   @ApiPropertyOptional({ description: '按风格分类过滤' })

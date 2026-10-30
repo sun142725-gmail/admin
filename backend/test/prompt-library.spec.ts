@@ -1,4 +1,5 @@
-// PromptLibrary 模块测试：JWT 保护、参数校验、CRUD 与分类/关键字过滤、引用计数。
+// PromptLibrary 模块测试：JWT + 权限码（view 读 / manage 写，与菜单/前端同口径）、参数校验、
+// CRUD 与分类/关键字过滤（LIKE 通配符转义）、引用计数容错、内部接口令牌。
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -11,10 +12,15 @@ import { ResponseInterceptor } from '../src/common/interceptors/response.interce
 import { User } from '../src/common/entities/user.entity';
 import { Role } from '../src/common/entities/role.entity';
 import { Permission } from '../src/common/entities/permission.entity';
+import { PromptTemplate } from '../src/common/entities/prompt-template.entity';
 
 describe('PromptLibrary (e2e)', () => {
   let app: INestApplication;
-  let accessToken: string;
+  let moduleFixture: TestingModule;
+  let managerToken: string; // flow:prompt:view + flow:prompt:manage 双码
+  let viewerToken: string; // 仅 flow:prompt:view
+  let guestToken: string; // 无角色
+  let promptRepo: Repository<PromptTemplate>;
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
@@ -24,7 +30,7 @@ describe('PromptLibrary (e2e)', () => {
     process.env.JWT_REFRESH_EXPIRES_IN = '7d';
     process.env.SEED = 'false';
 
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    moduleFixture = await Test.createTestingModule({
       imports: [AppModule]
     }).compile();
 
@@ -40,36 +46,89 @@ describe('PromptLibrary (e2e)', () => {
     const userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     const roleRepo = moduleFixture.get<Repository<Role>>(getRepositoryToken(Role));
     const permissionRepo = moduleFixture.get<Repository<Permission>>(getRepositoryToken(Permission));
-    const permission = await permissionRepo.save(
-      permissionRepo.create({ name: '提示词库使用', code: 'flow:run:view' })
+    // 与 guarded 控制器/菜单同口径：view 读、manage 写。
+    const viewPermission = await permissionRepo.save(
+      permissionRepo.create({ name: '提示词库查看', code: 'flow:prompt:view' })
     );
-    const role = await roleRepo.save(
-      roleRepo.create({ name: '提示词用户', code: 'prompt_user', permissions: [permission] })
+    const managePermission = await permissionRepo.save(
+      permissionRepo.create({ name: '提示词库管理', code: 'flow:prompt:manage' })
+    );
+    const managerRole = await roleRepo.save(
+      roleRepo.create({
+        name: '提示词库管理',
+        code: 'prompt_manager',
+        permissions: [viewPermission, managePermission]
+      })
+    );
+    const viewerRole = await roleRepo.save(
+      roleRepo.create({ name: '提示词库只读', code: 'prompt_viewer', permissions: [viewPermission] })
     );
     const passwordHash = await bcrypt.hash('password', 10);
-    await userRepo.save(userRepo.create({ username: 'prompter', passwordHash, status: 1, roles: [role] }));
+    await userRepo.save(
+      userRepo.create({ username: 'prompt-manager', passwordHash, status: 1, roles: [managerRole] })
+    );
+    await userRepo.save(
+      userRepo.create({ username: 'prompter', passwordHash, status: 1, roles: [viewerRole] })
+    );
+    await userRepo.save(userRepo.create({ username: 'prompt-guest', passwordHash, status: 1 }));
 
-    const loginResponse = await request(app.getHttpServer())
-      .post('/api/auth/login')
-      .send({ username: 'prompter', password: 'password' })
-      .expect(201);
-    accessToken = loginResponse.body.data.accessToken;
+    const login = async (username: string): Promise<string> => {
+      const res = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ username, password: 'password' })
+        .expect(201);
+      return res.body.data.accessToken as string;
+    };
+    managerToken = await login('prompt-manager');
+    viewerToken = await login('prompter');
+    guestToken = await login('prompt-guest');
+
+    promptRepo = moduleFixture.get<Repository<PromptTemplate>>(getRepositoryToken(PromptTemplate));
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  const auth = () => ({ Authorization: `Bearer ${accessToken}` });
+  const manageAuth = () => ({ Authorization: `Bearer ${managerToken}` });
+  const viewAuth = () => ({ Authorization: `Bearer ${viewerToken}` });
+  const guestAuth = () => ({ Authorization: `Bearer ${guestToken}` });
 
   it('未携带令牌访问列表应 401（JWT 保护）', async () => {
     await request(app.getHttpServer()).get('/api/prompt-templates').expect(401);
   });
 
+  it('无角色 guest 读列表应 403（修复前仅 JWT 校验返回 200）', async () => {
+    await request(app.getHttpServer()).get('/api/prompt-templates').set(guestAuth()).expect(403);
+  });
+
+  it('仅有 view 权限的用户：GET 放行、POST/PATCH/DELETE 一律 403（修复前 201/200/200）', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/prompt-templates')
+      .set(manageAuth())
+      .send({ name: '越权验证模板', category: 'ui', template: '越权验证：{{content}}' })
+      .expect(201);
+    const id = created.body.data.id;
+
+    await request(app.getHttpServer()).get('/api/prompt-templates').set(viewAuth()).expect(200);
+
+    await request(app.getHttpServer())
+      .post('/api/prompt-templates')
+      .set(viewAuth())
+      .send({ name: '无权新建', category: 'ui', template: 'x' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .patch(`/api/prompt-templates/${id}`)
+      .set(viewAuth())
+      .send({ name: '无权改' })
+      .expect(403);
+    await request(app.getHttpServer()).delete(`/api/prompt-templates/${id}`).set(viewAuth()).expect(403);
+  });
+
   it('创建模板：默认引用计数 0 且响应结构统一（code=0）', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/prompt-templates')
-      .set(auth())
+      .set(manageAuth())
       .send({
         name: '水彩绘本',
         category: 'illustrated',
@@ -86,7 +145,7 @@ describe('PromptLibrary (e2e)', () => {
   it('非法分类应被校验拦截（422）', async () => {
     await request(app.getHttpServer())
       .post('/api/prompt-templates')
-      .set(auth())
+      .set(manageAuth())
       .send({ name: '坏分类', category: 'not-a-category', template: 'x' })
       .expect(422); // 项目约定：BadRequest 统一映射 422
   });
@@ -94,7 +153,7 @@ describe('PromptLibrary (e2e)', () => {
   it('缺失必填字段应 422（模板正文为空）', async () => {
     await request(app.getHttpServer())
       .post('/api/prompt-templates')
-      .set(auth())
+      .set(manageAuth())
       .send({ name: '缺正文', category: 'poster' })
       .expect(422); // 项目约定：BadRequest 统一映射 422
   });
@@ -102,7 +161,7 @@ describe('PromptLibrary (e2e)', () => {
   it('未知字段应 422（forbidNonWhitelisted 规矩）', async () => {
     await request(app.getHttpServer())
       .post('/api/prompt-templates')
-      .set(auth())
+      .set(manageAuth())
       .send({ name: '多余字段', category: 'anime', template: 'x', hack: true })
       .expect(422); // 项目约定：BadRequest 统一映射 422
   });
@@ -110,13 +169,13 @@ describe('PromptLibrary (e2e)', () => {
   it('列表按分类过滤且关键字模糊命中', async () => {
     await request(app.getHttpServer())
       .post('/api/prompt-templates')
-      .set(auth())
+      .set(manageAuth())
       .send({ name: '赛璐璐动漫风', category: 'anime', template: '动漫：{{content}}' })
       .expect(201);
 
     const byCategory = await request(app.getHttpServer())
       .get('/api/prompt-templates')
-      .set(auth())
+      .set(viewAuth())
       .query({ category: 'anime' })
       .expect(200);
     expect(byCategory.body.data.length).toBeGreaterThan(0);
@@ -126,39 +185,125 @@ describe('PromptLibrary (e2e)', () => {
 
     const byKeyword = await request(app.getHttpServer())
       .get('/api/prompt-templates')
-      .set(auth())
+      .set(viewAuth())
       .query({ keyword: '赛璐璐' })
       .expect(200);
     expect(byKeyword.body.data.some((row: { name: string }) => row.name === '赛璐璐动漫风')).toBe(true);
   });
 
+  it("keyword='%' 不应命中全表（LIKE 通配符已转义）；下划线关键字精确命中字面行", async () => {
+    // 修复前：LIKE '%%%%%' 等价全表通配；修复后 %/_ 均为字面量。
+    const all = await request(app.getHttpServer())
+      .get('/api/prompt-templates')
+      .set(viewAuth())
+      .expect(200);
+    expect(all.body.data.length).toBeGreaterThan(0);
+
+    const byPercent = await request(app.getHttpServer())
+      .get('/api/prompt-templates')
+      .set(viewAuth())
+      .query({ keyword: '%' })
+      .expect(200);
+    expect(byPercent.body.data).toHaveLength(0);
+
+    await request(app.getHttpServer())
+      .post('/api/prompt-templates')
+      .set(manageAuth())
+      .send({ name: 'AB风格', category: 'poster', template: 'AB：{{content}}' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/api/prompt-templates')
+      .set(manageAuth())
+      .send({ name: 'A_B风格', category: 'poster', template: 'A_B：{{content}}' })
+      .expect(201);
+    // 修复前 '_' 通配任意单字符，'A_B' 会同时命中 'AB风格'；修复后只命中字面含下划线的行。
+    const byUnderline = await request(app.getHttpServer())
+      .get('/api/prompt-templates')
+      .set(viewAuth())
+      .query({ keyword: 'A_B' })
+      .expect(200);
+    expect(byUnderline.body.data).toHaveLength(1);
+    expect(byUnderline.body.data[0].name).toBe('A_B风格');
+  });
+
   it('更新模板后内容生效；删除后再查应 404', async () => {
     const created = await request(app.getHttpServer())
       .post('/api/prompt-templates')
-      .set(auth())
+      .set(manageAuth())
       .send({ name: '待改模板', category: 'ui', template: 'UI：{{content}}' })
       .expect(201);
     const id = created.body.data.id;
 
     const updated = await request(app.getHttpServer())
       .patch(`/api/prompt-templates/${id}`)
-      .set(auth())
+      .set(manageAuth())
       .send({ name: '改过的模板', category: 'ui', template: 'UI v2：{{content}}' })
       .expect(200);
     expect(updated.body.data.template).toBe('UI v2：{{content}}');
 
-    await request(app.getHttpServer()).delete(`/api/prompt-templates/${id}`).set(auth()).expect(200);
-    await request(app.getHttpServer()).get(`/api/prompt-templates/${id}`).set(auth()).expect(404);
+    await request(app.getHttpServer()).delete(`/api/prompt-templates/${id}`).set(manageAuth()).expect(200);
+    await request(app.getHttpServer()).get(`/api/prompt-templates/${id}`).set(manageAuth()).expect(404);
+  });
+
+  it('PATCH 仅传 name 部分字段应 200（修复前 UpdateDto 全必填报 422）', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/prompt-templates')
+      .set(manageAuth())
+      .send({ name: '部分更新模板', category: 'ui', template: 'UI 原文：{{content}}' })
+      .expect(201);
+    const id = created.body.data.id;
+
+    const updated = await request(app.getHttpServer())
+      .patch(`/api/prompt-templates/${id}`)
+      .set(manageAuth())
+      .send({ name: '只改名' })
+      .expect(200);
+    expect(updated.body.data.name).toBe('只改名');
+    expect(updated.body.data.template).toBe('UI 原文：{{content}}'); // 未传字段保持原值
+
+    await request(app.getHttpServer()).delete(`/api/prompt-templates/${id}`).set(manageAuth()).expect(200);
   });
 
   it('内部模板接口受 X-Internal-Token 保护（fail-closed 由 InternalTokenGuard 保证）', async () => {
     // 请求时未配置 INTERNAL_API_TOKEN（本套件未注入）→ guard 拒绝
     await request(app.getHttpServer()).get('/api/internal/prompt-templates/1').expect(401);
   });
+
+  it('recordUse 引用计数失败不影响内部读取：GET 仍 200 且无 unhandledRejection', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/prompt-templates')
+      .set(manageAuth())
+      .send({ name: '引用计数模板', category: 'ui', template: '计数：{{content}}' })
+      .expect(201);
+    const id = created.body.data.id;
+
+    const rejections: unknown[] = [];
+    const listener = (reason: unknown): void => {
+      rejections.push(reason);
+    };
+    process.on('unhandledRejection', listener);
+    const incrementSpy = jest.spyOn(promptRepo, 'increment');
+    incrementSpy.mockImplementationOnce(() => Promise.reject(new Error('increment down')));
+    try {
+      // 请求时临时注入内部令牌（guard 每次读 env；本套件其余用例保持未配置 → fail-closed 不受影响）。
+      process.env.INTERNAL_API_TOKEN = 'prompt_spec_internal_token';
+      const response = await request(app.getHttpServer())
+        .get(`/api/internal/prompt-templates/${id}`)
+        .set('X-Internal-Token', 'prompt_spec_internal_token')
+        .expect(200);
+      expect(response.body.data.template).toBe('计数：{{content}}');
+      // 引用计数是异步 best-effort：给事件循环留出 rejected promise 的暴露窗口。
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(rejections).toHaveLength(0); // 修复前：recordUse 未 catch → unhandledRejection
+    } finally {
+      incrementSpy.mockRestore();
+      delete process.env.INTERNAL_API_TOKEN;
+      process.off('unhandledRejection', listener);
+    }
+  });
 });
 
 // ---------- 增量端点（/api/prompt-library/*，PermissionsGuard 细粒度权限）：批量同步幂等 / 筛选分页 / 统计 ----------
-import { PromptTemplate } from '../src/common/entities/prompt-template.entity';
 import { createHash } from 'crypto';
 import { existsSync } from 'fs';
 import { join } from 'path';
@@ -310,6 +455,14 @@ describe('PromptLibrary sync & stats (e2e)', () => {
     expect(paged.body.data.page).toBe(1);
     expect(paged.body.data.items).toHaveLength(1);
     expect(paged.body.data.total).toBe(2);
+  });
+
+  it("keyword='%' 为字面量不命中任何行（search 路径同口径转义）", async () => {
+    const byPercent = await request(app.getHttpServer())
+      .get(`/api/prompt-library?keyword=${encodeURIComponent('%')}`)
+      .set(auth())
+      .expect(200);
+    expect(byPercent.body.data.total).toBe(0);
   });
 
   it('stats：total 与按分类计数口径正确', async () => {

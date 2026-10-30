@@ -19,6 +19,14 @@ import { assertPublicHost, readBodyWithLimit } from './ssrf-guard.util';
 // 示例图下载上限：5MB（流式读取超限即中止），防超大响应撑爆内存。
 const EXAMPLE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
+/**
+ * LIKE 关键字转义：把 \ % _ ! 视为字面量（! 同时是转义符，需先转义防悬挂）。
+ * 转义符选 `!` 而非 MySQL 默认的 `\`：ESCAPE '!' 单字符字面量在 MySQL 与 sqlite 语义一致；
+ * sqlite 字符串不做反斜杠转义，ESCAPE '\\' 是两字符串会直接报错（e2e 跑 sqlite :memory:）。
+ * 导出为纯函数便于单测（AGENTS 规则 4）。
+ */
+export const escapeLike = (keyword: string): string => keyword.replace(/[\\%_!]/g, (ch) => `!${ch}`);
+
 @Injectable()
 export class PromptLibraryService {
   constructor(
@@ -41,7 +49,8 @@ export class PromptLibraryService {
       qb.andWhere('t.category = :category', { category: query.category });
     }
     if (query.keyword) {
-      qb.andWhere('(t.name LIKE :kw OR t.styleTags LIKE :kw)', { kw: `%${query.keyword}%` });
+      const kw = `%${escapeLike(query.keyword)}%`;
+      qb.andWhere("(t.name LIKE :kw ESCAPE '!' OR t.styleTags LIKE :kw ESCAPE '!')", { kw });
     }
     return qb.take(query.take ?? 50).getMany();
   }
@@ -219,7 +228,8 @@ export class PromptLibraryService {
       qb.andWhere('t.source = :sourceTool', { sourceTool: query.sourceTool });
     }
     if (query.keyword) {
-      qb.andWhere('(t.name LIKE :kw OR t.template LIKE :kw)', { kw: `%${query.keyword}%` });
+      const kw = `%${escapeLike(query.keyword)}%`;
+      qb.andWhere("(t.name LIKE :kw ESCAPE '!' OR t.template LIKE :kw ESCAPE '!')", { kw });
     }
     qb.orderBy('t.id', 'DESC').skip((page - 1) * pageSize).take(pageSize);
     const [items, total] = await qb.getManyAndCount();

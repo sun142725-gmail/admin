@@ -1,4 +1,5 @@
-// 提示词库 API：风格模板 CRUD（Node 直连，非网关转发）。
+// 提示词库 API：单轨口径——/prompt-library（查看/统计/同步，flow:prompt:* 细粒度权限）与
+// /prompt-templates（CRUD，同一套 flow:prompt:view/manage 权限码，后端已收敛 PermissionsGuard）。
 import http from './http';
 
 export interface PromptTemplate {
@@ -40,7 +41,8 @@ export const listPromptTemplates = (params?: { category?: string; keyword?: stri
 export const createPromptTemplate = (payload: CreatePromptTemplatePayload) =>
   http.post<never, PromptTemplate>('/prompt-templates', payload);
 
-export const updatePromptTemplate = (id: number, payload: CreatePromptTemplatePayload) =>
+// PATCH 语义：所有字段可选（与后端 UpdatePromptTemplateDto = PartialType(Create) 对齐）。
+export const updatePromptTemplate = (id: number, payload: Partial<CreatePromptTemplatePayload>) =>
   http.patch<never, PromptTemplate>(`/prompt-templates/${id}`, payload);
 
 export const deletePromptTemplate = (id: number) =>
@@ -107,5 +109,8 @@ export const listPromptImages = (params?: PromptLibrarySearchParams) =>
 
 export const promptLibraryStats = () => http.get<never, PromptLibraryStatsVo>('/prompt-library/stats');
 
+// timeout 300000：后端单次 sync 上限 ArrayMaxSize(200) 条，逐条查重+插入通常秒级；
+// 仅条目带 imageUrl 时逐条 best-effort 下载（15s/条）会拖长——前端同步表单不传 imageUrl，
+// 按 200 条慢库写入+网络抖动留 5 分钟预算。此前 timeout:0（不限时）在弱网下请求会永久 pending。
 export const syncPromptImages = (items: SyncPromptImageItem[]) =>
-  http.post<never, SyncPromptResultVo>('/prompt-library/sync', { items }, { timeout: 0 });
+  http.post<never, SyncPromptResultVo>('/prompt-library/sync', { items }, { timeout: 300000 });
