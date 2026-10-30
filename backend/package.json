@@ -12,7 +12,8 @@
     "sync:stock": "ts-node scripts/sync-stock-agents.ts",
     "sync:ai:gen": "ts-node scripts/generate-ai-publish-sql.ts",
     "sync:ai:publish": "ts-node scripts/publish-ai-config.ts",
-    "sync:stock:gen": "ts-node scripts/generate-stock-agents-sql.ts"
+    "sync:stock:gen": "ts-node scripts/generate-stock-agents-sql.ts",
+    "repair:prompt-mojibake": "ts-node scripts/repair-prompt-mojibake.ts"
   },
   "dependencies": {
     "@alicloud/dysmsapi20170525": "^4.6.0",
