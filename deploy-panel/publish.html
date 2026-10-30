@@ -46,6 +46,29 @@
   </div>
 </div>
 
+<div class="mb-6 border border-gray-800 rounded-lg p-4">
+  <h2 class="text-lg font-bold mb-3">🧾 线上脚本</h2>
+  <div class="flex gap-4 items-center flex-wrap">
+    <div>
+      <label class="mr-2">脚本：</label>
+      <select id="onlineScript" class="bg-gray-800 px-3 py-2 rounded border border-gray-600">
+        <option value="">（加载中...）</option>
+      </select>
+    </div>
+    <button id="onlineRunBtn" class="bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded">
+      ▶ 执行脚本
+    </button>
+    <button id="refreshScriptsBtn" class="bg-gray-700 hover:bg-gray-600 px-5 py-2 rounded">
+      刷新脚本列表
+    </button>
+    <button id="refreshAuditBtn" class="bg-gray-700 hover:bg-gray-600 px-5 py-2 rounded">
+      查看审计记录
+    </button>
+  </div>
+  <div id="auditBox" class="hidden mt-3 bg-gray-950 border border-gray-700 p-3 rounded text-xs"
+       style="max-height:220px;overflow-y:auto;white-space:pre-wrap;font-family:Consolas,Menlo,monospace"></div>
+</div>
+
 <div class="mb-2 flex justify-between">
   <span>执行日志输出</span>
   <span id="status" class="text-blue-400">空闲</span>
@@ -62,9 +85,16 @@ const publishBtn = document.getElementById('publishBtn');
 const clearBtn = document.getElementById('clearBtn');
 const refreshLogBtn = document.getElementById('refreshLogBtn');
 const statusText = document.getElementById('status');
+const onlineScriptSel = document.getElementById('onlineScript');
+const onlineRunBtn = document.getElementById('onlineRunBtn');
+const refreshScriptsBtn = document.getElementById('refreshScriptsBtn');
+const refreshAuditBtn = document.getElementById('refreshAuditBtn');
+const auditBox = document.getElementById('auditBox');
 
 let pollingTimer = null;
 let running = false;
+// 当前运行中的任务是否由「线上脚本」触发（仅用于状态文案，纯前端标志）
+let onlineActive = false;
 
 function getPublishToken() {
   let token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -127,15 +157,26 @@ async function renderLog() {
   }
 }
 
+// 与发布按钮共用同一全局锁（服务端同一把 task.lock），两个触发入口必须联动禁用
+function setTaskButtonsDisabled(disabled) {
+  publishBtn.disabled = disabled;
+  onlineRunBtn.disabled = disabled;
+}
+
 async function pollTask() {
   await renderLog();
   const isTaskRunning = await fetchStatus();
   running = isTaskRunning;
-  publishBtn.disabled = isTaskRunning;
-  statusText.textContent = isTaskRunning ? "发布执行中..." : "空闲";
-  if (!isTaskRunning && pollingTimer) {
-    clearInterval(pollingTimer);
-    pollingTimer = null;
+  setTaskButtonsDisabled(isTaskRunning);
+  statusText.textContent = isTaskRunning
+    ? (onlineActive ? "线上脚本执行中..." : "发布执行中...")
+    : "空闲";
+  if (!isTaskRunning) {
+    onlineActive = false;
+    if (pollingTimer) {
+      clearInterval(pollingTimer);
+      pollingTimer = null;
+    }
   }
 }
 
@@ -148,7 +189,8 @@ publishBtn.onclick = async ()=>{
   }
   const target = targetSel.value;
   running = true;
-  publishBtn.disabled = true;
+  onlineActive = false;
+  setTaskButtonsDisabled(true);
   statusText.textContent = "发布执行中...";
   appendLog(`发起发布，目标:${target}`,"info");
 
@@ -179,8 +221,126 @@ publishBtn.onclick = async ()=>{
   }
 }
 
+// ---------- 线上脚本模块 ----------
+
+// 加载白名单目录内脚本列表；非 2xx 走 appendLog 提示（不把错误 JSON 当日志渲染）
+async function fetchOnlineScripts() {
+  try {
+    const res = await fetch(`${API_BASE}/online-scripts`, {
+      headers: { "X-Publish-Token": getPublishToken() }
+    });
+    if (!res.ok) {
+      const result = await res.json().catch(() => ({}));
+      appendLog(`获取脚本列表失败：${result.message || res.status}`, "error");
+      if (String(result.message || '').includes('密钥')) {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+      }
+      return;
+    }
+    const result = await res.json();
+    const items = Array.isArray(result.data) ? result.data : [];
+    onlineScriptSel.innerHTML = '';
+    if (!items.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = '（白名单目录暂无脚本）';
+      onlineScriptSel.appendChild(opt);
+      return;
+    }
+    for (const item of items) {
+      const opt = document.createElement('option');
+      opt.value = item.name;
+      opt.textContent = `${item.name}（${(item.size / 1024).toFixed(1)}KB）`;
+      onlineScriptSel.appendChild(opt);
+    }
+  } catch (err) {
+    appendLog(`获取脚本列表异常：${err.message}`, "error");
+  }
+}
+
+onlineRunBtn.onclick = async () => {
+  if (running) {
+    appendLog("任务正在执行，请勿重复提交！", "warn");
+    return;
+  }
+  const name = onlineScriptSel.value;
+  if (!name) {
+    appendLog("请先选择要执行的脚本", "warn");
+    return;
+  }
+  // 二次确认：必须输入脚本名全文（服务端 confirm 校验与前端双重把关）
+  const confirmed = window.prompt(`二次确认：请输入脚本名全文（${name}）以确认执行`);
+  if (confirmed !== name) {
+    appendLog("二次确认未通过，已取消执行", "warn");
+    return;
+  }
+  running = true;
+  onlineActive = true;
+  setTaskButtonsDisabled(true);
+  statusText.textContent = "线上脚本执行中...";
+  appendLog(`发起线上脚本执行：${name}`, "info");
+
+  try {
+    const resp = await fetch(`${API_BASE}/online-scripts/run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Publish-Token": getPublishToken()
+      },
+      body: JSON.stringify({ name, confirm: confirmed })
+    });
+    const result = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(result.message || `请求失败（${resp.status}）`);
+    appendLog(`✅ 线上脚本任务已启动，请观察日志输出`, "success");
+
+    // 日志复用 /logs：全局单任务锁下，日志永远对应当前唯一任务
+    if (pollingTimer) clearInterval(pollingTimer);
+    pollingTimer = setInterval(pollTask, 1500);
+  } catch (err) {
+    appendLog(`❌ 请求异常：${err.message}`, "error");
+    if (String(err.message).includes('密钥')) {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  } finally {
+    pollTask();
+  }
+};
+
+// 审计记录：独立小节渲染，不走 logBox
+async function fetchAudit() {
+  try {
+    const res = await fetch(`${API_BASE}/online-scripts/logs`, {
+      headers: { "X-Publish-Token": getPublishToken() }
+    });
+    if (!res.ok) {
+      const result = await res.json().catch(() => ({}));
+      appendLog(`获取审计记录失败：${result.message || res.status}`, "error");
+      return;
+    }
+    const result = await res.json();
+    const records = Array.isArray(result.data) ? result.data : [];
+    auditBox.classList.remove('hidden');
+    if (!records.length) {
+      auditBox.textContent = '暂无审计记录';
+      return;
+    }
+    auditBox.textContent = records.map(r => {
+      const status = r.timedOut ? '超时终止' : (r.exitCode === 0 ? '成功' : `失败(退出码 ${r.exitCode})`);
+      const dur = typeof r.durationMs === 'number' ? `${(r.durationMs / 1000).toFixed(1)}s` : '-';
+      return `${r.time || '-'} | ${r.script} | ${status} | 耗时 ${dur} | IP ${r.ip || '-'} | 密钥指纹 ${r.secretFingerprint || '-'}`;
+    }).join('\n');
+  } catch (err) {
+    appendLog(`获取审计记录异常：${err.message}`, "error");
+  }
+}
+
+refreshScriptsBtn.onclick = fetchOnlineScripts;
+refreshAuditBtn.onclick = fetchAudit;
+
 // 页面打开立刻加载一次日志
 renderLog();
+// 页面打开加载脚本列表
+fetchOnlineScripts();
 </script>
 </body>
 </html>
