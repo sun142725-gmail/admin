@@ -4,11 +4,13 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
   IsString,
   Length,
+  Matches,
   Max,
   Min,
   ValidateNested
@@ -16,7 +18,7 @@ import {
 
 export class InternalChatMessageDto {
   @ApiProperty({ enum: ['system', 'user', 'assistant'] })
-  @IsString()
+  @IsIn(['system', 'user', 'assistant'])
   role!: 'system' | 'user' | 'assistant';
 
   @ApiProperty({ description: '消息内容' })
@@ -39,6 +41,8 @@ export class InternalChatDto {
   @ApiPropertyOptional({ description: '温度，默认 0.7' })
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Max(2)
   temperature?: number;
 
   @ApiPropertyOptional({ description: '指定模型 id（空则按 chat 能力路由）' })
@@ -60,6 +64,7 @@ export class InternalImageDto {
   @ApiPropertyOptional({ description: '尺寸，如 1024x1024' })
   @IsOptional()
   @IsString()
+  @Matches(/^\d+x\d+$/, { message: 'size 格式须为 宽x高（如 1024x1024）' })
   size?: string;
 
   @ApiPropertyOptional({ description: '张数，默认 1' })
@@ -75,7 +80,9 @@ export class InternalImageDto {
   modelId?: number;
 
   @ApiPropertyOptional({
-    description: '图生图参考图（data URL，最多 4 张；首帧延续/角色一致性用）'
+    description: '图生图参考图（data URL，最多 4 张；首帧延续/角色一致性用）',
+    // 单张长度不设上限：大参考图（多 MB base64）是合法输入，由 main.ts 的 10MB JSON body 上限兜底，
+    // DTO 层再卡会误伤大参考图场景。
   })
   @IsOptional()
   @IsArray()

@@ -1,6 +1,14 @@
-// 内部 AI 服务：把 flow 引擎依赖的模型调用面（runLlm / 生图）收口为阻塞式 HTTP 接口。
-// 逻辑与 flow/engine/node-handlers 保持一致：多候选故障转移 + 180s 超时 + 用量记录。
+// 内部 AI 服务：把 flow 引擎依赖的模型调用面（runLlm / 生图 / TTS）收口为阻塞式 HTTP 接口。
+// 逻辑与 flow/engine/node-handlers 保持一致：多候选故障转移 + 可调超时预算 + 用量记录。
 // Go↔Node 之间无需流式（引擎只消费聚合后的完整文本），这是上一轮方案的关键结论。
+//
+// 超时语义（两层，勿混淆）：
+//   - 上游硬上限 = adapter 内 fetch 的 AbortSignal.timeout(120s)（openai-compatible.adapter 的
+//     STREAM_TIMEOUT_MS），任何单次上游调用 120s 必被掐断；
+//   - 本层超时是「多候选故障转移预算」：单个候选超预算即放弃并切下一个候选，因此应 ≥ adapter 上限；
+//     Go 侧等待预算请按 ≥300s 配置（最坏情况 = 候选数 × 本层超时）。
+//   - 预算可经 INTERNAL_AI_CHAT_TIMEOUT_MS / INTERNAL_AI_IMAGE_TIMEOUT_MS 调整（默认 180s/300s，
+//     每次调用时读取便于测试注入）；TTS 与 image 共用 IMAGE 预算（与历史行为一致）。
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import {
   ChatMessagePayload,
@@ -10,8 +18,14 @@ import { ModelRouterService, RoutedCandidate } from '../ai/core/model-router.ser
 import { UsageLogService } from '../ai/core/usage-log.service';
 import { InternalChatDto, InternalImageDto, InternalTtsDto } from './dto/internal-ai.dto';
 
-const CHAT_DEADLINE_MS = 180000;
-const IMAGE_TIMEOUT_MS = 300000;
+const DEFAULT_CHAT_TIMEOUT_MS = 180000;
+const DEFAULT_IMAGE_TIMEOUT_MS = 300000;
+
+// 每次调用时读环境变量（非启动期常量），便于按请求注入测试预算；非法值回落默认。
+const readTimeoutMs = (envKey: string, fallback: number): number => {
+  const parsed = Number(process.env[envKey]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
 
 @Injectable()
 export class InternalAiService {
@@ -22,6 +36,24 @@ export class InternalAiService {
     private readonly usageLog: UsageLogService
   ) {}
 
+  /**
+   * promise 与超时竞速：胜者出炉后 finally 必 clearTimeout，
+   * 杜绝每轮 Promise.race 泄漏 pending timer（高频调用积压）。
+   */
+  private async raceWithTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`${label}超时`)), Math.max(1, timeoutMs));
+        })
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** 阻塞式对话生成：聚合完整文本后返回（多候选逐个故障转移）。 */
   async chat(dto: InternalChatDto): Promise<{ text: string; modelId?: number }> {
     const candidates = await this.chatCandidates(dto.modelId);
@@ -30,21 +62,17 @@ export class InternalAiService {
     let lastError: Error | null = null;
 
     for (const candidate of candidates) {
+      const generator = candidate.adapter.chatStream(
+        dto.messages as ChatMessagePayload[],
+        options,
+        candidate.channel
+      );
       try {
         let text = '';
-        const generator = candidate.adapter.chatStream(
-          dto.messages as ChatMessagePayload[],
-          options,
-          candidate.channel
-        );
-        const deadline = Date.now() + CHAT_DEADLINE_MS;
+        // 单候选总预算：每轮 next() 用「预算起点起的剩余时间」竞速（预算内多轮聚合）。
+        const deadline = Date.now() + readTimeoutMs('INTERNAL_AI_CHAT_TIMEOUT_MS', DEFAULT_CHAT_TIMEOUT_MS);
         for (;;) {
-          const next = await Promise.race([
-            generator.next(),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('生成超时')), Math.max(1, deadline - Date.now()))
-            )
-          ]);
+          const next = await this.raceWithTimeout(generator.next(), deadline - Date.now(), '生成');
           if (next.done) {
             break;
           }
@@ -69,6 +97,9 @@ export class InternalAiService {
           errorMessage: lastError.message
         });
         this.logger.warn(`内部 chat 候选 ${candidate.model.id} 失败: ${lastError.message}`);
+        // 尽早终止当前候选（触发上游流清理）；不 await——生成器可能停在永久挂起的
+        // 上游读上，等它结算会拖垮故障转移，故 fire-and-forget（.catch 吞清理期错误）。
+        void generator.return?.(undefined).catch(() => undefined);
       }
     }
     throw new ServiceUnavailableException(lastError?.message ?? '生成失败');
@@ -92,7 +123,7 @@ export class InternalAiService {
         continue;
       }
       try {
-        const results = await Promise.race([
+        const results = await this.raceWithTimeout(
           generate(
             {
               prompt: dto.prompt,
@@ -102,10 +133,9 @@ export class InternalAiService {
             },
             candidate.channel
           ),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('生图超时')), IMAGE_TIMEOUT_MS)
-          )
-        ]);
+          readTimeoutMs('INTERNAL_AI_IMAGE_TIMEOUT_MS', DEFAULT_IMAGE_TIMEOUT_MS),
+          '生图'
+        );
         this.usageLog.record({
           userId: dto.userId,
           modelId: candidate.model.id,
@@ -148,12 +178,11 @@ export class InternalAiService {
         continue;
       }
       try {
-        const result = await Promise.race([
+        const result = await this.raceWithTimeout(
           synthesize({ text: dto.text, voice: dto.voice, speed: dto.speed }, candidate.channel),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('语音合成超时')), IMAGE_TIMEOUT_MS)
-          )
-        ]);
+          readTimeoutMs('INTERNAL_AI_IMAGE_TIMEOUT_MS', DEFAULT_IMAGE_TIMEOUT_MS),
+          '语音合成'
+        );
         this.usageLog.record({
           userId: dto.userId,
           modelId: candidate.model.id,

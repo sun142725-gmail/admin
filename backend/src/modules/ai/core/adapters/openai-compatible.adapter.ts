@@ -14,6 +14,23 @@ import {
 
 const STREAM_TIMEOUT_MS = 120000;
 
+/**
+ * MIME → multipart 参考图文件扩展名：imageEdits 的文件名与实际类型一致
+ * （JPEG/WebP 参考图不再冒充 .png，严格网关会挑剔）；未知类型兜底 png。
+ * 导出为纯函数便于单测（AGENTS 规则 4）。
+ */
+export const extensionForMime = (mime: string | undefined): string => {
+  switch ((mime ?? '').toLowerCase()) {
+    case 'image/jpeg':
+    case 'image/jpg':
+      return 'jpg';
+    case 'image/webp':
+      return 'webp';
+    default:
+      return 'png';
+  }
+};
+
 @Injectable()
 export class OpenAiCompatibleAdapter implements LlmAdapter {
   readonly type = 'openai-compatible';
@@ -117,9 +134,8 @@ export class OpenAiCompatibleAdapter implements LlmAdapter {
     form.append('model', channel.upstreamModel);
     form.append('prompt', options.prompt);
     form.append('n', String(options.count ?? 1));
-    if (options.size) {
-      form.append('size', options.size);
-    }
+    // 与 images/generations 通道对齐：缺省 1024x1024 兜底。
+    form.append('size', options.size ?? '1024x1024');
     options.referenceImages!.slice(0, 4).forEach((dataUrl, index) => {
       // match[0] 是完整匹配，group1=MIME，group2=base64 载荷
       const matched = dataUrl.match(/^data:([^;]+);base64,(.*)$/);
@@ -128,7 +144,11 @@ export class OpenAiCompatibleAdapter implements LlmAdapter {
       }
       const mimePart = matched[1];
       const bytes = Buffer.from(matched[2], 'base64');
-      form.append('image[]', new Blob([bytes], { type: mimePart ?? 'image/png' }), `reference-${index}.png`);
+      form.append(
+        'image[]',
+        new Blob([bytes], { type: mimePart ?? 'image/png' }),
+        `reference-${index}.${extensionForMime(mimePart)}`
+      );
     });
     const response = await fetch(`${channel.baseUrl}/images/edits`, {
       method: 'POST',

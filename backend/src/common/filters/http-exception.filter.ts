@@ -60,14 +60,27 @@ export class HttpExceptionFilter implements ExceptionFilter {
         );
       }
     } else {
-      const error = exception as Error;
-      const detail = error?.message ?? 'Unknown error';
-      this.logger.error(
-        `[${traceId}] ${request.method} ${request.url} -> 500 ${detail}`,
-        error?.stack
-      );
-      if (process.env.NODE_ENV !== 'production' && detail) {
-        message = detail;
+      // body-parser 的 413（请求体超限）不是 HttpException：识别 statusCode=413 / type=entity.too.large
+      // 映射回 413（此前落进本分支一律 500 误报）。413 属客户端问题，不落服务端错误日志。
+      const candidate = exception as { status?: number; statusCode?: number; type?: string };
+      if (
+        candidate?.status === HttpStatus.PAYLOAD_TOO_LARGE ||
+        candidate?.statusCode === HttpStatus.PAYLOAD_TOO_LARGE ||
+        candidate?.type === 'entity.too.large'
+      ) {
+        status = HttpStatus.PAYLOAD_TOO_LARGE;
+        code = status;
+        message = '请求体过大';
+      } else {
+        const error = exception as Error;
+        const detail = error?.message ?? 'Unknown error';
+        this.logger.error(
+          `[${traceId}] ${request.method} ${request.url} -> 500 ${detail}`,
+          error?.stack
+        );
+        if (process.env.NODE_ENV !== 'production' && detail) {
+          message = detail;
+        }
       }
     }
 

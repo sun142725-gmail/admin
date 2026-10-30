@@ -99,4 +99,47 @@ describe('InternalAi (e2e)', () => {
       .send({ userId: 1, messages: [{ role: 'user', content: '' }] })
       .expect(422); // 项目约定：BadRequest 统一映射 422
   });
+
+  it("messages.role='tool' 应 422（修复前仅 @IsString 会透传上游）", async () => {
+    await request(app.getHttpServer())
+      .post('/api/internal/ai/chat')
+      .set(internalHeaders())
+      .send({ userId: 1, messages: [{ role: 'tool', content: 'x' }] })
+      .expect(422); // 项目约定：BadRequest 统一映射 422
+  });
+
+  it('temperature=3.5 应 422（@Min(0) @Max(2)）', async () => {
+    await request(app.getHttpServer())
+      .post('/api/internal/ai/chat')
+      .set(internalHeaders())
+      .send({ userId: 1, messages: [{ role: 'user', content: 'x' }], temperature: 3.5 })
+      .expect(422); // 项目约定：BadRequest 统一映射 422
+  });
+
+  it("size='1024'（缺 x 高度）应 422（@Matches(/^\\d+x\\d+$/)）", async () => {
+    await request(app.getHttpServer())
+      .post('/api/internal/ai/image')
+      .set(internalHeaders())
+      .send({ userId: 1, prompt: 'x', size: '1024' })
+      .expect(422); // 项目约定：BadRequest 统一映射 422
+  });
+
+  it('超长错误令牌仍 401（常量时间比较吸收长度差，不崩溃不放行）', async () => {
+    await request(app.getHttpServer())
+      .post('/api/internal/ai/image')
+      .set('X-Internal-Token', 'x'.repeat(4096))
+      .send({ userId: 1, prompt: 'x' })
+      .expect(401);
+  });
+
+  it('请求体超限应 413（body-parser PayloadTooLarge 不再误报 500）', async () => {
+    // e2e 应用用 Nest 默认 parser（100kb 上限），200KB body 触发 PayloadTooLargeError，
+    // 全局异常过滤器识别 entity.too.large/statusCode=413 映射回 413（修复前一律 500）。
+    const response = await request(app.getHttpServer())
+      .post('/api/internal/ai/image')
+      .set(internalHeaders())
+      .send({ userId: 1, prompt: 'x'.repeat(200 * 1024) })
+      .expect(413);
+    expect(response.body.message).toBe('请求体过大');
+  });
 });

@@ -20,7 +20,9 @@ process.on('unhandledRejection', (reason) => {
 });
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: false });
+  // bodyParser:false → 显式接管 body 解析：消除「依赖 Nest 默认 parser 注册时机」的实现细节依赖
+  // （升级翻转风险），行为等价（见下方 json/urlencoded 注册）。
+  const app = await NestFactory.create(AppModule, { cors: false, bodyParser: false });
   app.setGlobalPrefix('api');
   // JSON body 上限调到 10MB：Go 流水线的图生图参考图以 base64 data URL 走 JSON（4 张可达 ~8MB）；
   // 前端业务请求远小于此，上限放宽只影响恶意请求的内存占用，限流与鉴权仍兜底

@@ -2,6 +2,12 @@
 
 > 生成时间：2026-10-29 ｜ 执行环境：本机（MySQL 3307 / Node 3000 / Go 8081）
 > 结论：**后端 17 套件 105 用例全绿；Go build/vet/test 全绿；前端 tsc 0 错误 + vite build 成功**
+>
+> **快照日期：2026-10-29（commit 5b58adb 时点，17 套件 / 105 用例）——非当前基线。**
+> 后续会话持续增补测试：2026-10-30 实测 `NODE_ENV=test npx jest --runInBand` 为
+> 25 套件 / 221 用例全绿。「端到端实测」「落库数据」两段为一次性环境记录，不可复现；
+> 其中 prompt_templates 6 条演示数据与乱码实锤吻合（5 行 mojibake 为该次演示写入的一次性脏数据，
+> 「官方示例」字样不在任何源码中，修复工具见 backend/scripts/repair-prompt-mojibake.ts）。
 
 ## 一、后端 E2E（Jest + supertest + sqlite 内存库）
 
