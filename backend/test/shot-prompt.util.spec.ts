@@ -65,3 +65,52 @@ describe('composeShotMotionPrompt', () => {
     expect(result).toBe('zoom out');
   });
 });
+
+// ---------- 真实中文数据扩展（素材口径见 fixtures/novel-fixtures.ts 头注释，仿写非原文） ----------
+
+describe('composeShotImagePrompt（真实中文数据）', () => {
+  it('中文 visualTask/stylePrompt 与英文 scenePrompt 拼接顺序保持不变', () => {
+    const result = composeShotImagePrompt({
+      scenePrompt: 'ancient bronze coffin hovering over desert, starry sky',
+      visualTask: '青铜古棺悬浮坑底，九点暗芒如眼',
+      stylePrompt: '国风玄幻，冷色调，电影感构图'
+    });
+    expect(result).toBe(
+      'ancient bronze coffin hovering over desert, starry sky, 青铜古棺悬浮坑底，九点暗芒如眼, 国风玄幻，冷色调，电影感构图'
+    );
+  });
+
+  it('重复的中文段去重只保留一次', () => {
+    const result = composeShotImagePrompt({
+      scenePrompt: '夜空下的戈壁滩',
+      visualTask: '科考队仰望天穹',
+      stylePrompt: '科考队仰望天穹'
+    });
+    expect(result).toBe('夜空下的戈壁滩, 科考队仰望天穹');
+  });
+
+  it('全中文标点首尾剥离（，、。）后再拼接', () => {
+    const result = composeShotImagePrompt({
+      scenePrompt: '荒原夜景，',
+      visualTask: '，主角侧影渺小、',
+      stylePrompt: '。冷色调星空。'
+    });
+    expect(result).toBe('荒原夜景, 主角侧影渺小, 冷色调星空');
+  });
+});
+
+describe('composeShotMotionPrompt（真实中文数据）', () => {
+  it('中文 progression 与英文 motionPrompt 拼接，i2v 追加首帧一致性后缀', () => {
+    const result = composeShotMotionPrompt({
+      motionPrompt: 'slow dolly-in toward the coffin',
+      progression: '缓慢推进',
+      shotMode: 'i2v'
+    });
+    expect(result).toBe(`slow dolly-in toward the coffin, 缓慢推进, ${I2V_MOTION_SUFFIX}`);
+  });
+
+  it('中文段重复时去重且 t2v 不追加后缀', () => {
+    const result = composeShotMotionPrompt({ motionPrompt: '俯瞰坑底', progression: '俯瞰坑底', shotMode: 't2v' });
+    expect(result).toBe('俯瞰坑底');
+  });
+});

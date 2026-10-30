@@ -84,3 +84,38 @@ describe('parseFfprobeDuration', () => {
     expect(parseFfprobeDuration(JSON.stringify({ format: { duration: 0 } }))).toBeNull();
   });
 });
+
+// ---------- 真实旁白扩展（素材口径见 fixtures/novel-fixtures.ts 头注释，仿写非原文） ----------
+
+describe('normalizeTtsText（真实旁白）', () => {
+  it('「」对话/省略号/破折号/换行混排：空白折叠为单空格，标点原样保留', () => {
+    const raw = '「你相信这世上真有仙吗？」\n\r\n他望向夜空……星河低垂——仿佛触手可及。\n\n「我不知道，」她说，「但今夜没有人睡得着。」';
+    expect(normalizeTtsText(raw)).toBe(
+      '「你相信这世上真有仙吗？」 他望向夜空……星河低垂——仿佛触手可及。 「我不知道，」她说，「但今夜没有人睡得着。」'
+    );
+  });
+
+  it('省略号不误删：围栏剥离后真实对白原样输出', () => {
+    expect(normalizeTtsText('```text\n「天棺坠于流沙……凿之者死。」\n```')).toBe('「天棺坠于流沙……凿之者死。」');
+  });
+
+  it('超 2000 码点截断不劈字（代理对完整、末尾非孤立高代理）', () => {
+    // '𠀋'（U+2000B）是代理对：按码点截断必须整字保留。
+    const raw = '仙'.repeat(1500) + '𠀋'.repeat(600);
+    const normalized = normalizeTtsText(raw);
+    expect([...normalized]).toHaveLength(MAX_TTS_TEXT_LENGTH);
+    expect([...normalized][1999]).toBe('𠀋');
+    expect(/[\uD800-\uDBFF]$/.test(normalized)).toBe(false);
+  });
+});
+
+describe('estimateSpeechMs（真实旁白）', () => {
+  it('中文计数不含标点：夜色如墨，星光黯淡。= 8 个 CJK → 2000ms', () => {
+    expect(estimateSpeechMs('夜色如墨，星光黯淡。')).toBe(2000);
+  });
+
+  it('中英数字混排分别累加：坐标 N39，海拔 1287 米', () => {
+    // CJK：坐标/海拔/米 = 5 字 → 1250ms；英文词：'N39' 中的 N = 1 词 → 66.67ms；合计 1317ms。
+    expect(estimateSpeechMs('坐标 N39，海拔 1287 米')).toBe(1317);
+  });
+});
