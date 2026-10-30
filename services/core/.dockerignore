@@ -1,0 +1,7 @@
+# 防止开发辅助文件与密钥进入构建上下文与镜像层（Dockerfile 为 COPY . .，忽略清单是唯一防线）
+.gitignore
+.env
+.env.*
+Makefile
+README.md
+dev.sh

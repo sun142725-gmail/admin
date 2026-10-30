@@ -24,13 +24,7 @@ docker-compose up -d --build deploy-panel
 http://服务器IP:9090
 ```
 
-首次访问后输入的发布密钥会初始化为服务端密钥，并持久化到 `deploy-panel/logs/publish-secret.txt`。后续访问需要输入同一个密钥。
-
-也可以提前在项目根目录 `.env` 或 shell 环境变量中指定固定密钥：
-
-```bash
-PUBLISH_SECRET=replace-with-strong-secret
-```
+发布密钥采用 fail-closed 模式：必须先在项目根目录 `.env`（或 shell 环境变量）配置 `PUBLISH_SECRET`，Compose 以 `:?required` 语法强制注入（`docker-compose.yml`），未配置时容器直接拒绝启动；运行期若密钥为空，服务端对所有业务请求返回 `503`，不存在「首次访问初始化密钥」的行为。`deploy-panel/logs/publish-secret.txt` 仅作为兼容旧版本遗留密钥文件的回退来源，优先级低于环境变量。
 
 页面首次访问会提示输入发布密钥，并保存到浏览器 `localStorage`。如需更换密钥，清理浏览器本地存储后重新输入。
 
@@ -39,7 +33,8 @@ PUBLISH_SECRET=replace-with-strong-secret
 | 目标 | 脚本 | 作用 |
 |---|---|---|
 | backend / frontend / has-doc / has-web | `deploy-*.sh` | git pull + 重建对应服务 |
-| all | `deploy-all.sh` | git pull + 重建全部应用与 nginx |
+| core | `deploy-core.sh` | git pull + 仅重建 Go 服务 core（`--no-deps --build`，不启动 mysql；首次接入需先执行过 `docker compose up -d --build core`） |
+| all | `deploy-all.sh` | git pull + 重建全部应用（含 core）与 nginx |
 | **stock-agents** | `sync-stock-agents.sh` | git pull 后在 mysql 容器内执行 `deploy/scripts/stock-agents.sql`，幂等同步六位「股市圆桌」智能体并按 `model_key+base_url` 绑定模型（不重建应用） |
 
 SQL 生成方式（开发机，提示词变更后）：`cd backend && npm run sync:stock:gen`，产物 `deploy/scripts/stock-agents.sql` 随仓库提交。线上模型名不同时，直接修改该 SQL 文末 UPDATE 中的两个字面量。
@@ -53,15 +48,18 @@ Compose 配置摘要：
 ```yaml
 deploy-panel:
   build: ./deploy-panel
+  container_name: rbac-deploy-panel
   environment:
-    PUBLISH_SECRET: ${PUBLISH_SECRET:-}
+    # fail-closed：密钥必须注入，面板不再提供“先到先得”的初始化抢占
+    PUBLISH_SECRET: ${PUBLISH_SECRET:?请在根目录 .env 配置强随机 PUBLISH_SECRET}
     PORT: 9090
     PROJECT_PATH: ${HOST_PROJECT_PATH:-/home/sun142725/admin}
     HOST_PROJECT_PATH: ${HOST_PROJECT_PATH:-/home/sun142725/admin}
     COMPOSE_PROJECT_NAME: admin
     COMPOSE_COMPATIBILITY: "1"
   ports:
-    - "9090:9090"
+    # 仅回环绑定：部署面板拥有 docker.sock 与 SSH 私钥，绝不能暴露到外网网卡
+    - "127.0.0.1:9090:9090"
   volumes:
     - ./:${HOST_PROJECT_PATH:-/home/sun142725/admin}
     - ./deploy-panel/logs:/app/logs
@@ -86,7 +84,7 @@ docker ps -a | grep rbac-deploy-panel
 docker logs rbac-deploy-panel
 ```
 
-如果日志显示进入首次使用初始化模式，说明服务已正常启动，打开页面输入发布密钥即可。如果想提前固定密钥，在项目根目录 `.env` 中添加后重建：
+如果日志显示未配置 `PUBLISH_SECRET` 的告警，说明服务已启动但处于 fail-closed 状态：所有业务请求会返回 `503`。需在项目根目录 `.env` 中配置密钥后重建：
 
 ```bash
 docker-compose up -d --build deploy-panel
@@ -145,7 +143,9 @@ node server.js
 - `frontend`：执行 `scripts/deploy-frontend.sh`，拉取最新代码并只重建 `frontend`；`nginx` 使用共享卷读取静态资源，无需重启
 - `has-doc`：执行 `scripts/deploy-has-doc.sh`，拉取最新代码并只构建 `has-doc`；`nginx` 使用共享卷读取静态资源，无需重启
 - `has-web`：执行 `scripts/deploy-has-web.sh`，拉取最新代码并只构建 `has-web`；`nginx` 使用共享卷读取静态资源，无需重启
-- `all`：执行 `scripts/deploy-all.sh`，拉取最新代码并重建 `backend`、`frontend`、`has-doc`、`has-web` 与 `nginx`
+- `core`：执行 `scripts/deploy-core.sh`，拉取最新代码并以 `--no-deps --build` 只重建 Go 服务 `core`（不启动 mysql；首次接入需先执行过 `docker compose up -d --build core`）
+- `all`：执行 `scripts/deploy-all.sh`，拉取最新代码并重建 `core`、`backend`、`frontend`、`has-doc`、`has-web` 与 `nginx`
+- `stock-agents`：执行 `scripts/sync-stock-agents.sh`，拉取最新代码后在 mysql 容器内幂等同步「股市圆桌」智能体（不重建应用）
 
 移动端访问路径：
 
@@ -158,6 +158,12 @@ node server.js
 
 ```bash
 docker compose up -d --build mobile-has-doc mobile-has-web nginx
+```
+
+首次接入 Go 服务 `core` 时同理（`deploy-core.sh` 使用 `--no-deps`，不会连带创建 mysql 等基础容器）：
+
+```bash
+docker compose up -d --build core
 ```
 
 也可以执行全量重建：
@@ -199,13 +205,43 @@ DEPLOY_CLEAN_CACHE=1 ./deploy-panel/scripts/deploy-frontend.sh
 
 - `POST /deploy`：触发发布任务，请求头必须包含 `X-Publish-Token`
 - `GET /logs`：获取最后 300 行部署日志
-- `GET /status`：查询当前是否存在运行中的发布任务
+- `GET /status`：查询当前是否存在运行中的发布任务（免鉴权，仅返回运行状态）
+- `GET /online-scripts`：列出线上脚本白名单目录内可执行脚本（name/size/mtime），需鉴权
+- `POST /online-scripts/run`：执行白名单内线上脚本，body `{name, confirm}`，需鉴权；`400`（脚本名非法/不存在/确认不符）、`409`（锁占用）、`413`（body 超 64KB）、`200` 已启动
+- `GET /online-scripts/logs`：获取线上脚本执行审计记录末 50 条（JSONL），需鉴权
 
-同一时间只允许一个发布任务执行，运行中重复触发会返回 `409`。
+同一时间只允许一个任务执行（发布与线上脚本共用同一把锁），运行中重复触发会返回 `409`。
+
+## 线上脚本
+
+发布面板支持在白名单目录内执行线上脚本（当前仅 SQL），用于替代手工登录服务器执行数据库变更。执行入口在页面「线上脚本」分区。
+
+### 如何新增脚本
+
+1. 开发机编写 SQL，**必须幂等**：`INSERT ... ON DUPLICATE KEY UPDATE` 或先判断再变更（结构变更用 information_schema + PREPARE 模板），参照 `deploy-panel/scripts/online/20261030_0001_example_probe.sql` 中的模板与 `deploy/scripts/stock-agents.sql` 的写法；
+2. 命名为字母数字开头的纯文件名、`.sql` 结尾（如 `20261030_0001_fix_xxx.sql`）；
+3. git 提交到 `deploy-panel/scripts/online/`；
+4. 服务器发布面板执行时自动 `git pull --ff-only` 拉取最新脚本，无需登录服务器同步。
+
+### 如何执行
+
+1. 打开发布面板「线上脚本」分区，选择脚本（列表来自服务端白名单目录扫描）；
+2. 点击「执行脚本」，二次确认时**输入脚本名全文**（前端 prompt 与服务端 `confirm` 双重校验）；
+3. 执行日志复用下方日志区；每次执行写入审计（时间、脚本名、来源 IP、密钥指纹、退出码、耗时、是否超时、输出末 2KB 摘要），点「查看审计记录」即可查看。
+
+### 安全约束
+
+- 脚本只能来自服务端固定目录 `deploy-panel/scripts/online/`，请求仅传文件名；服务端做 basename + 扩展名白名单 + 目录存在性多重校验，执行器 shell 内再校验一次（正则 + 禁符号链接），防路径穿越；
+- 鉴权复用 `PUBLISH_SECRET`（sha256 + timingSafeEqual），所有端点位于 fail-closed 鉴权闸之后；
+- 执行使用 spawn 数组参数（无 shell 拼接），用户输入永不进入 shell 字符串；
+- SQL 凭据取 mysql 容器内环境变量（`MYSQL_USER`/`MYSQL_PASSWORD`/`MYSQL_DATABASE`），不落脚本不落盘；绝不提供「请求体即 SQL」的接口，SQL 必须先随仓库提交；
+- 单次执行超时 `ONLINE_SCRIPT_TIMEOUT_MS`（默认 10 分钟），超时 SIGKILL 强杀并释放锁；
+- 与发布共用全局互斥锁 `task.lock`，同一时间只能运行一个任务；
+- 新端点请求体限长 64KB，超限返回 `413`；既有 `POST /deploy` 保持无 body 限长与无超时强杀的既有行为（历史约束，未改动）。
 
 ## 安全注意事项
 
-- 可配置 `PUBLISH_SECRET` 固定发布密钥；未配置时会进入首次使用初始化模式
+- `PUBLISH_SECRET` 必须预先在根目录 `.env` 配置（Compose `:?required` 强制注入）；未配置时服务端 fail-closed，业务接口一律返回 `503`，不存在首次访问初始化密钥的行为
 - 不要把真实发布密钥写入 `publish.html`、脚本或仓库文档
 - 建议只在内网或受控跳板机上开放该服务
 - 部署脚本会执行 `git pull` 与 `docker compose up -d --build`，请确认 `PROJECT_PATH` 指向正确仓库
@@ -214,7 +250,8 @@ DEPLOY_CLEAN_CACHE=1 ./deploy-panel/scripts/deploy-frontend.sh
 ## 日志与锁
 
 - 日志文件：`logs/deploy-logs.txt`
-- 任务锁文件：`task.lock`
-- 每次发布开始前会清空上一轮发布日志，页面只展示本次发布记录
+- 任务锁文件：`task.lock`（发布与线上脚本共用）
+- 线上脚本审计文件：`logs/online-script-audit.jsonl`（追加式 JSONL，每次执行一条）
+- 每次任务开始前会清空上一轮日志，页面只展示本次任务记录
 
 如果服务进程被强制终止，可能遗留 `task.lock`。确认没有部署任务运行后，可以手动删除该文件。

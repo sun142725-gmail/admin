@@ -64,6 +64,8 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+      # 首次构建含 go mod download 较慢，预留启动宽限，避免误判 unhealthy（对齐 backend）
+      start_period: 30s
 
   backend:
     build: ./backend
