@@ -2,6 +2,8 @@
 // AI 生图/模型探测等长任务单独放宽超时：全局 10s 会让这类请求必然 ECONNABORTED
 const LONG_TASK_TIMEOUT = 180000;
 import http from './http';
+import { store } from '../store';
+import { canvasKeepaliveBody } from '../components/canvas/canvasAutosave';
 import { streamSse } from './sse';
 
 // ---------- 类型 ----------
@@ -168,3 +170,39 @@ export const generateImages = (payload: {
   timeout: LONG_TASK_TIMEOUT
 });
 export const listImageHistory = () => http.get<never, AiImageRecord[]>('/ai/images');
+
+// ---------- 生图画布快照（每用户一行，GET 读 / PUT 幂等覆盖） ----------
+export interface AiCanvasVo {
+  snapshot: Record<string, unknown> | null;
+}
+
+export const loadCanvas = () => http.get<never, AiCanvasVo>('/ai/canvas');
+
+// 快照结构 { version: 1, nodes, viewport }（serialize 白名单纯数据），2MB 上限由后端校验。
+// 参数用 object 宽类型：快照结构契约由 components/canvas/canvas.helpers 定义，api 层不耦合。
+export const saveCanvas = (snapshot: object) =>
+  http.put<never, { success: boolean }>('/ai/canvas', { snapshot });
+
+// 页面卸载/切页时的最后一次画布保存：axios(XHR) 在 pagehide / 组件卸载期会被浏览器取消，
+// 改用原生 fetch keepalive——请求一旦发出即由浏览器保证尽力投递（同源 PUT+JSON，与 axios
+// baseURL '/api' 同构；响应不等待不解析）。鉴权头手动带上（原生 fetch 不走 axios 拦截器）。
+// 依赖 components/canvas/canvasAutosave 的纯函数做请求体预算（api→components 单向、
+// 该文件零 import 无环；快照契约同在 components/canvas，与页面层各自单向引用不耦合）。
+export const saveCanvasKeepalive = (snapshot: object): void => {
+  const body = canvasKeepaliveBody(snapshot);
+  if (!body) {
+    return; // 超 keepalive 64KB 预算：放弃 flush（防抖保存已兜底，flush 只兜增量窗口）
+  }
+  const token = store.getState().auth.accessToken;
+  void fetch('/api/ai/canvas', {
+    method: 'PUT',
+    keepalive: true,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body
+  }).catch(() => {
+    // 卸载期 flush 失败无下一次机会：静默；下次进入画布以服务器快照为准。
+  });
+};

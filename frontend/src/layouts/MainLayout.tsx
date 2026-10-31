@@ -26,7 +26,8 @@ import {
   StockOutlined,
   FileImageOutlined,
   FundOutlined,
-  ApartmentOutlined
+  ApartmentOutlined,
+  GatewayOutlined
 } from '@ant-design/icons';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMenuTree } from '../api/resources';
@@ -58,6 +59,7 @@ const getMenuIcon = (item: MenuItem) => {
       '/ai/agents': <RobotOutlined />,
       '/ai/chat': <MessageOutlined />,
       '/ai/images': <PictureOutlined />,
+      '/ai/canvas': <GatewayOutlined />,
       '/stock': <StockOutlined />,
       '/stock/screener': <FilterOutlined />,
       '/stock/watchlist': <StarOutlined />,
@@ -121,6 +123,7 @@ const PAGE_CODE_MAP: Record<string, string> = {
   '/ai/agents': 'ai_agent',
   '/ai/chat': 'ai_chat',
   '/ai/images': 'ai_images',
+  '/ai/canvas': 'ai_canvas',
   '/stock': 'stock_roundtable',
   '/stock/screener': 'stock_screener',
   '/stock/watchlist': 'stock_watchlist',
