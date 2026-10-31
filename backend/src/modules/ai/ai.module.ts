@@ -7,6 +7,7 @@ import { AiConversation } from '../../common/entities/ai-conversation.entity';
 import { AiMessage } from '../../common/entities/ai-message.entity';
 import { AiUsageLog } from '../../common/entities/ai-usage-log.entity';
 import { AiImage } from '../../common/entities/ai-image.entity';
+import { AiCanvas } from '../../common/entities/ai-canvas.entity';
 import { AiService } from './ai.service';
 import { AiController } from './ai.controller';
 import { OpenAiCompatibleAdapter } from './core/adapters/openai-compatible.adapter';
@@ -21,6 +22,8 @@ import { AiChatService } from './chat/chat.service';
 import { AiChatController } from './chat/chat.controller';
 import { AiImageService } from './image/image.service';
 import { AiImageController } from './image/image.controller';
+import { CanvasService } from './canvas/canvas.service';
+import { CanvasController } from './canvas/canvas.controller';
 
 @Module({
   imports: [
@@ -30,7 +33,8 @@ import { AiImageController } from './image/image.controller';
       AiConversation,
       AiMessage,
       AiUsageLog,
-      AiImage
+      AiImage,
+      AiCanvas
     ])
   ],
   providers: [
@@ -43,9 +47,10 @@ import { AiImageController } from './image/image.controller';
     AiAgentsService,
     ConversationsService,
     AiChatService,
-    AiImageService
+    AiImageService,
+    CanvasService
   ],
-  controllers: [AiController, AiAdminController, AiChatController, AiImageController],
+  controllers: [AiController, AiAdminController, AiChatController, AiImageController, CanvasController],
   // ModelRouterService / UsageLogService 供 stock 等业务模块复用模型路由与用量记录。
   exports: [AiService, ModelRouterService, UsageLogService]
 })

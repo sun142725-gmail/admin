@@ -57,6 +57,7 @@ import { AiConversation } from './common/entities/ai-conversation.entity';
 import { AiMessage } from './common/entities/ai-message.entity';
 import { AiUsageLog } from './common/entities/ai-usage-log.entity';
 import { AiImage } from './common/entities/ai-image.entity';
+import { AiCanvas } from './common/entities/ai-canvas.entity';
 import { StockRoundtable } from './common/entities/stock-roundtable.entity';
 import { StockRoundtableTurn } from './common/entities/stock-roundtable-turn.entity';
 import { StockWatchlist } from './common/entities/stock-watchlist.entity';
@@ -108,6 +109,7 @@ const ENTITIES = [
   AiMessage,
   AiUsageLog,
   AiImage,
+  AiCanvas,
   StockRoundtable,
   StockRoundtableTurn,
   StockWatchlist,

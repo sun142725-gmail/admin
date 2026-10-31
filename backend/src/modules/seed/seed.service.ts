@@ -626,7 +626,8 @@ export class SeedService implements OnModuleInit {
       { code: 'ai:agent:manage', name: '智能体管理' },
       { code: 'ai:usage:view', name: 'AI 用量' },
       { code: 'ai:chat:use', name: 'AI 对话' },
-      { code: 'ai:image:use', name: 'AI 生图' }
+      { code: 'ai:image:use', name: 'AI 生图' },
+      { code: 'ai:canvas:view', name: 'AI 画布' }
     ];
     const permissions: Permission[] = [];
     for (const item of codes) {
@@ -678,7 +679,8 @@ export class SeedService implements OnModuleInit {
       { path: '/ai/models', name: '模型管理', code: 'ai:model:manage' },
       { path: '/ai/agents', name: '智能体管理', code: 'ai:agent:manage' },
       { path: '/ai/chat', name: 'AI 对话', code: 'ai:chat:use' },
-      { path: '/ai/images', name: 'AI 生图', code: 'ai:image:use' }
+      { path: '/ai/images', name: 'AI 生图', code: 'ai:image:use' },
+      { path: '/ai/canvas', name: 'AI 画布', code: 'ai:canvas:view' }
     ];
     for (const page of pages) {
       const pageExists = await this.resourceRepo.findOne({ where: { path: page.path } });
