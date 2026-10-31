@@ -1,7 +1,10 @@
 // 会议纪要报告面板：渲染主席总结（分节样式）+ 结论徽章 + 复制。
 import React, { useMemo } from 'react';
-import { Alert, Button, Card, message } from 'antd';
+import Alert from 'antd/es/alert';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
 import { CopyOutlined } from '@ant-design/icons';
+import { useApiMessage } from '../../../hooks/useApiMessage';
 import type { RoundtableConsensus } from '../../../api/stock';
 import { conclusionColor } from '../useRoundtableFlow';
 
@@ -41,13 +44,14 @@ const renderLine = (line: string, index: number) => {
 
 export const ReportPanel: React.FC<Props> = ({ summaryText, consensus }) => {
   const lines = useMemo(() => summaryText.split('\n'), [summaryText]);
+  const msg = useApiMessage();
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(summaryText);
-      message.success('会议纪要已复制');
+      msg.success('会议纪要已复制');
     } catch {
-      message.error('复制失败，请手动选择文本复制');
+      msg.error('复制失败，请手动选择文本复制');
     }
   };
 

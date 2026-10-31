@@ -1,8 +1,10 @@
 // K 线抽屉：在自选股 / 选股结果等列表里点击股票，弹出日K（蜡烛 + MA + 成交量 + 副图指标）。
 // 数据走 GET /api/stock/market/kline（后端算好指标），支持个股 / 指数 / 东财板块代码。
 import React, { useEffect, useState } from 'react';
-import { Alert, Drawer, Spin } from 'antd';
+import Alert from 'antd/es/alert';
+import Spin from 'antd/es/spin';
 import { KlineResult, fetchKline } from '../../../api/stock';
+import { SelfDrawer } from '../../../components/base/SelfDrawer';
 import { KlineChart } from './KlineChart';
 
 interface Props {
@@ -66,7 +68,8 @@ export const KlineDrawer: React.FC<Props> = ({ open, symbol, name, onClose }) =>
   const pct = last?.pct;
 
   return (
-    <Drawer
+    // 900 为刻度外散值（README 归档映射要求专项截图比对后方可收敛，未复核前保持透传；80vw wrapper 兜底小屏）
+    <SelfDrawer
       open={open}
       onClose={onClose}
       width={900}
@@ -86,11 +89,11 @@ export const KlineDrawer: React.FC<Props> = ({ open, symbol, name, onClose }) =>
       ) : result && last ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-baseline gap-3">
-            <span className="text-2xl font-semibold font-mono" style={{ color: (pct ?? 0) > 0 ? '#cf1322' : (pct ?? 0) < 0 ? '#3f8600' : undefined }}>
+            <span className={`text-2xl font-semibold font-mono ${(pct ?? 0) > 0 ? 'text-stock-up' : (pct ?? 0) < 0 ? 'text-stock-down' : undefined}`}>
               {last.close.toFixed(2)}
             </span>
             {pct != null && (
-              <span className="text-sm font-mono" style={{ color: pct > 0 ? '#cf1322' : pct < 0 ? '#3f8600' : undefined }}>
+              <span className={`text-sm font-mono ${pct > 0 ? 'text-stock-up' : pct < 0 ? 'text-stock-down' : undefined}`}>
                 {pct > 0 ? '+' : ''}
                 {pct.toFixed(2)}%
               </span>
@@ -102,6 +105,6 @@ export const KlineDrawer: React.FC<Props> = ({ open, symbol, name, onClose }) =>
           <KlineChart result={result} height={520} />
         </div>
       ) : null}
-    </Drawer>
+    </SelfDrawer>
   );
 };

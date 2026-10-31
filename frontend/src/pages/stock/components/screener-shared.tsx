@@ -1,8 +1,11 @@
 // 选股信号展示工具：KDJ/MACD 信号 Tag 与命中摘要列（手动扫描结果与每日扫描面板共用）。
 import React from 'react';
-import { Button, Popconfirm, Tag, Tooltip } from 'antd';
+import Button from 'antd/es/button';
+import Tag from 'antd/es/tag';
+import Tooltip from 'antd/es/tooltip';
 import type { ColumnType, ColumnsType } from 'antd/es/table';
 import { StarFilled, StarOutlined } from '@ant-design/icons';
+import { ConfirmPopconfirm } from '../../../components/business/ConfirmAction';
 import type { ScreenerFreq } from '../../../api/screener';
 
 export interface SignalLike {
@@ -28,7 +31,7 @@ export const renderSignal = (signal: SignalLike) => {
   return <Tag>无信号</Tag>;
 };
 
-/** 命中摘要列（周期/最新价/涨跌幅/KDJ/MACD 的紧凑展示）。 */
+/** 命中摘要列（周期/最新价/涨跌幅/KDJ/MACD 的紧凑展示）。涨跌语义色走 token 工具类（global.css --color-stock-up/down）。 */
 export const renderPct = (v: number | string | null | undefined) => {
   // MySQL decimal 列经 TypeORM 返回字符串，先收敛为数值
   const n = typeof v === 'string' ? parseFloat(v) : v;
@@ -36,7 +39,7 @@ export const renderPct = (v: number | string | null | undefined) => {
     return '-';
   }
   return (
-    <span style={{ color: n > 0 ? '#cf1322' : n < 0 ? '#3f8600' : undefined }}>{n.toFixed(2)}%</span>
+    <span className={n > 0 ? 'text-stock-up' : n < 0 ? 'text-stock-down' : undefined}>{n.toFixed(2)}%</span>
   );
 };
 
@@ -81,7 +84,7 @@ const PopconfirmStar = ({
   name: string;
   onToggle: (symbol: string, name: string) => void;
 }) => (
-  <Popconfirm title="移出自选？" onConfirm={() => onToggle(symbol, name)}>
+  <ConfirmPopconfirm title="移出自选？" onConfirm={() => onToggle(symbol, name)}>
     <Button type="text" size="small" aria-label="移出自选" icon={<StarFilled style={{ color: '#faad14' }} />} />
-  </Popconfirm>
+  </ConfirmPopconfirm>
 );

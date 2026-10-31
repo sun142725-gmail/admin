@@ -1,9 +1,21 @@
 // 自选股页面：收藏清单（分组筛选）+ 实时行情快照 + 备注/分组编辑 + 快捷入口。
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Form, Input, Modal, Popconfirm, Segmented, Space, Table, Tag, Tooltip, message } from 'antd';
+import Button from 'antd/es/button';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Segmented from 'antd/es/segmented';
+import Space from 'antd/es/space';
+import Tag from 'antd/es/tag';
+import Tooltip from 'antd/es/tooltip';
 import type { ColumnsType } from 'antd/es/table';
 import { EditOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { SelfForm } from '../../components/base/SelfForm';
+import { SelfModal } from '../../components/base/SelfModal';
+import { SelfTable } from '../../components/base/SelfTable';
+import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { PageHeader } from '../../components/business/PageHeader';
+import { useApiMessage } from '../../hooks/useApiMessage';
 import {
   WatchlistItem,
   addToWatchlist,
@@ -36,6 +48,7 @@ export const WatchlistPage: React.FC = () => {
   const [editing, setEditing] = useState<WatchlistItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
+  const msg = useApiMessage();
   const favoriteSymbols = useMemo(() => new Set(items.map((item) => item.symbol)), [items]);
 
   const loadWatchlist = async () => {
@@ -44,7 +57,7 @@ export const WatchlistPage: React.FC = () => {
       const res = await listWatchlist();
       setItems(res);
     } catch {
-      message.error('自选股加载失败');
+      msg.error('自选股加载失败');
     } finally {
       setLoading(false);
     }
@@ -102,11 +115,11 @@ export const WatchlistPage: React.FC = () => {
   const onAdd = async () => {
     const parsed = parseSymbol(addSymbol);
     if (!parsed) {
-      message.warning('请输入 6 位股票代码（如 600519 / 300750.SZ）');
+      msg.warning('请输入 6 位股票代码（如 600519 / 300750.SZ）');
       return;
     }
     if (favoriteSymbols.has(parsed.symbol)) {
-      message.info('该股票已在自选中');
+      msg.info('该股票已在自选中');
       return;
     }
     setAdding(true);
@@ -125,7 +138,7 @@ export const WatchlistPage: React.FC = () => {
       setAddSymbol('');
       await loadWatchlist();
     } catch (error) {
-      message.error(error instanceof Error && error.message ? error.message : '添加失败');
+      msg.errorFrom(error, '添加失败');
     } finally {
       setAdding(false);
     }
@@ -134,10 +147,10 @@ export const WatchlistPage: React.FC = () => {
   const onRemove = async (symbol: string) => {
     try {
       await removeFromWatchlist(symbol);
-      message.success('已移出自选');
+      msg.success('已移出自选');
       loadWatchlist();
     } catch (error) {
-      message.error(error instanceof Error && error.message ? error.message : '移除失败');
+      msg.errorFrom(error, '移除失败');
     }
   };
 
@@ -180,11 +193,11 @@ export const WatchlistPage: React.FC = () => {
     setSaving(true);
     try {
       await updateWatchlist(editing.symbol, { note: values.note, group: values.group });
-      message.success('已保存');
+      msg.success('已保存');
       setEditing(null);
       await loadWatchlist();
     } catch (error) {
-      message.error(error instanceof Error && error.message ? error.message : '保存失败');
+      msg.errorFrom(error, '保存失败');
     } finally {
       setSaving(false);
     }
@@ -196,14 +209,14 @@ export const WatchlistPage: React.FC = () => {
       key: 'star',
       width: 50,
       render: (_: unknown, record) => (
-        <Popconfirm title="移出自选？" onConfirm={() => onRemove(record.symbol)}>
+        <ConfirmPopconfirm title="移出自选？" onConfirm={() => onRemove(record.symbol)}>
           <Button
             type="text"
             size="small"
             aria-label="移出自选"
             icon={<StarFilled style={{ color: '#faad14' }} />}
           />
-        </Popconfirm>
+        </ConfirmPopconfirm>
       )
     },
     {
@@ -241,7 +254,7 @@ export const WatchlistPage: React.FC = () => {
         if (v == null) {
           return '-';
         }
-        return <span style={{ color: v > 0 ? '#cf1322' : v < 0 ? '#3f8600' : undefined }}>{v.toFixed(2)}%</span>;
+        return <span className={v > 0 ? 'text-stock-up' : v < 0 ? 'text-stock-down' : undefined}>{v.toFixed(2)}%</span>;
       }
     },
     { title: '备注', dataIndex: 'note', ellipsis: true, render: (v: string | null) => v || '-' },
@@ -278,11 +291,11 @@ export const WatchlistPage: React.FC = () => {
           <Button size="small" type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
             编辑
           </Button>
-          <Popconfirm title="确认移出自选？" onConfirm={() => onRemove(record.symbol)}>
+          <ConfirmPopconfirm title="确认移出自选？" onConfirm={() => onRemove(record.symbol)}>
             <Button size="small" type="link" danger>
               移除
             </Button>
-          </Popconfirm>
+          </ConfirmPopconfirm>
         </Space>
       )
     }
@@ -290,28 +303,28 @@ export const WatchlistPage: React.FC = () => {
 
   return (
     <div>
-      <div className="page-toolbar">
-        <div>
-          <div className="page-toolbar-title">自选股</div>
-          <div className="page-toolbar-subtitle">收藏关注的股票，点击股票行查看日K线图；可作为选股器候选池，一键发起圆桌分析。</div>
-        </div>
-        <Space>
-          <Input
-            style={{ width: 220 }}
-            placeholder="输入代码添加，如 600519"
-            value={addSymbol}
-            onChange={(e) => setAddSymbol(e.target.value)}
-            onPressEnter={onAdd}
-            maxLength={16}
-          />
-          <Button type="primary" loading={adding} onClick={onAdd} icon={<StarOutlined />}>
-            添加自选
-          </Button>
-          <Tooltip title="在圆桌分析页与选股结果里点星标也能收藏">
-            <Tag>提示</Tag>
-          </Tooltip>
-        </Space>
-      </div>
+      <PageHeader
+        title="自选股"
+        subtitle="收藏关注的股票，点击股票行查看日K线图；可作为选股器候选池，一键发起圆桌分析。"
+        actions={
+          <Space>
+            <Input
+              style={{ width: 220 }}
+              placeholder="输入代码添加，如 600519"
+              value={addSymbol}
+              onChange={(e) => setAddSymbol(e.target.value)}
+              onPressEnter={onAdd}
+              maxLength={16}
+            />
+            <Button type="primary" loading={adding} onClick={onAdd} icon={<StarOutlined />}>
+              添加自选
+            </Button>
+            <Tooltip title="在圆桌分析页与选股结果里点星标也能收藏">
+              <Tag>提示</Tag>
+            </Tooltip>
+          </Space>
+        }
+      />
 
       {groups.length > 2 && (
         <div className="mb-3">
@@ -324,7 +337,7 @@ export const WatchlistPage: React.FC = () => {
       )}
 
       <div className="page-table-card">
-        <Table
+        <SelfTable
           rowKey="id"
           columns={columns}
           dataSource={dataSource}
@@ -337,7 +350,9 @@ export const WatchlistPage: React.FC = () => {
             },
             style: { cursor: 'pointer' }
           })}
-          pagination={items.length > 50 ? { pageSize: 50, showTotal: (t) => `共 ${t} 只` } : false}
+          // 条件分页特例：不传 showSizeChanger（SelfTable 默认 true 与 rc-pagination total>50 默认一致），
+          // pageSizeOptions 显式对齐 rc-pagination 原生默认（components/README.md）
+          pagination={items.length > 50 ? { pageSize: 50, pageSizeOptions: ['10', '20', '50', '100'], showTotal: (t) => `共 ${t} 只` } : false}
           size="middle"
           scroll={{ x: 'max-content' }}
           locale={{ emptyText: '还没有自选股：在上方输入代码，或在圆桌/选股结果里点星标收藏' }}
@@ -351,7 +366,7 @@ export const WatchlistPage: React.FC = () => {
         onClose={() => setKlineTarget(null)}
       />
 
-      <Modal
+      <SelfModal
         title={editing ? `编辑：${editing.name}` : ''}
         open={!!editing}
         onOk={() => void onSaveEdit()}
@@ -359,15 +374,15 @@ export const WatchlistPage: React.FC = () => {
         confirmLoading={saving}
         okText="保存"
       >
-        <Form layout="vertical" form={form}>
+        <SelfForm form={form}>
           <Form.Item label="备注（为什么关注它）" name="note">
             <Input.TextArea rows={3} maxLength={255} placeholder="例：消费龙头，回调到 60 日线关注" />
           </Form.Item>
           <Form.Item label="分组" name="group" extra="自由命名（如 白酒/半导体/观察仓），用于页签筛选">
             <Input maxLength={32} placeholder="默认" />
           </Form.Item>
-        </Form>
-      </Modal>
+        </SelfForm>
+      </SelfModal>
     </div>
   );
 };

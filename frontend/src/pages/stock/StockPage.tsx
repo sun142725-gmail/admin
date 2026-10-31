@@ -1,10 +1,16 @@
 // 股市圆桌主页面：分析台（选对象 → 看行情 → 召集会议）+ 会议记录。
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Input, Segmented, Select, Tooltip, message } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Input from 'antd/es/input';
+import Segmented from 'antd/es/segmented';
+import Select from 'antd/es/select';
+import Tooltip from 'antd/es/tooltip';
 import { ThunderboltOutlined } from '@ant-design/icons';
-import type { InputProps } from 'antd';
+import type {InputProps} from 'antd/es/input';
 import { useSearchParams } from 'react-router-dom';
 import { Permission } from '../../components/permission/Permission';
+import { useApiMessage } from '../../hooks/useApiMessage';
 import { KlineResult, RoundtableMode, StockModelOption, fetchKline, fetchStockModels } from '../../api/stock';
 import { SubjectPicker, SubjectSelection } from './components/SubjectPicker';
 import { WatchStarButton } from './components/WatchStarButton';
@@ -48,6 +54,7 @@ export const StockPage: React.FC = () => {
   const [klineLoading, setKlineLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const { session, start, stop, restore } = useRoundtableFlow();
+  const msg = useApiMessage();
 
   // K 线对象：板块走东财 BK 体系（新浪板块无 K 线源）。
   const klineSymbol =
@@ -111,7 +118,7 @@ export const StockPage: React.FC = () => {
       subject.name
     );
     if (error) {
-      message.error(`发起会议失败：${error}`);
+      msg.error(`发起会议失败：${error}`);
       return;
     }
     setTab('stage');
@@ -147,10 +154,10 @@ export const StockPage: React.FC = () => {
         await restore(id);
         setTab('stage');
       } catch (error) {
-        message.error(error instanceof Error ? error.message : '载入会议记录失败');
+        msg.errorFrom(error, '载入会议记录失败');
       }
     },
-    [restore]
+    [restore, msg]
   );
 
   const running = session.phase === 'running';

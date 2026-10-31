@@ -10,14 +10,11 @@ import {
   Form,
   Input,
   InputNumber,
-  Popconfirm,
   Radio,
   Space,
-  Table,
   Tabs,
   Tag,
-  Tooltip,
-  message
+  Tooltip
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { StarFilled, StarOutlined } from '@ant-design/icons';
@@ -32,6 +29,10 @@ import {
   scanScreener
 } from '../../api/screener';
 import { addToWatchlist, listWatchlist, removeFromWatchlist, type WatchlistItem } from '../../api/watchlist';
+import { SelfTable } from '../../components/base/SelfTable';
+import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { PageHeader } from '../../components/business/PageHeader';
+import { useApiMessage } from '../../hooks/useApiMessage';
 import { ScreenerRunsPanel } from './components/ScreenerRunsPanel';
 import { KlineDrawer, isStockRowClickIgnored } from './components/KlineDrawer';
 import { FREQ_LABEL, renderPct, renderSignal } from './components/screener-shared';
@@ -47,6 +48,7 @@ export const ScreenerPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [scanning, setScanning] = useState(false);
+  const msg = useApiMessage();
   const [result, setResult] = useState<ScreenerScanResult | null>(null);
   // 候选池模式：board=按板块选池（默认），manual=手填代码，watchlist=我的自选，roundtable=圆桌分析过的
   const [poolMode, setPoolMode] = useState<'board' | 'manual' | 'watchlist' | 'roundtable'>(() =>
@@ -84,14 +86,14 @@ export const ScreenerPage: React.FC = () => {
           next.delete(symbol);
           return next;
         });
-        message.success('已移出自选');
+        msg.success('已移出自选');
       } else {
         await addToWatchlist({ symbol, name: name || symbol });
         setFavoriteSymbols((prev) => new Set(prev).add(symbol));
-        message.success('已加入自选');
+        msg.success('已加入自选');
       }
     } catch (error) {
-      message.error(error instanceof Error && error.message ? error.message : '操作失败');
+      msg.errorFrom(error, '操作失败');
     }
   };
 
@@ -100,15 +102,15 @@ export const ScreenerPage: React.FC = () => {
   const onScan = async () => {
     const payloadSymbols = poolMode === 'manual' ? parseSymbols(symbolsText) : undefined;
     if (poolMode === 'board' && boards.length === 0) {
-      message.warning('请至少选择一个板块');
+      msg.warning('请至少选择一个板块');
       return;
     }
     if (poolMode === 'manual' && payloadSymbols?.length === 0) {
-      message.warning('请先填入候选股票代码');
+      msg.warning('请先填入候选股票代码');
       return;
     }
     if (freqs.length === 0 || indicators.length === 0) {
-      message.warning('请至少选择一个周期与一个指标');
+      msg.warning('请至少选择一个周期与一个指标');
       return;
     }
     setScanning(true);
@@ -128,10 +130,10 @@ export const ScreenerPage: React.FC = () => {
       });
       setResult(res);
       if (res.failed > 0) {
-        message.info(`扫描完成：${res.scanned} 只成功，${res.failed} 只数据源失败已跳过`);
+        msg.info(`扫描完成：${res.scanned} 只成功，${res.failed} 只数据源失败已跳过`);
       }
     } catch (error) {
-      message.error(error instanceof Error && error.message ? error.message : '扫描失败，请稍后重试');
+      msg.errorFrom(error, '扫描失败，请稍后重试');
     } finally {
       setScanning(false);
     }
@@ -147,14 +149,14 @@ export const ScreenerPage: React.FC = () => {
         // 加自选直接执行；移除需二次确认
         if (isFavorite) {
           return (
-            <Popconfirm title="移出自选？" onConfirm={() => toggleFavorite(record.symbol, record.name)}>
+            <ConfirmPopconfirm title="移出自选？" onConfirm={() => toggleFavorite(record.symbol, record.name)}>
               <Button
                 type="text"
                 size="small"
                 aria-label="移出自选"
                 icon={<StarFilled style={{ color: '#faad14' }} />}
               />
-            </Popconfirm>
+            </ConfirmPopconfirm>
           );
         }
         return (
@@ -191,7 +193,7 @@ export const ScreenerPage: React.FC = () => {
       dataIndex: 'pct1d',
       width: 100,
       render: (v: number | null) =>
-        v == null ? '-' : <span style={{ color: v > 0 ? '#cf1322' : v < 0 ? '#3f8600' : undefined }}>{v.toFixed(2)}%</span>
+        v == null ? '-' : <span className={v > 0 ? 'text-stock-up' : v < 0 ? 'text-stock-down' : undefined}>{v.toFixed(2)}%</span>
     },
     {
       title: 'KDJ',
@@ -225,14 +227,10 @@ export const ScreenerPage: React.FC = () => {
 
   return (
     <div>
-      <div className="page-toolbar">
-        <div>
-          <div className="page-toolbar-title">选股器</div>
-          <div className="page-toolbar-subtitle">
-            规则扫描：对候选池逐股检测 KDJ / MACD 金叉与即将金叉，支持日线 / 周线 / 月线。
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="选股器"
+        subtitle="规则扫描：对候选池逐股检测 KDJ / MACD 金叉与即将金叉，支持日线 / 周线 / 月线。"
+      />
 
       <Tabs
         defaultActiveKey={searchParams.get('tab') === 'daily' ? 'daily' : 'manual'}
@@ -299,7 +297,7 @@ export const ScreenerPage: React.FC = () => {
                   <span>只（{sortBy === 'random' ? '随机抽' : 'Top N'}）</span>
                 </Space>
               </Space>
-              <div className="mt-1 text-xs" style={{ color: '#94a3b8' }}>
+              <div className="mt-1 text-xs text-text-sub">
                 大池扫描由后台分批执行（每批 50 只，批间歇 1 秒），全程约几十秒，请耐心等待；K 线缓存 10
                 分钟，重复扫描更快。
               </div>
@@ -307,7 +305,7 @@ export const ScreenerPage: React.FC = () => {
           ) : poolMode === 'watchlist' ? (
             <Form.Item className="!mb-3">
               <Space>
-                <span style={{ color: '#94a3b8' }}>
+                <span className="text-text-sub">
                   将扫描你自选清单里的全部股票（在「自选股」页面或结果行星标中管理收藏）。
                 </span>
                 <Button size="small" type="link" onClick={() => navigate('/stock/watchlist')}>
@@ -317,7 +315,7 @@ export const ScreenerPage: React.FC = () => {
             </Form.Item>
           ) : poolMode === 'roundtable' ? (
             <Form.Item className="!mb-3">
-              <span style={{ color: '#94a3b8' }}>
+              <span className="text-text-sub">
                 将扫描你在圆桌里分析过的全部个股（跨所有历史会议去重）。
               </span>
             </Form.Item>
@@ -428,7 +426,7 @@ export const ScreenerPage: React.FC = () => {
         />
       )}
 
-      <Table
+      <SelfTable
         rowKey={(record) => `${record.symbol}:${record.freq}`}
         columns={columns}
         dataSource={dataSource}
@@ -441,7 +439,9 @@ export const ScreenerPage: React.FC = () => {
           },
           style: { cursor: 'pointer' }
         })}
-        pagination={dataSource.length > 50 ? { pageSize: 50, showTotal: (t) => `共 ${t} 条` } : false}
+        // 条件分页特例：不传 showSizeChanger（SelfTable 默认 true 与 rc-pagination total>50 默认一致），
+        // pageSizeOptions 显式对齐 rc-pagination 原生默认（components/README.md）
+        pagination={dataSource.length > 50 ? { pageSize: 50, pageSizeOptions: ['10', '20', '50', '100'], showTotal: (t) => `共 ${t} 条` } : false}
         size="middle"
         scroll={{ x: 'max-content' }}
         locale={{ emptyText: result ? '没有命中筛选条件的股票' : '选择候选池后点击「开始扫描」' }}

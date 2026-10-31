@@ -1,6 +1,11 @@
 // 每日扫描面板：收盘定时扫描的运行历史与命中清单，支持手动触发与轮询刷新。
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Select, Space, Table, Tag, Tooltip, message } from 'antd';
+import Alert from 'antd/es/alert';
+import Button from 'antd/es/button';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Tag from 'antd/es/tag';
+import Tooltip from 'antd/es/tooltip';
 import type { ColumnsType } from 'antd/es/table';
 import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +17,8 @@ import {
   triggerScreenerRun
 } from '../../../api/screener';
 import { FREQ_LABEL, renderPct, renderPrice, renderSignal, starColumn } from './screener-shared';
+import { SelfTable } from '../../../components/base/SelfTable';
+import { useApiMessage } from '../../../hooks/useApiMessage';
 import { isStockRowClickIgnored, KlineDrawer } from './KlineDrawer';
 
 const RUN_STATUS: Record<ScreenerRun['status'], { color: string; label: string }> = {
@@ -36,6 +43,7 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
   // K 线抽屉：点击命中股票行弹出日K
   const [klineTarget, setKlineTarget] = useState<{ symbol: string; name: string } | null>(null);
   const pollTimer = useRef<number | null>(null);
+  const msg = useApiMessage();
 
   const loadRuns = useCallback(async () => {
     setRunsLoading(true);
@@ -46,7 +54,7 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
       // 默认选中最近一条
       setSelectedRunId((prev) => prev ?? items[0]?.id ?? null);
     } catch {
-      message.error('运行历史加载失败');
+      msg.error('运行历史加载失败');
     } finally {
       setRunsLoading(false);
     }
@@ -61,7 +69,7 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
     try {
       setDetail(await getScreenerRun(runId));
     } catch {
-      message.error('运行详情加载失败');
+      msg.error('运行详情加载失败');
     } finally {
       setDetailLoading(false);
     }
@@ -109,10 +117,10 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
     try {
       // 默认全市场配置（三大板块市值 Top 500 × 日线），后台执行
       await triggerScreenerRun();
-      message.success('扫描已启动：全市场成交额 Top 1500，预计几分钟，完成后自动出现在列表');
+      msg.success('扫描已启动：全市场成交额 Top 1500，预计几分钟，完成后自动出现在列表');
       await loadRuns();
     } catch (error) {
-      message.error(error instanceof Error && error.message ? error.message : '触发失败');
+      msg.errorFrom(error, '触发失败');
     } finally {
       setTriggering(false);
     }
@@ -209,7 +217,7 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
         }
       />
 
-      <Table
+      <SelfTable
         rowKey="id"
         size="small"
         loading={runsLoading}
@@ -262,10 +270,10 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
 
       {detail?.run && (
         <div>
-          <div className="mb-2 text-sm" style={{ color: '#64748b' }}>
+          <div className="mb-2 text-sm text-text-sub">
             {detail.run.runDate} · {detail.run.poolDesc} · 命中 {detail.run.matched} 只
           </div>
-          <Table
+          <SelfTable
             rowKey="id"
             size="middle"
             loading={detailLoading}
@@ -279,7 +287,9 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
               },
               style: { cursor: 'pointer' }
             })}
-            pagination={detail.hits.length > 50 ? { pageSize: 50, showTotal: (t) => `共 ${t} 条` } : false}
+            // 条件分页特例：不传 showSizeChanger（SelfTable 默认 true 与 rc-pagination total>50 默认一致），
+            // pageSizeOptions 显式对齐 rc-pagination 原生默认（components/README.md）
+            pagination={detail.hits.length > 50 ? { pageSize: 50, pageSizeOptions: ['10', '20', '50', '100'], showTotal: (t) => `共 ${t} 条` } : false}
             scroll={{ x: 'max-content' }}
             locale={{ emptyText: '该次运行没有命中（或尚未完成）' }}
           />

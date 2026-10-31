@@ -1,7 +1,9 @@
 // 收藏星标按钮：点击直接加入自选；移除需二次确认（高频加、低频删）。
 import React, { useEffect, useState } from 'react';
-import { Button, Popconfirm, message } from 'antd';
+import Button from 'antd/es/button';
 import { StarFilled, StarOutlined } from '@ant-design/icons';
+import { ConfirmPopconfirm } from '../../../components/business/ConfirmAction';
+import { useApiMessage } from '../../../hooks/useApiMessage';
 import { addToWatchlist, listWatchlist, removeFromWatchlist, type WatchlistItem } from '../../../api/watchlist';
 
 interface WatchStarButtonProps {
@@ -13,6 +15,7 @@ interface WatchStarButtonProps {
 export const WatchStarButton: React.FC<WatchStarButtonProps> = ({ symbol, name, size = 'middle' }) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [ready, setReady] = useState(false);
+  const msg = useApiMessage();
 
   useEffect(() => {
     let stopped = false;
@@ -37,9 +40,9 @@ export const WatchStarButton: React.FC<WatchStarButtonProps> = ({ symbol, name, 
     try {
       await addToWatchlist({ symbol, name: name || symbol });
       setIsFavorite(true);
-      message.success('已加入自选');
+      msg.success('已加入自选');
     } catch (error) {
-      message.error(error instanceof Error && error.message ? error.message : '操作失败');
+      msg.errorFrom(error, '操作失败');
     }
   };
 
@@ -47,22 +50,22 @@ export const WatchStarButton: React.FC<WatchStarButtonProps> = ({ symbol, name, 
     try {
       await removeFromWatchlist(symbol);
       setIsFavorite(false);
-      message.success('已移出自选');
+      msg.success('已移出自选');
     } catch (error) {
-      message.error(error instanceof Error && error.message ? error.message : '操作失败');
+      msg.errorFrom(error, '操作失败');
     }
   };
 
   if (isFavorite) {
     return (
-      <Popconfirm title="移出自选？" onConfirm={() => void remove()}>
+      <ConfirmPopconfirm title="移出自选？" onConfirm={() => void remove()}>
         <Button
           type="text"
           size={size}
           aria-label="移出自选"
           icon={<StarFilled style={{ color: '#faad14' }} />}
         />
-      </Popconfirm>
+      </ConfirmPopconfirm>
     );
   }
   return (

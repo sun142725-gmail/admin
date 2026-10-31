@@ -1,8 +1,13 @@
 // 会议记录：历史列表（回放跳转分析台 + 删除）。
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Tag, message } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Tag from 'antd/es/tag';
 import { DeleteOutlined, PlayCircleOutlined, ReloadOutlined } from '@ant-design/icons';
-import { AppTable } from '../../../components/AppTable';
+import { SelfTable } from '../../../components/base/SelfTable';
+import { StatusTag } from '../../../components/business/StatusTag';
+import { useApiMessage } from '../../../hooks/useApiMessage';
+import type { StatusMeta } from '../../../types/ui';
 import {
   RoundtableListItem,
   listRoundtables,
@@ -15,7 +20,7 @@ interface Props {
   refreshKey: number;
 }
 
-const STATUS_TAG: Record<string, { color: string; label: string }> = {
+const STATUS_TAG: Record<string, StatusMeta> = {
   completed: { color: 'success', label: '已完成' },
   failed: { color: 'error', label: '失败' },
   preparing: { color: 'processing', label: '准备中' },
@@ -36,6 +41,7 @@ export const HistoryTable: React.FC<Props> = ({ onReplay, refreshKey }) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(false);
+  const msg = useApiMessage();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,11 +50,11 @@ export const HistoryTable: React.FC<Props> = ({ onReplay, refreshKey }) => {
       setItems(result.items);
       setTotal(result.total);
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '加载会议记录失败');
+      msg.errorFrom(error, '加载会议记录失败');
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize]);
+  }, [page, pageSize, msg]);
 
   useEffect(() => {
     void load();
@@ -57,10 +63,10 @@ export const HistoryTable: React.FC<Props> = ({ onReplay, refreshKey }) => {
   const handleRemove = async (id: number) => {
     try {
       await removeRoundtable(id);
-      message.success('已删除');
+      msg.success('已删除');
       void load();
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '删除失败');
+      msg.errorFrom(error, '删除失败');
     }
   };
 
@@ -115,7 +121,7 @@ export const HistoryTable: React.FC<Props> = ({ onReplay, refreshKey }) => {
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (value: string) => <Tag color={STATUS_TAG[value]?.color ?? 'default'}>{STATUS_TAG[value]?.label ?? value}</Tag>
+      render: (value: string) => <StatusTag value={value} map={STATUS_TAG} fallback={{ label: value, color: 'default' }} />
     },
     {
       title: '时间',
@@ -150,7 +156,7 @@ export const HistoryTable: React.FC<Props> = ({ onReplay, refreshKey }) => {
         </Button>
       }
     >
-      <AppTable
+      <SelfTable
         rowKey="id"
         loading={loading}
         columns={columns}
