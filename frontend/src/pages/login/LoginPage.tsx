@@ -1,15 +1,20 @@
 // 登录页面提供账号密码登录表单。
 import React from 'react';
 import { AppstoreOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, message } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
 import { useNavigate } from 'react-router-dom';
 import { login as loginApi, profile as profileApi } from '../../api/auth';
 import { useAppDispatch } from '../../store/hooks';
 import { setProfile, setTokens } from '../../store/authSlice';
+import { useApiMessage } from '../../hooks/useApiMessage';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const msg = useApiMessage();
 
   const onFinish = async (values: { username: string; password: string }) => {
     try {
@@ -17,10 +22,10 @@ export const LoginPage: React.FC = () => {
       dispatch(setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken }));
       const profile = await profileApi();
       dispatch(setProfile(profile));
-      message.success('登录成功');
+      msg.success('登录成功');
       navigate('/');
     } catch (error) {
-      message.error('登录失败');
+      msg.error('登录失败');
     }
   };
 

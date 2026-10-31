@@ -9,23 +9,24 @@ import {
   Progress,
   Row,
   Space,
-  Statistic,
   Table,
   Tag,
   Tooltip,
-  Typography,
-  message
+  Typography
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { fetchDashboardOverview, DashboardOverview } from '../../api/dashboard';
+import { StatCard } from '../../components/business/StatCard';
+import { useApiMessage } from '../../hooks/useApiMessage';
 
 const { Title, Paragraph } = Typography;
 
 export const HomePage: React.FC = () => {
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(false);
+  const msg = useApiMessage();
 
   const loadData = async (silent = false) => {
     if (!silent) {
@@ -35,8 +36,7 @@ export const HomePage: React.FC = () => {
       const res = await fetchDashboardOverview();
       setData(res);
     } catch (error) {
-      const msg = getErrorMessage(error, '获取系统监控信息失败');
-      message.error(msg);
+      msg.errorFrom(error, '获取系统监控信息失败');
     } finally {
       setLoading(false);
     }
@@ -117,22 +117,19 @@ export const HomePage: React.FC = () => {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} md={8}>
-          <Card bordered={false}>
-            <Statistic title="CPU 使用率" value={data?.cpu.usagePercent ?? 0} suffix="%" precision={2} />
+          <StatCard title="CPU 使用率" value={data?.cpu.usagePercent ?? 0} suffix="%" precision={2}>
             <Progress className="mt-3" percent={data?.cpu.usagePercent ?? 0} showInfo={false} />
-          </Card>
+          </StatCard>
         </Col>
         <Col xs={24} md={8}>
-          <Card bordered={false}>
-            <Statistic title="内存使用率" value={data?.memory.usagePercent ?? 0} suffix="%" precision={2} />
+          <StatCard title="内存使用率" value={data?.memory.usagePercent ?? 0} suffix="%" precision={2}>
             <Progress className="mt-3" percent={data?.memory.usagePercent ?? 0} showInfo={false} />
-          </Card>
+          </StatCard>
         </Col>
         <Col xs={24} md={8}>
-          <Card bordered={false}>
-            <Statistic title="磁盘使用率" value={data?.disk?.usagePercent ?? 0} suffix="%" precision={2} />
+          <StatCard title="磁盘使用率" value={data?.disk?.usagePercent ?? 0} suffix="%" precision={2}>
             <Progress className="mt-3" percent={data?.disk?.usagePercent ?? 0} showInfo={false} />
-          </Card>
+          </StatCard>
         </Col>
       </Row>
 
@@ -207,18 +204,4 @@ const formatDuration = (seconds: number) => {
   const hour = Math.floor((seconds % 86400) / 3600);
   const minute = Math.floor((seconds % 3600) / 60);
   return `${day}天 ${hour}小时 ${minute}分钟`;
-};
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (error && typeof error === 'object') {
-    const responseMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
-    if (responseMessage) {
-      return responseMessage;
-    }
-    const directMessage = (error as { message?: string }).message;
-    if (directMessage) {
-      return directMessage;
-    }
-  }
-  return fallback;
 };

@@ -1,11 +1,21 @@
 // 角色权限页将复杂权限配置从角色列表中拆出，便于集中维护。
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Checkbox, Empty, Input, Space, Spin, Tag, message } from 'antd';
+import Alert from 'antd/es/alert';
+import Button from 'antd/es/button';
+import Checkbox from 'antd/es/checkbox';
+import Empty from 'antd/es/empty';
+import Input from 'antd/es/input';
+import Space from 'antd/es/space';
+import Spin from 'antd/es/spin';
+import Tag from 'antd/es/tag';
 import { ArrowLeftOutlined, DownOutlined, ReloadOutlined, RightOutlined, SaveOutlined } from '@ant-design/icons';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { listRoles, assignPermissions } from '../../api/roles';
 import { listPermissions } from '../../api/permissions';
 import { Permission } from '../../components/permission/Permission';
+import { PageHeader } from '../../components/business/PageHeader';
+import { PagePanel } from '../../components/business/PagePanel';
+import { useApiMessage } from '../../hooks/useApiMessage';
 
 interface PermissionItem {
   id: number;
@@ -70,10 +80,11 @@ export const RolePermissionsPage: React.FC = () => {
   const [onlySelected, setOnlySelected] = useState(false);
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<string[]>([]);
   const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const msg = useApiMessage();
 
   const fetchData = async () => {
     if (!roleId) {
-      message.error('角色参数无效');
+      msg.error('角色参数无效');
       navigate('/roles');
       return;
     }
@@ -82,7 +93,7 @@ export const RolePermissionsPage: React.FC = () => {
       const [roleRes, permissionRes] = await Promise.all([listRoles(1, 200), listPermissions(1, 500)]);
       const currentRole = ((roleRes.items ?? []) as RoleItem[]).find((item) => item.id === roleId) ?? null;
       if (!currentRole) {
-        message.error('角色不存在或已被删除');
+        msg.error('角色不存在或已被删除');
         navigate('/roles');
         return;
       }
@@ -236,7 +247,7 @@ export const RolePermissionsPage: React.FC = () => {
     setSaving(true);
     try {
       await assignPermissions(role.id, selectedIds);
-      message.success('角色权限已更新');
+      msg.success('角色权限已更新');
       await fetchData();
     } finally {
       setSaving(false);
@@ -257,29 +268,31 @@ export const RolePermissionsPage: React.FC = () => {
 
   return (
     <div className="role-permissions-page">
-      <div className="page-toolbar">
-        <div>
-          <div className="page-toolbar-title">角色功能权限</div>
-          <div className="page-toolbar-subtitle">
+      <PageHeader
+        title="角色功能权限"
+        subtitle={
+          <>
             为角色 <Tag color="blue">{role.name ?? state?.roleName ?? `#${role.id}`}</Tag> 独立配置功能权限，避免角色列表页信息过长。
-          </div>
-        </div>
-        <div className="page-actions">
-          <Button onClick={handleExpandAll}>展开全部模块</Button>
-          <Button onClick={handleCollapseAll}>折叠全部模块</Button>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/roles')}>
-            返回角色列表
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={fetchData}>
-            刷新
-          </Button>
-          <Permission code="system:role:assign" mode="disable">
-            <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>
-              保存权限
+          </>
+        }
+        actions={
+          <>
+            <Button onClick={handleExpandAll}>展开全部模块</Button>
+            <Button onClick={handleCollapseAll}>折叠全部模块</Button>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/roles')}>
+              返回角色列表
             </Button>
-          </Permission>
-        </div>
-      </div>
+            <Button icon={<ReloadOutlined />} onClick={fetchData}>
+              刷新
+            </Button>
+            <Permission code="system:role:assign" mode="disable">
+              <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>
+                保存权限
+              </Button>
+            </Permission>
+          </>
+        }
+      />
 
       <div className="role-permissions-summary">
         <div className="role-permissions-stat-card">
@@ -376,9 +389,9 @@ export const RolePermissionsPage: React.FC = () => {
               );
             })
           ) : (
-            <div className="page-table-card role-permissions-empty">
+            <PagePanel className="role-permissions-empty">
               <Empty description="没有匹配到权限项" />
-            </div>
+            </PagePanel>
           )}
         </div>
 

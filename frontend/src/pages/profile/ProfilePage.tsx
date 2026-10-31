@@ -1,10 +1,18 @@
 // 个人中心页面提供资料修改与密码修改。
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Form, Input, Space, Typography, Upload, message } from 'antd';
-import type { UploadProps } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Space from 'antd/es/space';
+import Typography from 'antd/es/typography';
+import Upload from 'antd/es/upload';
+import type {UploadProps} from 'antd/es/upload';
 import { getProfile, updateProfile, updatePassword, uploadAvatar } from '../../api/profile';
 import { useAppDispatch } from '../../store/hooks';
 import { setProfile } from '../../store/authSlice';
+import { SelfForm } from '../../components/base/SelfForm';
+import { useApiMessage } from '../../hooks/useApiMessage';
 
 const { Title } = Typography;
 
@@ -13,6 +21,7 @@ export const ProfilePage: React.FC = () => {
   const [passwordForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const dispatch = useAppDispatch();
+  const msg = useApiMessage();
 
   const fetchProfile = async () => {
     const data = await getProfile();
@@ -29,7 +38,7 @@ export const ProfilePage: React.FC = () => {
     try {
       const updated = await updateProfile(values);
       dispatch(setProfile(updated));
-      message.success('资料已更新');
+      msg.success('资料已更新');
     } finally {
       setLoading(false);
     }
@@ -38,7 +47,7 @@ export const ProfilePage: React.FC = () => {
   const onUpdatePassword = async () => {
     const values = await passwordForm.validateFields();
     await updatePassword({ oldPassword: values.oldPassword, newPassword: values.newPassword });
-    message.success('密码已修改，请重新登录');
+    msg.success('密码已修改，请重新登录');
   };
 
   const uploadProps: UploadProps = {
@@ -59,7 +68,7 @@ export const ProfilePage: React.FC = () => {
     <div className="p-6">
       <Card className="mb-6">
         <Title level={4}>个人资料</Title>
-        <Form layout="vertical" form={profileForm}>
+        <SelfForm form={profileForm}>
           <Form.Item label="头像" name="avatarUrl">
             <Space>
               <Upload {...uploadProps}>
@@ -77,12 +86,12 @@ export const ProfilePage: React.FC = () => {
           <Button type="primary" onClick={onUpdateProfile} loading={loading}>
             保存资料
           </Button>
-        </Form>
+        </SelfForm>
       </Card>
 
       <Card>
         <Title level={4}>修改密码</Title>
-        <Form layout="vertical" form={passwordForm}>
+        <SelfForm form={passwordForm}>
           <Form.Item label="旧密码" name="oldPassword" rules={[{ required: true, message: '请填写旧密码' }]}>
             <Input.Password />
           </Form.Item>
@@ -99,7 +108,7 @@ export const ProfilePage: React.FC = () => {
           <Button type="primary" onClick={onUpdatePassword}>
             修改密码
           </Button>
-        </Form>
+        </SelfForm>
       </Card>
     </div>
   );

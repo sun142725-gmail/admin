@@ -1,8 +1,22 @@
 // 字典管理页面提供字典与字典项维护。
-import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Drawer, Form, Input, InputNumber, Modal, Space, Switch, message } from 'antd';
-import { AppTable } from '../../components/AppTable';
+import React, { useMemo, useState } from 'react';
+import Button from 'antd/es/button';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import InputNumber from 'antd/es/input-number';
+import Space from 'antd/es/space';
+import Switch from 'antd/es/switch';
+import { SelfDrawer } from '../../components/base/SelfDrawer';
+import { SelfForm } from '../../components/base/SelfForm';
+import { SelfModal } from '../../components/base/SelfModal';
+import { SelfTable } from '../../components/base/SelfTable';
+import { ActionCell } from '../../components/business/ActionCell';
+import { FilterBar } from '../../components/business/FilterBar';
+import { PageHeader } from '../../components/business/PageHeader';
+import { PagePanel } from '../../components/business/PagePanel';
 import { Permission } from '../../components/permission/Permission';
+import { useApiMessage } from '../../hooks/useApiMessage';
+import { useTableQuery } from '../../hooks/useTableQuery';
 import {
   createDict,
   createDictItem,
@@ -33,12 +47,6 @@ interface DictItemDetail {
 }
 
 export const DictPage: React.FC = () => {
-  const [data, setData] = useState<DictItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState<{ keyword?: string }>({});
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<DictItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -46,35 +54,23 @@ export const DictPage: React.FC = () => {
   const [dictItems, setDictItems] = useState<DictItemDetail[]>([]);
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [currentDictItem, setCurrentDictItem] = useState<DictItemDetail | null>(null);
-  const [queryForm] = Form.useForm();
+  const [queryForm] = Form.useForm<{ keyword?: string }>();
   const [form] = Form.useForm();
   const [itemForm] = Form.useForm();
+  const msg = useApiMessage();
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const res = await listDicts({ page, pageSize, ...filters });
-      setData(res.items ?? []);
-      setTotal(res.total ?? 0);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [page, pageSize, filters]);
+  const table = useTableQuery<DictItem, { keyword?: string }>({
+    fetcher: ({ page, pageSize, filters }) => listDicts({ page, pageSize, ...filters })
+  });
 
   const onSearch = async () => {
     const values = await queryForm.validateFields();
-    setPage(1);
-    setFilters({ keyword: values.keyword });
+    table.search({ keyword: values.keyword });
   };
 
   const onReset = () => {
     queryForm.resetFields();
-    setPage(1);
-    setFilters({});
+    table.reset();
   };
 
   const onCreate = () => {
@@ -83,6 +79,7 @@ export const DictPage: React.FC = () => {
     setOpen(true);
   };
 
+  // 现状无 resetFields（setFieldsValue 直接覆盖全部表单字段），保持原时序零改动
   const onEdit = (item: DictItem) => {
     setEditItem(item);
     form.setFieldsValue({ ...item, status: item.status === 1 });
@@ -97,19 +94,19 @@ export const DictPage: React.FC = () => {
     };
     if (editItem) {
       await updateDict(editItem.id, payload);
-      message.success('更新成功');
+      msg.success('更新成功');
     } else {
       await createDict(payload);
-      message.success('创建成功');
+      msg.success('创建成功');
     }
     setOpen(false);
-    fetchData();
+    table.reload();
   };
 
   const onDelete = async (item: DictItem) => {
     await deleteDict(item.id);
-    message.success('删除成功');
-    fetchData();
+    msg.success('删除成功');
+    table.reload();
   };
 
   const openDetail = async (item: DictItem) => {
@@ -119,6 +116,7 @@ export const DictPage: React.FC = () => {
     setDrawerOpen(true);
   };
 
+  // 现状无 resetFields（setFieldsValue 覆盖各字段），保持原时序零改动
   const openItemModal = (item?: DictItemDetail) => {
     setCurrentDictItem(item ?? null);
     const labelI18n = item?.labelI18n ?? {};
@@ -145,7 +143,7 @@ export const DictPage: React.FC = () => {
         const parsed = JSON.parse(values.labelI18n);
         Object.assign(labelI18n, parsed);
       } catch {
-        message.error('多语言 JSON 格式不正确');
+        msg.error('多语言 JSON 格式不正确');
         return;
       }
     }
@@ -154,7 +152,7 @@ export const DictPage: React.FC = () => {
           try {
             return JSON.parse(values.extra);
           } catch {
-            message.error('扩展字段 JSON 格式不正确');
+            msg.error('扩展字段 JSON 格式不正确');
             return null;
           }
         })()
@@ -175,10 +173,10 @@ export const DictPage: React.FC = () => {
     }
     if (currentDictItem) {
       await updateDictItem(currentDictItem.id, payload);
-      message.success('字典项已更新');
+      msg.success('字典项已更新');
     } else {
       await createDictItem(currentDict.id, payload);
-      message.success('字典项已创建');
+      msg.success('字典项已创建');
     }
     const detail = await getDictDetail(currentDict.code);
     setDictItems(detail.items ?? []);
@@ -187,7 +185,7 @@ export const DictPage: React.FC = () => {
 
   const onDeleteItem = async (item: DictItemDetail) => {
     await deleteDictItem(item.id);
-    message.success('字典项已删除');
+    msg.success('字典项已删除');
     if (currentDict) {
       const detail = await getDictDetail(currentDict.code);
       setDictItems(detail.items ?? []);
@@ -207,23 +205,14 @@ export const DictPage: React.FC = () => {
       {
         title: '操作',
         render: (_: unknown, record: DictItem) => (
-          <Space>
-            <Permission code="system:dict:list" mode="disable">
-              <Button size="small" onClick={() => openDetail(record)}>
-                详情
-              </Button>
-            </Permission>
-            <Permission code="system:dict:update" mode="disable">
-              <Button size="small" onClick={() => onEdit(record)}>
-                编辑
-              </Button>
-            </Permission>
-            <Permission code="system:dict:delete" mode="disable">
-              <Button size="small" danger onClick={() => onDelete(record)}>
-                删除
-              </Button>
-            </Permission>
-          </Space>
+          <ActionCell
+            record={record}
+            items={[
+              { key: 'detail', label: '详情', permission: 'system:dict:list', onClick: openDetail },
+              { key: 'edit', label: '编辑', permission: 'system:dict:update', onClick: onEdit },
+              { key: 'delete', label: '删除', danger: true, permission: 'system:dict:delete', onClick: onDelete }
+            ]}
+          />
         )
       }
     ],
@@ -243,18 +232,19 @@ export const DictPage: React.FC = () => {
       {
         title: '操作',
         render: (_: unknown, record: DictItemDetail) => (
-          <Space>
-            <Permission code="system:dict:update" mode="disable">
-              <Button size="small" onClick={() => openItemModal(record)}>
-                编辑
-              </Button>
-            </Permission>
-            <Permission code="system:dict:delete" mode="disable">
-              <Button size="small" danger onClick={() => onDeleteItem(record)}>
-                删除
-              </Button>
-            </Permission>
-          </Space>
+          <ActionCell
+            record={record}
+            items={[
+              { key: 'edit', label: '编辑', permission: 'system:dict:update', onClick: openItemModal },
+              {
+                key: 'delete',
+                label: '删除',
+                danger: true,
+                permission: 'system:dict:delete',
+                onClick: (item: DictItemDetail) => onDeleteItem(item)
+              }
+            ]}
+          />
         )
       }
     ],
@@ -263,62 +253,30 @@ export const DictPage: React.FC = () => {
 
   return (
     <div>
-      <div className="page-toolbar">
-        <div>
-          <div className="page-toolbar-title">字典管理</div>
-          <div className="page-toolbar-subtitle">维护枚举字典、多语言标签与扩展属性，供前后端统一复用。</div>
-        </div>
-        <div className="page-actions">
+      <PageHeader
+        title="字典管理"
+        subtitle="维护枚举字典、多语言标签与扩展属性，供前后端统一复用。"
+        actions={
           <Permission code="system:dict:create" mode="disable">
             <Button type="primary" onClick={onCreate}>
               新增字典
             </Button>
           </Permission>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="page-filter-card">
-        <Form layout="inline" form={queryForm}>
-          <Form.Item label="关键词" name="keyword">
-            <Input placeholder="编码/名称" />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" onClick={onSearch}>
-                查询
-              </Button>
-              <Button onClick={onReset}>重置</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </div>
+      <FilterBar form={queryForm} onSearch={onSearch} onReset={onReset}>
+        <Form.Item label="关键词" name="keyword">
+          <Input placeholder="编码/名称" />
+        </Form.Item>
+      </FilterBar>
 
-      <div className="page-table-card">
-        <AppTable
-          rowKey="id"
-          columns={columns}
-          dataSource={data}
-          loading={loading}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            onChange: (p, ps) => {
-              setPage(p);
-              setPageSize(ps);
-            }
-          }}
-        />
-      </div>
+      <PagePanel>
+        <SelfTable rowKey="id" columns={columns} dataSource={table.data} loading={table.loading} pagination={table.pagination} />
+      </PagePanel>
 
-      <Modal
-        className="app-form-modal"
-        title={editItem ? '编辑字典' : '新增字典'}
-        open={open}
-        onOk={onSubmit}
-        onCancel={() => setOpen(false)}
-      >
-        <Form layout="vertical" form={form}>
+      <SelfModal title={editItem ? '编辑字典' : '新增字典'} open={open} onOk={onSubmit} onCancel={() => setOpen(false)}>
+        <SelfForm form={form}>
           {!editItem && (
             <Form.Item
               label="字典编码"
@@ -341,15 +299,14 @@ export const DictPage: React.FC = () => {
           <Form.Item label="状态" name="status" valuePropName="checked" initialValue={true}>
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />
           </Form.Item>
-        </Form>
-      </Modal>
+        </SelfForm>
+      </SelfModal>
 
-      <Drawer
-        className="app-form-drawer"
+      <SelfDrawer
         title={currentDict ? `字典详情 - ${currentDict.name}` : '字典详情'}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        width={720}
+        width="lg"
       >
         <Space className="mb-4">
           <Permission code="system:dict:update" mode="disable">
@@ -358,17 +315,16 @@ export const DictPage: React.FC = () => {
             </Button>
           </Permission>
         </Space>
-        <AppTable rowKey="id" columns={itemColumns} dataSource={dictItems} pagination={false} />
-      </Drawer>
+        <SelfTable rowKey="id" columns={itemColumns} dataSource={dictItems} pagination={false} />
+      </SelfDrawer>
 
-      <Modal
-        className="app-form-modal"
+      <SelfModal
         title={currentDictItem ? '编辑字典项' : '新增字典项'}
         open={itemModalOpen}
         onOk={submitItem}
         onCancel={() => setItemModalOpen(false)}
       >
-        <Form layout="vertical" form={itemForm}>
+        <SelfForm form={itemForm}>
           <Form.Item label="值" name="value" rules={[{ required: true, message: '请填写字典值' }]}>
             <Input />
           </Form.Item>
@@ -390,8 +346,8 @@ export const DictPage: React.FC = () => {
           <Form.Item label="扩展字段 JSON" name="extra">
             <Input.TextArea placeholder='例如 {"color":"red"}' />
           </Form.Item>
-        </Form>
-      </Modal>
+        </SelfForm>
+      </SelfModal>
     </div>
   );
 };

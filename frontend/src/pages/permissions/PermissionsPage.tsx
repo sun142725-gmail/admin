@@ -1,9 +1,19 @@
 // 权限管理页面提供权限码 CRUD。
 import React, { useEffect, useState } from 'react';
-import { Button, Form, Input, Modal, Space, message } from 'antd';
+import Button from 'antd/es/button';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
 import { listPermissions, createPermission, updatePermission, deletePermission } from '../../api/permissions';
 import { Permission } from '../../components/permission/Permission';
-import { AppTable } from '../../components/AppTable';
+import { SelfForm, validateFormValues } from '../../components/base/SelfForm';
+import { SelfModal } from '../../components/base/SelfModal';
+import { SelfTable } from '../../components/base/SelfTable';
+import { ActionCell } from '../../components/business/ActionCell';
+import { confirmAction } from '../../components/business/ConfirmAction';
+import { PageHeader } from '../../components/business/PageHeader';
+import { PagePanel } from '../../components/business/PagePanel';
+import { useApiMessage } from '../../hooks/useApiMessage';
+import { useFormModal } from '../../hooks/useFormModal';
 
 interface PermissionItem {
   id: number;
@@ -14,16 +24,16 @@ interface PermissionItem {
 
 export const PermissionsPage: React.FC = () => {
   const [data, setData] = useState<PermissionItem[]>([]);
-  const [open, setOpen] = useState(false);
-  const [editItem, setEditItem] = useState<PermissionItem | null>(null);
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<PermissionItem>();
+  const msg = useApiMessage();
+  const modal = useFormModal<PermissionItem>(form);
 
   const fetchData = async () => {
     try {
       const res = await listPermissions();
       setData(res.items ?? []);
     } catch {
-      message.error('权限列表加载失败');
+      msg.error('权限列表加载失败');
     }
   };
 
@@ -31,54 +41,42 @@ export const PermissionsPage: React.FC = () => {
     fetchData();
   }, []);
 
-  const onCreate = () => {
-    setEditItem(null);
-    form.resetFields();
-    setOpen(true);
-  };
-
   const onEdit = (item: PermissionItem) => {
-    setEditItem(item);
-    // setFieldsValue 是浅合并：先重置，避免上一个编辑对象的描述字段残留到本次表单
-    form.resetFields();
-    form.setFieldsValue(item);
-    setOpen(true);
+    modal.openForm(item);
   };
 
   const onSubmit = async () => {
-    let values;
-    try {
-      values = await form.validateFields();
-    } catch {
+    const values = await validateFormValues(form);
+    if (!values) {
       return;
     }
     try {
-      if (editItem) {
-        await updatePermission(editItem.id, values);
-        message.success('更新成功');
+      if (modal.editing) {
+        await updatePermission(modal.editing.id, values);
+        msg.success('更新成功');
       } else {
         await createPermission(values);
-        message.success('创建成功');
+        msg.success('创建成功');
       }
-      setOpen(false);
+      modal.close();
       fetchData();
     } catch (error) {
-      message.error(error instanceof Error && error.message ? error.message : '操作失败');
+      msg.errorFrom(error, '操作失败');
     }
   };
 
   const onDelete = (item: PermissionItem) => {
-    Modal.confirm({
+    confirmAction({
       title: '删除权限',
       content: `确认删除权限「${item.name}」？该操作不可恢复。`,
-      okButtonProps: { danger: true },
+      danger: true,
       onOk: async () => {
         try {
           await deletePermission(item.id);
-          message.success('删除成功');
+          msg.success('删除成功');
           fetchData();
         } catch (error) {
-          message.error(error instanceof Error && error.message ? error.message : '删除失败');
+          msg.errorFrom(error, '删除失败');
         }
       }
     });
@@ -91,53 +89,40 @@ export const PermissionsPage: React.FC = () => {
     {
       title: '操作',
       render: (_: unknown, item: PermissionItem) => (
-        <Space>
-          <Permission code="system:permission:update" mode="disable">
-            <Button size="small" onClick={() => onEdit(item)}>
-              编辑
-            </Button>
-          </Permission>
-          <Permission code="system:permission:delete" mode="disable">
-            <Button size="small" danger onClick={() => onDelete(item)}>
-              删除
-            </Button>
-          </Permission>
-        </Space>
+        <ActionCell
+          record={item}
+          items={[
+            { key: 'edit', label: '编辑', permission: 'system:permission:update', onClick: onEdit },
+            { key: 'delete', label: '删除', danger: true, permission: 'system:permission:delete', onClick: onDelete }
+          ]}
+        />
       )
     }
   ];
 
   return (
     <div>
-      <div className="page-toolbar">
-        <div>
-          <div className="page-toolbar-title">权限管理</div>
-          <div className="page-toolbar-subtitle">统一维护权限名称、权限码与描述，供角色与菜单引用。</div>
-        </div>
-        <div className="page-actions">
+      <PageHeader
+        title="权限管理"
+        subtitle="统一维护权限名称、权限码与描述，供角色与菜单引用。"
+        actions={
           <Permission code="system:permission:create" mode="disable">
-            <Button type="primary" onClick={onCreate}>
+            <Button type="primary" onClick={() => modal.openForm()}>
               新增权限
             </Button>
           </Permission>
-        </div>
-      </div>
-      <div className="page-table-card">
-        <AppTable rowKey="id" columns={columns} dataSource={data} />
-      </div>
+        }
+      />
+      <PagePanel>
+        <SelfTable rowKey="id" columns={columns} dataSource={data} />
+      </PagePanel>
 
-      <Modal
-        className="app-form-modal"
-        title={editItem ? '编辑权限' : '新增权限'}
-        open={open}
-        onOk={onSubmit}
-        onCancel={() => setOpen(false)}
-      >
-        <Form layout="vertical" form={form}>
+      <SelfModal title={modal.editing ? '编辑权限' : '新增权限'} open={modal.open} onOk={onSubmit} onCancel={modal.close}>
+        <SelfForm form={form}>
           <Form.Item label="权限名称" name="name" rules={[{ required: true, message: '请填写权限名称' }]}>
             <Input />
           </Form.Item>
-          {!editItem && (
+          {!modal.editing && (
             <Form.Item label="权限码" name="code" rules={[{ required: true, message: '请填写权限码' }]}>
               <Input />
             </Form.Item>
@@ -145,8 +130,8 @@ export const PermissionsPage: React.FC = () => {
           <Form.Item label="描述" name="description">
             <Input />
           </Form.Item>
-        </Form>
-      </Modal>
+        </SelfForm>
+      </SelfModal>
     </div>
   );
 };
