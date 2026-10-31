@@ -1,8 +1,14 @@
 // 日志概览面板：趋势/Top 聚合/来源分布统计，点击 Top 项可下钻到对应日志 Tab。
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Col, Radio, Row, Statistic, Tag, message } from 'antd';
+import Card from 'antd/es/card';
+import { Col } from 'antd/es/grid';
+import Radio from 'antd/es/radio';
+import { Row } from 'antd/es/grid';
+import Statistic from 'antd/es/statistic';
+import Tag from 'antd/es/tag';
 import ReactECharts from 'echarts-for-react';
 import { getLogStats, LogStats } from '../../api/logCenter';
+import { useApiMessage } from '../../hooks/useApiMessage';
 
 type JumpTab = 'track' | 'frontend' | 'error';
 
@@ -11,6 +17,9 @@ interface Props {
 }
 
 const DAY_OPTIONS = [1, 3, 7, 14, 30].map((value) => ({ value, label: `${value}天` }));
+
+// 概览图表统一高度（5 处 ReactECharts 同值，避免散写漂移）
+const CHART_HEIGHT = 260;
 
 const sourceLabel = (source: string | null) =>
   source === 'server' ? '服务端' : source === 'web' ? 'Web' : source ?? '未知';
@@ -21,6 +30,7 @@ const sumTrend = (trend?: Array<{ count: number }>) =>
 export const OverviewPanel: React.FC<Props> = ({ onJump }) => {
   const [days, setDays] = useState(7);
   const [stats, setStats] = useState<LogStats | null>(null);
+  const msg = useApiMessage();
 
   useEffect(() => {
     let cancelled = false;
@@ -31,12 +41,12 @@ export const OverviewPanel: React.FC<Props> = ({ onJump }) => {
         }
       })
       .catch(() => {
-        message.error('统计加载失败，请稍后重试');
+        msg.error('统计加载失败，请稍后重试');
       });
     return () => {
       cancelled = true;
     };
-  }, [days]);
+  }, [days, msg]);
 
   const serverErrorCount = useMemo(
     () =>
@@ -68,7 +78,7 @@ export const OverviewPanel: React.FC<Props> = ({ onJump }) => {
   // echarts-for-react 的点击事件走 onEvents；Top 图各自绑定下钻
   const topErrorsChart = stats && stats.topErrors.length > 0 && (
     <ReactECharts
-      style={{ height: 260 }}
+      style={{ height: CHART_HEIGHT }}
       option={topBarOption(
         stats.topErrors.map((row) => row.message),
         stats.topErrors.map((row) => Number(row.count))
@@ -85,7 +95,7 @@ export const OverviewPanel: React.FC<Props> = ({ onJump }) => {
 
   const topPagesChart = stats && stats.topPages.length > 0 && (
     <ReactECharts
-      style={{ height: 260 }}
+      style={{ height: CHART_HEIGHT }}
       option={topBarOption(
         stats.topPages.map((row) => row.pageCode),
         stats.topPages.map((row) => Number(row.count))
@@ -102,7 +112,7 @@ export const OverviewPanel: React.FC<Props> = ({ onJump }) => {
 
   const topSlowChart = stats && stats.topSlowRequests.length > 0 && (
     <ReactECharts
-      style={{ height: 260 }}
+      style={{ height: CHART_HEIGHT }}
       option={topBarOption(
         stats.topSlowRequests.map((row) => row.message),
         stats.topSlowRequests.map((row) => Number(row.count))
@@ -147,10 +157,10 @@ export const OverviewPanel: React.FC<Props> = ({ onJump }) => {
 
   return (
     <div className="app-page-flat">
-      <div className="page-filter-card" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className="page-filter-card flex justify-end">
         <Radio.Group optionType="button" options={DAY_OPTIONS} value={days} onChange={(e) => setDays(e.target.value)} />
       </div>
-      <Card size="small" style={{ marginBottom: 12 }}>
+      <Card size="small" className="mb-3">
         <Row gutter={16}>
           <Col span={6}>
             <Statistic title="PV 总量" value={sumTrend(stats?.pvTrend)} loading={!stats} />
@@ -165,7 +175,7 @@ export const OverviewPanel: React.FC<Props> = ({ onJump }) => {
             <Statistic
               title="服务端错误(5xx)"
               value={Number(serverErrorCount)}
-              valueStyle={Number(serverErrorCount) > 0 ? { color: '#cf1322' } : undefined}
+              valueStyle={Number(serverErrorCount) > 0 ? { color: 'var(--color-log-error)' } : undefined}
               loading={!stats}
             />
           </Col>
@@ -174,14 +184,15 @@ export const OverviewPanel: React.FC<Props> = ({ onJump }) => {
       <Row gutter={12}>
         <Col span={12}>
           <Card size="small" title="错误趋势">
-            {stats && <ReactECharts style={{ height: 260 }} option={trendOption([{ name: '错误', type: 'line', color: '#cf1322', data: stats.errorTrend }])} />}
+            {stats && <ReactECharts style={{ height: CHART_HEIGHT }} option={trendOption([{ name: '错误', type: 'line', color: '#cf1322', data: stats.errorTrend }])} />}
+          {/* #cf1322 与 global.css --color-log-error 同值；ECharts canvas 不解析 CSS var()，保留字面量 */}
           </Card>
         </Col>
         <Col span={12}>
           <Card size="small" title="PV / 前端日志趋势">
             {stats && (
               <ReactECharts
-                style={{ height: 260 }}
+                style={{ height: CHART_HEIGHT }}
                 option={trendOption([
                   { name: 'PV', type: 'bar', color: '#1677ff', data: stats.pvTrend },
                   { name: '前端日志', type: 'line', color: '#722ed1', data: stats.frontendTrend }

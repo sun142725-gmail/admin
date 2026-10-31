@@ -16,6 +16,8 @@
   /* A 股语义色：红涨绿跌（生成 text-stock-up / text-stock-down 等工具类） */
   --color-stock-up: #f5222d;
   --color-stock-down: #16a34a;
+  /* 日志中心语义色：服务端 5xx / 错误数超阈值高亮（原 #cf1322 硬编码收敛，antd red-7） */
+  --color-log-error: #cf1322;
 }
 
 :root {

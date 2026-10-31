@@ -1,10 +1,22 @@
 // 会话链路视图：按 SessionId + 来源还原一个用户会话的完整请求流（PV/API/错误/服务端 5xx），
 // 按天分组折叠，点击某一天展开当天全部事件，每条可下钻详情。
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Card, Collapse, Col, Empty, Input, Row, Select, Space, Spin, Statistic, Tag, message } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Collapse from 'antd/es/collapse';
+import { Col } from 'antd/es/grid';
+import Empty from 'antd/es/empty';
+import Input from 'antd/es/input';
+import { Row } from 'antd/es/grid';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Spin from 'antd/es/spin';
+import Statistic from 'antd/es/statistic';
+import Tag from 'antd/es/tag';
 import dayjs from 'dayjs';
 import { getSessionTrace, LogEventType, LogItem, TraceResult } from '../../api/logCenter';
-import { AppTable } from '../../components/AppTable';
+import { SelfTable } from '../../components/base/SelfTable';
+import { useApiMessage } from '../../hooks/useApiMessage';
 
 type SessionEntry = { type: LogEventType; item: LogItem };
 
@@ -29,11 +41,12 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<(TraceResult & { days: number }) | null>(null);
   const [searched, setSearched] = useState(false);
+  const msg = useApiMessage();
 
   const fetchTrace = useCallback(
     async (targetId: string, targetSource?: string) => {
       if (!targetId.trim()) {
-        message.warning('请输入 SessionId');
+        msg.warning('请输入 SessionId');
         return;
       }
       setLoading(true);
@@ -42,12 +55,12 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
         setResult(res);
         setSearched(true);
       } catch {
-        message.error('会话链路查询失败，请稍后重试');
+        msg.error('会话链路查询失败，请稍后重试');
       } finally {
         setLoading(false);
       }
     },
-    [days]
+    [days, msg]
   );
 
   // 支持详情弹窗/外部链接带 sessionId 深链直达
@@ -110,7 +123,7 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
       title: '内容',
       key: 'content',
       render: (_: unknown, entry: SessionEntry) => (
-        <span style={{ wordBreak: 'break-all' }}>
+        <span className="break-all">
           {entry.type === 'track'
             ? `${entry.item.pageCode ?? ''} ${entry.item.path ?? ''}`.trim() || '-'
             : entry.item.message}
@@ -140,7 +153,7 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
           <Input
             placeholder="SessionId"
             maxLength={128}
-            style={{ width: 320 }}
+            className="w-full sm:!w-[320px]"
             value={sessionId}
             allowClear
             onChange={(e) => setSessionId(e.target.value)}
@@ -149,13 +162,13 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
           <Select
             placeholder="来源"
             allowClear
-            style={{ width: 120 }}
+            className="w-full sm:w-[120px]"
             options={sourceOptions}
             value={source}
             onChange={(value) => setSource(value)}
           />
           <Select
-            style={{ width: 110 }}
+            className="w-full sm:w-[110px]"
             value={days}
             onChange={(value) => setDays(value)}
             options={[1, 3, 7, 14].map((value) => ({ value, label: `最近${value}天` }))}
@@ -167,7 +180,7 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
       </div>
 
       {loading && !result ? (
-        <div style={{ textAlign: 'center', padding: 48 }}>
+        <div className="py-12 text-center">
           <Spin />
         </div>
       ) : !searched ? (
@@ -176,7 +189,7 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
         </Card>
       ) : (
         <>
-          <Card size="small" style={{ marginBottom: 12 }}>
+          <Card size="small" className="mb-3">
             <Row gutter={16}>
               <Col span={6}>
                 <Statistic title="事件总数" value={entries.length} />
@@ -185,7 +198,7 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
                 <Statistic title="PV（打点）" value={pvCount} />
               </Col>
               <Col span={6}>
-                <Statistic title="错误" value={errorCount} valueStyle={errorCount > 0 ? { color: '#cf1322' } : undefined} />
+                <Statistic title="错误" value={errorCount} valueStyle={errorCount > 0 ? { color: 'var(--color-log-error)' } : undefined} />
               </Col>
               <Col span={6}>
                 <Statistic
@@ -218,7 +231,7 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
                     </Space>
                   ),
                   children: (
-                    <AppTable
+                    <SelfTable
                       size="small"
                       rowKey={(entry: SessionEntry) => `${entry.type}-${entry.item.id}`}
                       columns={dayColumns}
