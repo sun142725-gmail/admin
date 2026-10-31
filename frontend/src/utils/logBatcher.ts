@@ -4,7 +4,9 @@
 // 2. 4xx 拒绝直接丢弃（重试也不可能成功，避免"毒丸"事件堵塞队列），5xx/网络错误才重排；
 // 3. 单批重试有上限，超过即放弃，防止死循环；
 // 4. 入队前截断超长字段，避免触发服务端 payload 大小限制导致整批被拒；
-// 5. 页面隐藏/关闭时兜底发送（keepalive），减少最后一批日志丢失。
+// 5. 页面隐藏/关闭时兜底发送（keepalive），减少最后一批日志丢失；
+// 6. 短窗口内同 type+message+stack 的前端/错误事件去重计数（meta.repeat），防止同类错误刷屏淹没队列；
+// 7. 前端/错误事件自动注入 appVersion（vite define 注入的 构建版本+git 短哈希），线上报错可定位构建。
 import { postLogEvents, LogEvent } from '../api/logCenter';
 import { store } from '../store';
 import { uuid } from './uuid';
@@ -21,8 +23,18 @@ const MAX_RETRY = 3;
 const MAX_MESSAGE_CHARS = 1000;
 const MAX_STACK_CHARS = 2000;
 const MAX_META_CHARS = 1200;
+// 去重窗口与单条事件重复计数上限
+const DEDUPE_WINDOW_MS = 3000;
+const MAX_REPEAT = 9999;
 
-let queue: LogEvent[] = [];
+interface QueueItem {
+  event: LogEvent;
+  count: number;
+  firstAt: number;
+  key: string;
+}
+
+let queue: QueueItem[] = [];
 let timer: number | null = null;
 let retryCount = 0;
 
@@ -37,6 +49,21 @@ export const getSessionId = () => {
 
 const truncate = (value: string, max: number) =>
   value.length > max ? `${value.slice(0, max)}…[截断，原长 ${value.length}]` : value;
+
+// 前端/错误事件自动带上构建版本；打点事件保持纯净
+const injectAppVersion = (event: LogEvent): LogEvent => {
+  if (event.type === 'track') {
+    return event;
+  }
+  const baseMeta =
+    event.payload.meta && typeof event.payload.meta === 'object'
+      ? (event.payload.meta as Record<string, unknown>)
+      : {};
+  return {
+    ...event,
+    payload: { ...event.payload, meta: { appVersion: __APP_VERSION__, ...baseMeta } }
+  };
+};
 
 // 入队前收敛单条事件体积，防止一条超大日志让整批上报被服务端拒绝
 const sanitizeEvent = (event: LogEvent): LogEvent => {
@@ -56,12 +83,31 @@ const sanitizeEvent = (event: LogEvent): LogEvent => {
   return { ...event, payload };
 };
 
-export const enqueueLogEvent = (event: LogEvent) => {
-  const payload: LogEvent = {
-    ...sanitizeEvent(event),
-    createdAt: event.createdAt ?? new Date().toISOString()
-  };
-  queue.push(payload);
+// 同 type + message + stack 前 200 字符视为同类事件；打点/PV 每次都算独立事件不参与去重
+const dedupeKey = (event: LogEvent): string | null => {
+  if (event.type === 'track') {
+    return null;
+  }
+  const message = typeof event.payload.message === 'string' ? event.payload.message : '';
+  const stack = typeof event.payload.stack === 'string' ? event.payload.stack.slice(0, 200) : '';
+  return `${event.type}|${message}|${stack}`;
+};
+
+export const enqueueLogEvent = (raw: LogEvent) => {
+  const event = sanitizeEvent(injectAppVersion(raw));
+  const key = dedupeKey(event);
+  const now = Date.now();
+  if (key) {
+    // 窗口内同类事件合并计数：从队尾向前找最近的匹配项
+    for (let i = queue.length - 1; i >= 0; i--) {
+      const item = queue[i];
+      if (item.key === key && now - item.firstAt < DEDUPE_WINDOW_MS) {
+        item.count = Math.min(item.count + 1, MAX_REPEAT);
+        return;
+      }
+    }
+  }
+  queue.push({ event, count: 1, firstAt: now, key: key ?? '' });
   // 超限丢弃最旧事件：最新日志对排查更有价值
   if (queue.length > MAX_QUEUE) {
     queue = queue.slice(-MAX_QUEUE);
@@ -82,6 +128,21 @@ const scheduleFlush = () => {
   }, FLUSH_INTERVAL);
 };
 
+// 出队时把合并的重复次数写进 meta.repeat，服务端与详情页可见
+const materialize = (item: QueueItem): LogEvent => {
+  if (item.count <= 1) {
+    return item.event;
+  }
+  const baseMeta =
+    item.event.payload.meta && typeof item.event.payload.meta === 'object'
+      ? (item.event.payload.meta as Record<string, unknown>)
+      : {};
+  return {
+    ...item.event,
+    payload: { ...item.event.payload, meta: { ...baseMeta, repeat: item.count } }
+  };
+};
+
 export const flushQueue = async () => {
   if (timer) {
     window.clearTimeout(timer);
@@ -90,7 +151,7 @@ export const flushQueue = async () => {
   if (!queue.length) {
     return;
   }
-  const batch = queue;
+  const batch = queue.map(materialize);
   queue = [];
   try {
     await postLogEvents({
@@ -110,7 +171,10 @@ export const flushQueue = async () => {
       retryCount = 0;
       return;
     }
-    queue = batch.concat(queue);
+    // 失败重排：本批回队首（await 期间新入队的事件保持在其后），重新计时去重窗口
+    queue = batch
+      .map((event) => ({ event, count: 1, firstAt: Date.now(), key: dedupeKey(event) ?? '' }))
+      .concat(queue);
     scheduleFlush();
   }
 };
@@ -130,21 +194,25 @@ const flushWithKeepalive = () => {
     headers.Authorization = `Bearer ${token}`;
   }
   while (queue.length) {
-    const batch: LogEvent[] = [];
+    const items: QueueItem[] = [];
     let size = 0;
-    while (queue.length && batch.length < MAX_BATCH) {
-      const next = JSON.stringify(queue[0]);
-      if (size + next.length > 60000 && batch.length) {
+    while (queue.length && items.length < MAX_BATCH) {
+      const next = JSON.stringify(materialize(queue[0]));
+      if (size + next.length > 60000 && items.length) {
         break;
       }
-      batch.push(queue.shift() as LogEvent);
+      items.push(queue.shift() as QueueItem);
       size += next.length;
     }
     void fetch('/api/log-center/events', {
       method: 'POST',
       keepalive: true,
       headers,
-      body: JSON.stringify({ source: SOURCE, sessionId: getSessionId(), events: batch })
+      body: JSON.stringify({
+        source: SOURCE,
+        sessionId: getSessionId(),
+        events: items.map(materialize)
+      })
     }).catch(() => undefined);
   }
 };
