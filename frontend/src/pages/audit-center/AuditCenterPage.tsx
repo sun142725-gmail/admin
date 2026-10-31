@@ -37,6 +37,7 @@ import { ColumnSettings } from '../../components/ColumnSettings';
 import { OverviewPanel } from './OverviewPanel';
 import { SessionTraceView } from './SessionTraceView';
 import { downloadCsv } from '../../utils/csv';
+import { formatUaShort, parseUserAgent } from '../../utils/ua';
 
 type AuditItem = LogItem;
 
@@ -71,6 +72,14 @@ const SOURCE_FALLBACK_OPTIONS = [
 
 // 表头列设置的 localStorage 前缀（按页签记忆，值为列 key 数组）
 const COLUMN_STORAGE_PREFIX = 'rbac_log_columns_';
+
+// 各页签默认展示的列（其余列通过表头设置勾选开启）
+const DEFAULT_VISIBLE: Record<ListTab, string[]> = {
+  audit: ['id', 'userId', 'module', 'actionLog', 'ip', 'traceId', 'createdAt'],
+  track: ['id', 'userId', 'pageCode', 'path', 'env', 'createdAt'],
+  frontend: ['id', 'userId', 'level', 'category', 'message', 'status', 'duration', 'createdAt'],
+  error: ['id', 'userId', 'message', 'status', 'duration', 'createdAt']
+};
 
 // 带列标识的列定义：columnKey 供表头设置勾选（action 列恒显示）
 type ColumnDef = ColumnsType<AuditItem>[number] & { columnKey?: string };
@@ -391,6 +400,38 @@ export const AuditCenterPage: React.FC = () => {
         return duration != null ? `${duration}ms` : '-';
       }
     };
+    // HTTP 捕获衍生列（仅 API 流水/错误类事件有值）
+    const methodColumn: ColumnDef = {
+      columnKey: 'method',
+      title: '方法',
+      width: 80,
+      render: (_: unknown, record) =>
+        (record.meta as { request?: { method?: string } } | undefined)?.request?.method ?? '-'
+    };
+    const hostColumn: ColumnDef = {
+      columnKey: 'host',
+      title: '域名',
+      width: 160,
+      ellipsis: true,
+      render: (_: unknown, record) =>
+        (record.meta as { request?: { host?: string } } | undefined)?.request?.host ?? '-'
+    };
+    const apiPathColumn: ColumnDef = {
+      columnKey: 'apiPath',
+      title: '接口路径',
+      width: 200,
+      ellipsis: true,
+      render: (_: unknown, record) =>
+        (record.meta as { request?: { url?: string } } | undefined)?.request?.url ?? '-'
+    };
+    // 打点日志：UA 识别结果短格式（浏览器 · 系统）
+    const envColumn: ColumnDef = {
+      columnKey: 'env',
+      title: '环境',
+      width: 180,
+      ellipsis: true,
+      render: (_: unknown, record) => formatUaShort(record.userAgent)
+    };
     if (activeTab === 'audit') {
       return [
         ...base,
@@ -407,6 +448,7 @@ export const AuditCenterPage: React.FC = () => {
         ...base,
         { columnKey: 'pageCode', title: '页面码', dataIndex: 'pageCode', width: 160 },
         { columnKey: 'path', title: '路径', dataIndex: 'path', width: 200 },
+        envColumn,
         traceIdColumn,
         sessionColumn,
         sourceColumn,
@@ -428,6 +470,9 @@ export const AuditCenterPage: React.FC = () => {
         { columnKey: 'message', title: '消息', dataIndex: 'message', width: 260, ellipsis: true, render: messageWithRepeat },
         statusColumn,
         durationColumn,
+        methodColumn,
+        hostColumn,
+        apiPathColumn,
         traceIdColumn,
         sessionColumn,
         sourceColumn,
@@ -441,6 +486,9 @@ export const AuditCenterPage: React.FC = () => {
         { columnKey: 'message', title: '消息', dataIndex: 'message', width: 260, ellipsis: true, render: messageWithRepeat },
         statusColumn,
         durationColumn,
+        methodColumn,
+        hostColumn,
+        apiPathColumn,
         traceIdColumn,
         sessionColumn,
         sourceColumn,
@@ -460,7 +508,10 @@ export const AuditCenterPage: React.FC = () => {
     [fullColumns]
   );
 
-  const visibleKeys = isListTab(activeTab) ? visibleMap[activeTab] : undefined;
+  // 未自定义时回退到各页签的默认展示集合
+  const visibleKeys = isListTab(activeTab)
+    ? visibleMap[activeTab] ?? DEFAULT_VISIBLE[activeTab]
+    : undefined;
 
   const columns = useMemo(() => {
     if (!visibleKeys) {
@@ -623,12 +674,13 @@ export const AuditCenterPage: React.FC = () => {
     }
     // API 捕获（慢请求/失败请求带完整请求与响应快照）结构化展示
     const metaRequest = item.meta?.request as
-      | { method?: string; url?: string; headers?: unknown; body?: unknown }
+      | { method?: string; host?: string; url?: string; query?: unknown; headers?: unknown; body?: unknown }
       | undefined;
     const metaResponse = item.meta?.response as
-      | { status?: number; duration?: number; body?: unknown }
+      | { status?: number; duration?: number; headers?: unknown; body?: unknown }
       | undefined;
     const hasCapture = Boolean(metaRequest || metaResponse);
+    const uaInfo = item.userAgent ? parseUserAgent(item.userAgent) : null;
     return (
       <>
         <FieldRow label="用户" copyText={item.userId != null ? String(item.userId) : undefined}>
@@ -648,7 +700,22 @@ export const AuditCenterPage: React.FC = () => {
             {item.path ?? '-'}
           </FieldRow>
         )}
-        {'userAgent' in item && <FieldRow label="Useragent">{item.userAgent ?? '-'}</FieldRow>}
+        {uaInfo ? (
+          <>
+            <FieldRow label="Useragent" copyText={item.userAgent}>
+              {item.userAgent}
+            </FieldRow>
+            <FieldRow label="浏览器">
+              {uaInfo.browserVersion ? `${uaInfo.browser} ${uaInfo.browserVersion}` : uaInfo.browser}
+            </FieldRow>
+            <FieldRow label="操作系统">
+              {uaInfo.osVersion ? `${uaInfo.os} ${uaInfo.osVersion}` : uaInfo.os}
+            </FieldRow>
+            <FieldRow label="设备">{uaInfo.device}</FieldRow>
+          </>
+        ) : (
+          'userAgent' in item && <FieldRow label="Useragent">-</FieldRow>
+        )}
         {'referrer' in item && <FieldRow label="Referrer">{item.referrer ?? '-'}</FieldRow>}
         {'level' in item && <FieldRow label="级别">{item.level ?? '-'}</FieldRow>}
         {'category' in item && <FieldRow label="分类">{item.category ?? '-'}</FieldRow>}
@@ -659,7 +726,14 @@ export const AuditCenterPage: React.FC = () => {
         )}
         {metaRequest && (
           <div style={{ marginTop: 8 }}>
-            {`请求 ${metaRequest.method ?? ''} ${metaRequest.url ?? ''}`.trim()}:
+            {`请求 ${metaRequest.method ?? ''} ${metaRequest.url ?? ''}`.trim()}
+            {metaRequest.host ? `（${metaRequest.host}）` : ''}:
+            {metaRequest.query !== undefined && (
+              <div>
+                Query:
+                <JsonView value={metaRequest.query} maxHeight={120} />
+              </div>
+            )}
             {metaRequest.headers !== undefined && (
               <div>
                 请求头:
@@ -679,6 +753,12 @@ export const AuditCenterPage: React.FC = () => {
             {`响应${metaResponse.status != null ? ` ${metaResponse.status}` : ''}${
               metaResponse.duration != null ? ` · ${metaResponse.duration}ms` : ''
             }:`}
+            {metaResponse.headers !== undefined && (
+              <div>
+                响应头:
+                <JsonView value={metaResponse.headers} maxHeight={160} />
+              </div>
+            )}
             {metaResponse.body !== undefined && <JsonView value={metaResponse.body} maxHeight={220} />}
           </div>
         )}
