@@ -20,6 +20,9 @@ export class AuditCenterService {
     if (query.userId) {
       where.userId = query.userId;
     }
+    if (query.traceId) {
+      where.traceId = query.traceId;
+    }
     if (query.module) {
       where.module = query.module;
     }

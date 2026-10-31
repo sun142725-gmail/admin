@@ -6,6 +6,7 @@ import { BaseEntity } from './base.entity';
 @Index(['createdAt'])
 @Index(['userId'])
 @Index(['module'])
+@Index(['traceId'])
 export class AuditLog extends BaseEntity {
   @Column({ name: 'user_id', nullable: true })
   userId?: number;
@@ -21,4 +22,9 @@ export class AuditLog extends BaseEntity {
 
   @Column({ nullable: true })
   ip?: string;
+
+  // 请求链路 ID：TraceMiddleware 注入 ALS，AuditService 落库时自动带上，
+  // 用于在日志中心按 traceId 串联"操作"与"当时的报错/前端日志"
+  @Column({ name: 'trace_id', nullable: true })
+  traceId?: string;
 }

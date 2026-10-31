@@ -23,6 +23,11 @@ export class QueryAuditDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(128)
+  traceId?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(64)
   module?: string;
 

@@ -13,6 +13,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { SeedModule } from './modules/seed/seed.module';
 import { AiModule } from './modules/ai/ai.module';
 import { SseHeadersMiddleware } from './common/middleware/sse-headers.middleware';
+import { TraceMiddleware } from './common/middlewares/trace.middleware';
 import { DivinationModule } from './modules/divination/divination.module';
 import { AuditCenterModule } from './modules/audit-center/audit-center.module';
 import { ProfileModule } from './modules/profile/profile.module';
@@ -191,6 +192,8 @@ const ENTITIES = [
 export class AppModule implements NestModule {
   // SSE 路由提前设置禁缓冲响应头（拦截器阶段响应头已发出，只能用中间件）。
   configure(consumer: MiddlewareConsumer) {
+    // 全局建立 traceId ALS 上下文：审计写入等服务层从上下文取 traceId，无需层层透传 request
+    consumer.apply(TraceMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
     consumer
       .apply(SseHeadersMiddleware)
       .forRoutes(

@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditLog } from '../../common/entities/audit-log.entity';
+import { currentTraceId } from '../../common/utils/trace';
 
 @Injectable()
 export class AuditService {
@@ -16,10 +17,18 @@ export class AuditService {
   /**
    * 审计为旁路能力：写入失败只告警，不影响业务结果
    * （否则"业务已成功 + 响应 500"会让用户重试时遭遇唯一约束冲突）。
+   * traceId 不由调用方层层透传：TraceMiddleware 已在请求入口写入 ALS，这里直接读取。
    */
   async log(action: string, module: string, detail: string, userId?: number, ip?: string) {
     try {
-      const audit = this.auditRepo.create({ action, module, detail, userId, ip });
+      const audit = this.auditRepo.create({
+        action,
+        module,
+        detail,
+        userId,
+        ip,
+        traceId: currentTraceId()
+      });
       await this.auditRepo.save(audit);
     } catch (error) {
       this.logger.error(`审计日志写入失败 action=${action} module=${module}: ${error instanceof Error ? error.message : String(error)}`);
