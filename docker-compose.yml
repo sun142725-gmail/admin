@@ -97,6 +97,9 @@ services:
       DICT_CACHE_TTL: 21600
       # 日志保留天数（log-center 查询窗口与清理任务共用）
       LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-7}
+      # 服务端日志文件化（按天落盘到 LOG_FILE_DIR）
+      LOG_FILE_ENABLED: ${LOG_FILE_ENABLED:-false}
+      LOG_FILE_DIR: ${LOG_FILE_DIR:-/app/logs}
       # 微服务网关：/api/svc/core/* 转发到 Go 服务（compose 网络内走服务名）
       PROXY_CORE_TARGET: http://core:8081/api/v1
       # 内部接口令牌：Go 流水线回调 /api/internal/ai/*（chat/image/提示词模板）用
@@ -122,6 +125,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
+      - ./logs/backend:/app/logs
       - ./uploads:/app/uploads
     restart: unless-stopped
     healthcheck:

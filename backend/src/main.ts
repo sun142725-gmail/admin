@@ -10,6 +10,7 @@ import * as express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { FileTeeLogger } from './common/logging/file-logger';
 
 // 兜底未被捕获的 Promise 拒绝：Node 默认策略是抛出并终止进程，
 // 任何一处漏接的异步异常（定时任务/事件回调）都会打崩服务；这里改为记录保活
@@ -24,6 +25,8 @@ async function bootstrap() {
   // （升级翻转风险），行为等价（见下方 json/urlencoded 注册）。
   const app = await NestFactory.create(AppModule, { cors: false, bodyParser: false });
   app.setGlobalPrefix('api');
+  // 文件落盘日志：LOG_FILE_ENABLED=true 时控制台输出同步按天写入 LOG_FILE_DIR（旁路，失败不影响服务）
+  app.useLogger(new FileTeeLogger());
   // JSON body 上限调到 10MB：Go 流水线的图生图参考图以 base64 data URL 走 JSON（4 张可达 ~8MB）；
   // 前端业务请求远小于此，上限放宽只影响恶意请求的内存占用，限流与鉴权仍兜底
   app.use(express.json({ limit: '10mb' }));
