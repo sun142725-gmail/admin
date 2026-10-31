@@ -2,6 +2,12 @@
 // internal-ai.service.spec.ts 先例）。覆盖：参考图 data URL 校验纯函数白名单口径、
 // generate 对 adapter.images 的参考图透传（图生图链路）、不带参考图不污染 generations 通道、
 // 候选无 images 方法时跳过切下一候选（既有故障转移行为防回归）。
+// data URL 落盘 mock：persistDataUrl 写 process.cwd()/uploads/ai-images，用例断言调用与返回短路径
+jest.mock('fs/promises', () => ({
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  writeFile: jest.fn().mockResolvedValue(undefined)
+}));
+import { mkdir, writeFile } from 'fs/promises';
 import { AiImageService } from '../src/modules/ai/image/image.service';
 import { GenerateImageDto, isValidReferenceDataUrl } from '../src/modules/ai/image/dto/image.dto';
 import { ModelRouterService, RoutedCandidate } from '../src/modules/ai/core/model-router.service';
@@ -134,5 +140,57 @@ describe('AiImageService.generate 参考图透传（纯 DI 单测）', () => {
     // 首候选无 images 方法直接 continue，只有第二候选真正被调用
     expect(images).toHaveBeenCalledTimes(1);
     expect((images.mock.calls[0][1] as { label: string }).label).toBe('model-2');
+  });
+});
+
+// ---------- data URL 结果落盘（修 ai_images.url varchar(512) 溢出 422） ----------
+describe('AiImageService.generate data URL 结果落盘', () => {
+  const mockedWriteFile = writeFile as jest.Mock;
+  const mockedMkdir = mkdir as jest.Mock;
+
+  beforeEach(() => {
+    mockedWriteFile.mockClear().mockResolvedValue(undefined);
+    mockedMkdir.mockClear().mockResolvedValue(undefined);
+  });
+
+  it('b64_json 转出的 data URL 结果：落盘并返回 /uploads/ai-images 短路径', async () => {
+    const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==';
+    const { adapter, images } = makeImageAdapter([dataUrl]);
+    const { repo, save } = makeImageRepo();
+    const service = new AiImageService(repo, makeRouter([candidate(7, adapter)]), makeUsage().service);
+
+    const result = await service.generate(1, { prompt: '测试', size: '1024x1024' });
+
+    expect(mockedMkdir).toHaveBeenCalled();
+    expect(mockedWriteFile).toHaveBeenCalledTimes(1);
+    const [writtenPath, writtenBuffer] = mockedWriteFile.mock.calls[0];
+    expect(writtenPath).toMatch(/uploads[\\/]ai-images[\\/]\d+-0\.png$/);
+    expect((writtenBuffer as { data?: number[] }).data?.length ?? 0).toBeGreaterThan(0);
+    expect(result.images[0].url).toMatch(/^\/uploads\/ai-images\/\d+-0\.png$/);
+    expect(save.mock.calls[0][0][0].url).toMatch(/^\/uploads\/ai-images\//);
+  });
+
+  it('落盘失败 best-effort：保留原 data URL 不阻塞返回', async () => {
+    mockedWriteFile.mockRejectedValue(new Error('disk full'));
+    const dataUrl = 'data:image/jpeg;base64,/9j/4AAQ';
+    const { adapter } = makeImageAdapter([dataUrl]);
+    const { repo } = makeImageRepo();
+    const service = new AiImageService(repo, makeRouter([candidate(7, adapter)]), makeUsage().service);
+
+    const result = await service.generate(1, { prompt: '测试' });
+
+    expect(result.images[0].url).toBe(dataUrl);
+  });
+
+  it('http(s) 结果不落盘直接透传', async () => {
+    const { adapter, images } = makeImageAdapter(['https://img.example/a.png']);
+    const { repo } = makeImageRepo();
+    const service = new AiImageService(repo, makeRouter([candidate(7, adapter)]), makeUsage().service);
+
+    const result = await service.generate(1, { prompt: '测试' });
+
+    expect(images).toHaveBeenCalledTimes(1);
+    expect(mockedWriteFile).not.toHaveBeenCalled();
+    expect(result.images[0].url).toBe('https://img.example/a.png');
   });
 });
