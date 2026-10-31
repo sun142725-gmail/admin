@@ -39,7 +39,7 @@ import { AppTable } from '../../components/AppTable';
 import { SelfTable } from '../../components/base/SelfTable';
 ```
 
-⚠ **条件分页特例**（stock 三页 `pagination={cond ? { pageSize:50, showTotal } : false}`）：默认值会补上 `showSizeChanger/pageSizeOptions/items_per_page`（原生 Table 现状没有）→ 迁移时逐页显式 `showSizeChanger:false` 保持现状。
+⚠ **条件分页特例**（stock 三页 `pagination={cond ? { pageSize:50, pageSizeOptions } : false}`）：不传 `showSizeChanger` 即保持原生行为——rc-pagination 默认 `total>50` 才显示切换器，与迁移前现状一致（原生 Table 并非没有 showSizeChanger，勿再显式写 `showSizeChanger:false`）；`pageSizeOptions:['10','20','50','100']` 显式对齐 rc-pagination 原生默认档位。
 
 ### SelfForm（`base/SelfForm.tsx`）
 
@@ -273,7 +273,7 @@ const cols = useColumnSettings({ tab: activeTab, defaults: DEFAULT_VISIBLE[activ
 | SelfModal | 520 | 640 | 720 | number|string |
 | SelfDrawer | 480 | 560 | 720 | number|string（'66vw'/min() 合法）+ styles.wrapper.maxWidth 80vw |
 
-现状散值归档映射：Drawer 480→sm、560→md、640/680→md 或 lg（就近）、720→lg、760/860/900→专项截图比对后收敛、860(PublishPage)→lg=720 截图比对、900(KlineDrawer)→720 专项溢出比对、'66vw'→透传保留（已知特例二期归档）。
+现状散值归档映射：Drawer 480→sm、560→md、640/680→md 或 lg（就近）、720→lg、760→专项截图比对后收敛、860(PublishPage) 与 900(KlineDrawer) 保持数字透传（嵌套内容/自绘图表未验证收窄，评审回退原值）、'66vw'→透传保留（已知特例二期归档）。
 
 ### ③ 状态色刻度（语义映射表，迁移逐组执行）
 
@@ -296,11 +296,11 @@ const cols = useColumnSettings({ tab: activeTab, defaults: DEFAULT_VISIBLE[activ
 | app-form-modal 新增站点 | 无 className 弹窗迁入 SelfModal 获 18px 20px 内边距 | 如 stock/WatchlistPage.tsx:354-361（无 className 且 okText='保存'）等，逐站枚举 |
 | ActionCell link 统一 | default size=small 操作列（UsersPage.tsx:169-191）迁入后变 link | admin 组各页操作列 |
 | Tag 语义色统一 | 同语义异色收敛到色刻度表（停用=红→无色等） | 逐组比对 |
-| Drawer 中间值归档 | 640/680/760/860/900 → sm/md/lg | PublishPage 860→720、KlineDrawer 900→720 需专项溢出截图 |
+| Drawer 中间值归档 | 640/680/760 → sm/md/lg | PublishPage 860 保持数字透传（嵌套内容未验证收窄）、KlineDrawer 900 保持数字透传（KlineChart 自绘图表未验证收窄） |
 | SelfDrawer maxWidth 80vw | 视口 <700px 时抽屉收窄且贴屏幕右缘（styles.wrapper 兜底，规范要求的响应式） | 全部迁入站点小屏 |
 | OutputsMediaPreview JSON 折叠 | 原 RunOutputsView 裸 pre → Collapse+JsonView | flow 组迁移时截图比对 |
 | FilterBar 控件宽 140/120 硬编码改响应式 | audit 筛选栏（AuditCenterPage.tsx:912,931,945,969） | audit 组 |
-| stock 条件分页补默认值 | 已由 `showSizeChanger:false` 显式规避 | 不列入 |
+| stock 条件分页补默认值 | 已按 rc-pagination `total>50` 原生默认处理（不传 showSizeChanger，显式 pageSizeOptions 对齐档位） | 不列入 |
 
 ## 红线（各组迁移必读）
 
@@ -317,11 +317,11 @@ const cols = useColumnSettings({ tab: activeTab, defaults: DEFAULT_VISIBLE[activ
 ## 逐组迁移 checklist
 
 - [ ] **admin（基准模板波）**：Users/Roles/Permissions/Dict/Profile → PageHeader/FilterBar/PagePanel+SelfTable/SelfModal+useFormModal/confirmAction/StatusTag/ActionCell；RolePermissionsPage 禁改 `.app-content-inner`；HomePage StatCard+children；LoginPage 仅收 useApiMessage。
-- [ ] **content**：TemplatePage（Quill 时序不动、SOURCE_COLOR_MAP 保留）、PublishPage 抽屉 860→lg、Inbox/Publish 用 useTableQuery、AgentsPage 560=md 零变更、ChatPage 375/768 回归。
+- [ ] **content**：TemplatePage（Quill 时序不动、SOURCE_COLOR_MAP 保留）、PublishPage 抽屉 860 保持数字透传（嵌套内容未验证收窄，不收敛）、Inbox/Publish 用 useTableQuery、AgentsPage 560=md 零变更、ChatPage 375/768 回归。
 - [ ] **audit**：useColumnSettings（契约）、FilterBar hideDefaultActions+formClassName、`Record<string,any>` 补类型、OverviewPanel #cf1322→token 工具类、:1078 EmptyState description。
 - [ ] **flow**：FlowRunsPage 288=560 零变更、FlowEditorPage 930=460 截图确认、flowRunUI 3 表收编 StatusTag、RunOutputsView→OutputsMediaPreview、flow-page-header 视觉等价比对。
 - [ ] **misc**：TemplateCard 挪 business/ 同步 import、GraphicPage 跨组 css 归位、空态走 EmptyState、divination key 保留、15 处 Popconfirm 迁 ConfirmPopconfirm。
-- [ ] **stock（最后一波）**：三页条件分页 `showSizeChanger:false`、4 处 locale.emptyText 透传、onRow/isStockRowClickIgnored 保留、KlineDrawer 900→720 截图、涨跌幅 span→text-stock-up/down、末尾全仓 grep AppTable 零引用删垫片。
+- [ ] **stock（最后一波）**：三页条件分页不传 showSizeChanger（rc-pagination total>50 原生默认）+ 显式 pageSizeOptions、4 处 locale.emptyText 透传、onRow/isStockRowClickIgnored 保留、KlineDrawer 900 保持数字透传（自绘图表未验证收窄，不收敛）、涨跌幅 span→text-stock-up/down、末尾全仓 grep AppTable 零引用删垫片。
 
 ## 既有组件处置
 

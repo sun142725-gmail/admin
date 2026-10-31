@@ -1,47 +1,8 @@
-/* 任务流列表/历史页响应式：标题不折行、描述分级隐藏、筛选区自适应换行。 */
+/* 任务流页搜索框响应式（头部骨架已迁 components/business/PageHeader 的 page-toolbar，
+   原 .flow-page-header 系列规则随迁移移除；仅保留仍被 FlowsPage 引用的搜索框弹性收缩档）。 */
 
-.flow-page-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  row-gap: 8px;
-  margin-bottom: 16px;
-}
-
-.flow-page-header-title {
-  margin: 0 !important;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.flow-page-header-desc {
-  color: var(--text-sub);
-  font-size: 13px;
-  min-width: 0;
-}
-
-.flow-page-header-spacer {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-/* 中屏：描述收进省略号 */
-@media (max-width: 1280px) {
-  .flow-page-header-desc {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 380px;
-  }
-}
-
-/* 窄屏：描述隐藏、搜索框弹性收缩 */
+/* 窄屏：搜索框弹性收缩（page-actions 自带 flex-wrap，媒体查询收紧其内搜索框） */
 @media (max-width: 1024px) {
-  .flow-page-header-desc {
-    display: none;
-  }
-
   .flow-page-header-search {
     flex: 1 1 140px;
     min-width: 120px;
@@ -49,17 +10,8 @@
   }
 }
 
-/* 手机：头部整体纵排，操作区满宽 */
+/* 手机：搜索框满宽（page-toolbar 纵排由 PageHeader 的 flex-wrap 类承接） */
 @media (max-width: 640px) {
-  .flow-page-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .flow-page-header-title {
-    align-self: flex-start;
-  }
-
   .flow-page-header-search {
     max-width: none;
     flex: 1 1 auto;

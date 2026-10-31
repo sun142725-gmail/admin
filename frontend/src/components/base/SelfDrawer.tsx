@@ -40,8 +40,8 @@ export const SelfDrawer: React.FC<SelfDrawerProps> = ({ className, width, styles
     width={resolveDrawerWidth(width)}
     // 小屏兜底作用于宽度载体 wrapper（content-wrapper），外部 styles.wrapper 与默认合并、其他槽位透传
     styles={{
-      wrapper: { maxWidth: '80vw', ...styles?.wrapper },
-      ...styles
+      ...styles,
+      wrapper: { maxWidth: '80vw', ...styles?.wrapper }
     }}
   />
 );

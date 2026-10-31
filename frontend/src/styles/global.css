@@ -393,7 +393,7 @@ a {
 }
 
 .page-toolbar {
-  @apply flex items-center justify-between gap-3 mb-[18px];
+  @apply flex flex-wrap items-center justify-between gap-3 mb-[18px];
 }
 
 .page-toolbar-title {

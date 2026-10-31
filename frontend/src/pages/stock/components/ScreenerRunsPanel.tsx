@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Alert from 'antd/es/alert';
 import Button from 'antd/es/button';
-import Select from 'antd/es/select';
 import Space from 'antd/es/space';
 import Tag from 'antd/es/tag';
 import Tooltip from 'antd/es/tooltip';
