@@ -9,7 +9,6 @@ import {
   Input,
   InputNumber,
   Modal,
-  Segmented,
   Select,
   Space,
   Spin,
@@ -758,43 +757,6 @@ export const AuditCenterPage: React.FC = () => {
 
   return (
     <div className="app-page-flat">
-      <div
-        className="page-filter-card"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}
-      >
-        <Segmented options={MODE_ITEMS} value={activeTab} onChange={(value) => navigate(`/logs/${value}`)} />
-        {isListTab(activeTab) && (
-          <Space size={8} wrap>
-            {activeTab !== 'audit' && (
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                仅保留最近 {retentionDays} 天
-              </Typography.Text>
-            )}
-            <Select
-              size="small"
-              style={{ width: 110 }}
-              value={autoRefreshSec}
-              onChange={setAutoRefreshSec}
-              options={[
-                { value: 0, label: '不自动刷新' },
-                { value: 10, label: '10s 刷新' },
-                { value: 30, label: '30s 刷新' },
-                { value: 60, label: '60s 刷新' }
-              ]}
-            />
-            <Button size="small" icon={<DownloadOutlined />} loading={exporting} onClick={onExport}>
-              导出CSV
-            </Button>
-            <ColumnSettings
-              options={columnOptions}
-              visible={visibleKeys ?? columnOptions.map((option) => option.key)}
-              onChange={(keys) => changeVisible(keys)}
-              onReset={() => changeVisible(null)}
-            />
-          </Space>
-        )}
-      </div>
-
       {activeTab === 'overview' && <OverviewPanel onJump={jumpToTab} />}
 
       {activeTab === 'session' && <SessionTraceView sourceOptions={sourceOptions} onShowDetail={showDetail} />}
@@ -848,12 +810,38 @@ export const AuditCenterPage: React.FC = () => {
                 <DatePicker.RangePicker showTime />
               </Form.Item>
               <Form.Item className="w-full !mb-0 text-center">
-                <Space>
+                <Space wrap size={8}>
                   <Button type="primary" onClick={onSearch}>
                     查询
                   </Button>
                   <Button onClick={onReset}>重置</Button>
                   <Button onClick={fetchData}>刷新</Button>
+                  {activeTab !== 'audit' && (
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      仅保留最近 {retentionDays} 天
+                    </Typography.Text>
+                  )}
+                  <Select
+                    size="small"
+                    style={{ width: 110 }}
+                    value={autoRefreshSec}
+                    onChange={setAutoRefreshSec}
+                    options={[
+                      { value: 0, label: '不自动刷新' },
+                      { value: 10, label: '10s 刷新' },
+                      { value: 30, label: '30s 刷新' },
+                      { value: 60, label: '60s 刷新' }
+                    ]}
+                  />
+                  <Button size="small" icon={<DownloadOutlined />} loading={exporting} onClick={onExport}>
+                    导出CSV
+                  </Button>
+                  <ColumnSettings
+                    options={columnOptions}
+                    visible={visibleKeys ?? columnOptions.map((option) => option.key)}
+                    onChange={(keys) => changeVisible(keys)}
+                    onReset={() => changeVisible(null)}
+                  />
                 </Space>
               </Form.Item>
             </Form>
