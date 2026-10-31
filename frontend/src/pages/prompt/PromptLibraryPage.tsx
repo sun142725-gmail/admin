@@ -5,7 +5,10 @@
 // 权限口径：查看 flow:prompt:view，写操作（新建/编辑/删除/批量同步）flow:prompt:manage，
 // 与后端统一控制器 /prompt-library、菜单(/prompts) 同码。
 // 2026-10-31：Card title+extra 骨架收编为 PageHeader（components/README.md 点名收编写法）。
+// 2026-10-31：新增详情弹窗（卡片 cover/名称点开）：大图 + 正文复制 + 一键生成（文生图/以图换图）；
+// 「打开生图页」无预填跳 /ai/images（ImagesPage 被并行会话占用禁改，详情内生成为主路径）。
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Button from 'antd/es/button';
 import Empty from 'antd/es/empty';
 import Input from 'antd/es/input';
@@ -21,15 +24,19 @@ import { useAppSelector } from '../../store/hooks';
 import { PromptLibraryItem, deletePromptTemplate } from '../../api/promptLibrary';
 import { usePromptLibrary } from './usePromptLibrary';
 import { TemplateCard } from './components/TemplateCard';
+import { TemplateDetailModal } from './components/TemplateDetailModal';
 import { TemplateEditModal } from './components/TemplateEditModal';
 import { TemplateSyncModal } from './components/TemplateSyncModal';
 import '../flow/flow-pages.css';
 
 export const PromptLibraryPage: React.FC = () => {
   const lib = usePromptLibrary();
+  const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<PromptLibraryItem | null>(null);
   const [syncOpen, setSyncOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailTpl, setDetailTpl] = useState<PromptLibraryItem | null>(null);
   // 写权限（新建/编辑/删除/同步）：与 Permission 组件同一数据源（profile.permissions）。
   const canManage = useAppSelector((state) =>
     (state.auth.profile?.permissions ?? []).includes('flow:prompt:manage')
@@ -44,6 +51,11 @@ export const PromptLibraryPage: React.FC = () => {
   const openEdit = (tpl: PromptLibraryItem) => {
     setEditing(tpl);
     setEditOpen(true);
+  };
+
+  const openDetail = (tpl: PromptLibraryItem) => {
+    setDetailTpl(tpl);
+    setDetailOpen(true);
   };
 
   const handleDelete = async (tpl: PromptLibraryItem) => {
@@ -127,6 +139,7 @@ export const PromptLibraryPage: React.FC = () => {
                 key={tpl.id}
                 tpl={tpl}
                 canManage={canManage}
+                onOpen={openDetail}
                 onCopy={(target) => void handleCopy(target)}
                 onEdit={openEdit}
                 onDelete={(target) => void handleDelete(target)}
@@ -147,6 +160,14 @@ export const PromptLibraryPage: React.FC = () => {
         </>
       )}
 
+      <TemplateDetailModal
+        open={detailOpen}
+        tpl={detailTpl}
+        canManage={canManage}
+        onClose={() => setDetailOpen(false)}
+        onOpenImagesPage={() => navigate('/ai/images')}
+        onExampleSet={() => void lib.reloadAll()}
+      />
       <TemplateEditModal
         open={editOpen}
         editing={editing}

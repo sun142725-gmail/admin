@@ -2,6 +2,7 @@
 // 权限口径与页面一致：无 manage 权限不渲染编辑/删除（antd Card actions 不能放 null 占位，
 // 按 canManage 条件拼数组，与 <Permission> 组件同一权限数据源）。
 // 2026-10-31：Popconfirm→ConfirmPopconfirm、内联间距/字号→Tailwind（收编进新库）。
+// 2026-10-31：新增 onOpen（cover/名称点开详情弹窗）；actions 在 Card 独立区域天然不冒泡到 cover/Meta。
 import Card from 'antd/es/card';
 import Image from 'antd/es/image';
 import Space from 'antd/es/space';
@@ -14,25 +15,31 @@ import { CATEGORY_COLOR, PROMPT_CATEGORIES, PromptLibraryItem } from '../../../a
 interface TemplateCardProps {
   tpl: PromptLibraryItem;
   canManage: boolean;
+  /** 点开详情弹窗（cover 大图与 Meta 名称两处入口；actions 三操作仍走独立回调不绑 onOpen）。 */
+  onOpen: (tpl: PromptLibraryItem) => void;
   onCopy: (tpl: PromptLibraryItem) => void;
   onEdit: (tpl: PromptLibraryItem) => void;
   onDelete: (tpl: PromptLibraryItem) => void;
 }
 
-export const TemplateCard: React.FC<TemplateCardProps> = ({ tpl, canManage, onCopy, onEdit, onDelete }) => (
+export const TemplateCard: React.FC<TemplateCardProps> = ({ tpl, canManage, onOpen, onCopy, onEdit, onDelete }) => (
   <Card
     size="small"
     hoverable
     cover={
       tpl.exampleImageUrl ? (
-        <Image
-          src={tpl.exampleImageUrl}
-          alt={tpl.name}
-          className="w-full object-cover max-h-72"
-          preview={false}
-        />
+        <div className="cursor-pointer" onClick={() => onOpen(tpl)}>
+          <Image
+            src={tpl.exampleImageUrl}
+            alt={tpl.name}
+            className="w-full object-cover max-h-72"
+            preview={false}
+          />
+        </div>
       ) : (
-        <div className="prompt-library-card-placeholder">无示例图</div>
+        <div className="prompt-library-card-placeholder cursor-pointer" onClick={() => onOpen(tpl)}>
+          无示例图
+        </div>
       )
     }
     actions={[
@@ -59,7 +66,9 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ tpl, canManage, onCo
     <Card.Meta
       title={
         <Space size={4} wrap>
-          <span className="text-[13px]">{tpl.name}</span>
+          <span className="text-[13px] cursor-pointer" onClick={() => onOpen(tpl)}>
+            {tpl.name}
+          </span>
           <Tag color={CATEGORY_COLOR[tpl.category] ?? 'default'} className="!mr-0">
             {PROMPT_CATEGORIES.find((c) => c.value === tpl.category)?.label ?? tpl.category}
           </Tag>

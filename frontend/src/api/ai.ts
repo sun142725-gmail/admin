@@ -156,8 +156,15 @@ export const streamChat = (
   });
 
 // ---------- 生图 ----------
-export const generateImages = (payload: { modelId?: number; prompt: string; size?: string; count?: number }) =>
-  http.post<never, { images: AiImageRecord[] }>('/ai/images/generations', payload, {
-    timeout: LONG_TASK_TIMEOUT
-  });
+export const generateImages = (payload: {
+  modelId?: number;
+  prompt: string;
+  size?: string;
+  count?: number;
+  // 图生图参考图（data URL 数组，≤4 张）：与后端 GenerateImageDto.referenceImages 对齐，
+  // 有值时后端适配器自动切 images/edits 通道。
+  referenceImages?: string[];
+}) => http.post<never, { images: AiImageRecord[] }>('/ai/images/generations', payload, {
+  timeout: LONG_TASK_TIMEOUT
+});
 export const listImageHistory = () => http.get<never, AiImageRecord[]>('/ai/images');

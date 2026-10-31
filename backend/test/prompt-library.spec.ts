@@ -311,6 +311,78 @@ describe('PromptLibrary (e2e)', () => {
     await request(app.getHttpServer()).delete(`/api/prompt-library/${id}`).set(manageAuth()).expect(200);
   });
 
+  it('PATCH exampleImageUrl 设示例图 200 且落新值（详情弹窗「设为示例图」链路）', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/prompt-library')
+      .set(manageAuth())
+      .send({ name: '示例图模板', category: 'illustrated', template: '示例图：{{content}}' })
+      .expect(201);
+    const id = created.body.data.id;
+    expect(created.body.data.exampleImageUrl).toBeNull(); // 初始无图
+
+    const updated = await request(app.getHttpServer())
+      .patch(`/api/prompt-library/${id}`)
+      .set(manageAuth())
+      .send({ exampleImageUrl: '/uploads/prompt-library/ab.jpg' })
+      .expect(200);
+    expect(updated.body.data.exampleImageUrl).toBe('/uploads/prompt-library/ab.jpg');
+
+    await request(app.getHttpServer()).delete(`/api/prompt-library/${id}`).set(manageAuth()).expect(200);
+  });
+
+  it("PATCH exampleImageUrl 空串即清空（200 返回 ''，清空语义落定）", async () => {
+    // UpdateDto=PartialType(Create) 已含 exampleImageUrl（@Length(0,500) 允许 0 长度），
+    // service.update 以 {...dto} spread 直写：空串即 typeORM 写 '' 非 NULL，前端以空串为无图口径。
+    const created = await request(app.getHttpServer())
+      .post('/api/prompt-library')
+      .set(manageAuth())
+      .send({
+        name: '清空示例图模板',
+        category: 'illustrated',
+        template: '清空：{{content}}',
+        exampleImageUrl: '/uploads/prompt-library/cd.jpg'
+      })
+      .expect(201);
+    const id = created.body.data.id;
+
+    const cleared = await request(app.getHttpServer())
+      .patch(`/api/prompt-library/${id}`)
+      .set(manageAuth())
+      .send({ exampleImageUrl: '' })
+      .expect(200);
+    expect(cleared.body.data.exampleImageUrl).toBe('');
+
+    await request(app.getHttpServer()).delete(`/api/prompt-library/${id}`).set(manageAuth()).expect(200);
+  });
+
+  it('仅 view 权限 PATCH exampleImageUrl 应 403（PermissionsGuard 先于管道校验）', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/prompt-library')
+      .set(manageAuth())
+      .send({
+        name: '越权设图模板',
+        category: 'illustrated',
+        template: '越权：{{content}}',
+        exampleImageUrl: '/uploads/prompt-library/keep.jpg'
+      })
+      .expect(201);
+    const id = created.body.data.id;
+
+    await request(app.getHttpServer())
+      .patch(`/api/prompt-library/${id}`)
+      .set(viewAuth())
+      .send({ exampleImageUrl: '/uploads/prompt-library/hacked.jpg' })
+      .expect(403);
+    // 拒绝后原值不被篡改（guard 拦截在写入之前）
+    const detail = await request(app.getHttpServer())
+      .get(`/api/prompt-library/${id}`)
+      .set(manageAuth())
+      .expect(200);
+    expect(detail.body.data.exampleImageUrl).toBe('/uploads/prompt-library/keep.jpg');
+
+    await request(app.getHttpServer()).delete(`/api/prompt-library/${id}`).set(manageAuth()).expect(200);
+  });
+
   it('删除保护：引用>0 且未带 force 应 409，模板保留', async () => {
     const created = await request(app.getHttpServer())
       .post('/api/prompt-library')

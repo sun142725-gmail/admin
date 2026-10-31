@@ -49,8 +49,9 @@ export class AiImageService {
         continue;
       }
       try {
+        // referenceImages 有值时适配器自动切 images/edits（图生图）；undefined 走 generations，行为不变。
         const results = await candidate.adapter.images(
-          { prompt: dto.prompt, size: dto.size, count: dto.count ?? 1 },
+          { prompt: dto.prompt, size: dto.size, count: dto.count ?? 1, referenceImages: dto.referenceImages },
           candidate.channel
         );
         const records = await this.imageRepo.save(

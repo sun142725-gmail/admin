@@ -1,4 +1,4 @@
-// 玄幻/星空/修仙主题示例种子数据（curated，9 条起步）。
+// 玄幻/星空/修仙/二次元主题示例种子数据（curated，9+6=15 条）。
 //
 // 版权口径：全部为原创仿写（沿用 commit 922975e 的版权纪律）——只借「风格描述：{{content}}。
 // 要点，要点，构图/氛围。」的通用句式与既有官方示例（官方 5 条为水彩绘本/日系赛璐璐/新海诚
@@ -6,7 +6,7 @@
 // 不复刻任何第三方作品的具体描述文本。
 //
 // 结构约定（与 prompt-template.entity.ts 容量对齐，seed-prompt-library.util.spec.ts 逐条自检）：
-//   name 非空 ≤128 / category ∈ {fantasy,starry,xianxia} 且 ≤64 / template 含 {{content}} 且 1..8000 /
+//   name 非空 ≤128 / category ∈ {fantasy,starry,xianxia,anime} 且 ≤64 / template 含 {{content}} 且 1..8000 /
 //   styleTags 非空 ≤255 / source='官方示例' ≤64 / negativePrompt 可选 ≤2000。
 // 不配 exampleImageUrl/sourceModel：种子不触网（AGENTS 离线纪律），示例图可后续在页面补传。
 export interface SeedPromptTemplateItem {

@@ -76,6 +76,8 @@ export class CreatePromptTemplateDto {
 }
 
 // PATCH 语义：所有字段可选（曾误用全必填继承导致 PATCH 只传 name 报 422）。
+// exampleImageUrl 继承自 Create（@Length(0,500) 对齐实体列容量）：PATCH 传空串 '' 即清空
+// （service.update 以 {...dto} spread 直写，typeORM update 写 '' 非 NULL，前端以空串为无图口径）。
 export class UpdatePromptTemplateDto extends PartialType(CreatePromptTemplateDto) {}
 
 // 旧 list 轨 QueryPromptTemplateDto（take 裸数组）已随 GET /prompt-templates 一并裁剪：

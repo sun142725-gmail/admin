@@ -99,6 +99,10 @@ const fakeMarket = {
 };
 
 describe('Stock Roundtable (e2e)', () => {
+  // SSE 全流程用例（建会话→多专家流式→落库→列表）单步含完整请求链路，全量并行跑时
+  // 多 worker 抢 CPU 会把单用例推过 jest 默认 5s（2026-10-31 并行全量实测 7 用例超时）。
+  // 放宽到 30s：只放开时长上限，失败断言语义不变。
+  jest.setTimeout(30000);
   let app: INestApplication;
   let userRepo: Repository<User>;
   let accessToken: string;
