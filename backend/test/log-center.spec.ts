@@ -214,6 +214,99 @@ describe('LogCenter (e2e)', () => {
     expect(empty.body.data.error).toHaveLength(0);
   });
 
+  it('should search keyword in message or stack', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ username: 'tester', password: 'password' })
+      .expect(201);
+    const accessToken = loginResponse.body.data.accessToken;
+
+    await request(app.getHttpServer())
+      .post('/api/log-center/events')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        source: 'web',
+        sessionId: 'session-keyword',
+        events: [
+          {
+            type: 'error',
+            traceId: 'trace-kw-stack',
+            payload: { message: '提交失败', stack: 'TypeError: Cannot read properties of undefined\n    at KWSTACKMARK (app.js:1:1)' }
+          },
+          {
+            type: 'error',
+            traceId: 'trace-kw-msg',
+            payload: { message: 'KWMSGMARK 请求失败' }
+          }
+        ]
+      })
+      .expect(201);
+
+    // 关键字命中 stack（旧实现只搜 message，此处为回归断言）
+    const byStack = await request(app.getHttpServer())
+      .get('/api/log-center')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ type: 'error', keyword: 'KWSTACKMARK', pageSize: 100 })
+      .expect(200);
+    expect(byStack.body.data.items.some((item: { traceId?: string }) => item.traceId === 'trace-kw-stack')).toBe(true);
+
+    // 关键字命中 message
+    const byMessage = await request(app.getHttpServer())
+      .get('/api/log-center')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ type: 'error', keyword: 'KWMSGMARK', pageSize: 100 })
+      .expect(200);
+    expect(byMessage.body.data.items.some((item: { traceId?: string }) => item.traceId === 'trace-kw-msg')).toBe(true);
+  });
+
+  it('should aggregate overview stats', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ username: 'tester', password: 'password' })
+      .expect(201);
+    const accessToken = loginResponse.body.data.accessToken;
+
+    await request(app.getHttpServer())
+      .post('/api/log-center/events')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        source: 'web',
+        sessionId: 'session-stats',
+        events: [
+          { type: 'track', payload: { pageCode: 'stats_page_a', path: '/stats-a' } },
+          { type: 'track', payload: { pageCode: 'stats_page_a', path: '/stats-a' } },
+          { type: 'frontend', payload: { level: 'warn', category: 'api', message: '慢请求 GET /api/stats-demo' } },
+          { type: 'error', payload: { message: 'STATS-ERR-MARK 上报错误' } }
+        ]
+      })
+      .expect(201);
+
+    const stats = await request(app.getHttpServer())
+      .get('/api/log-center/stats')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ days: 7 })
+      .expect(200);
+    const data = stats.body.data;
+    expect(data.days).toBe(7);
+    // 趋势数量与窗口内写入量一致（含登录审计无关，仅校验三类日志各自 >=1）
+    expect(data.pvTrend.reduce((sum: number, row: { count: number }) => sum + Number(row.count), 0)).toBeGreaterThanOrEqual(2);
+    expect(data.frontendTrend.reduce((sum: number, row: { count: number }) => sum + Number(row.count), 0)).toBeGreaterThanOrEqual(1);
+    expect(data.errorTrend.reduce((sum: number, row: { count: number }) => sum + Number(row.count), 0)).toBeGreaterThanOrEqual(1);
+    // Top 聚合命中写入数据
+    expect(data.topPages).toEqual(
+      expect.arrayContaining([expect.objectContaining({ pageCode: 'stats_page_a' })])
+    );
+    expect(data.topSlowRequests).toEqual(
+      expect.arrayContaining([expect.objectContaining({ message: '慢请求 GET /api/stats-demo' })])
+    );
+    expect(
+      data.topErrors.some((row: { message: string }) => row.message.includes('STATS-ERR-MARK'))
+    ).toBe(true);
+    // 来源分布包含 web 与 server（server 由前面用例插入）
+    const sources = data.errorBySource.map((row: { source: string | null }) => row.source);
+    expect(sources).toContain('web');
+  });
+
   it('should clamp query range to retention window and expose retentionDays', async () => {
     const loginResponse = await request(app.getHttpServer())
       .post('/api/auth/login')

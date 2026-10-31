@@ -18,6 +18,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { BatchEventsDto } from './dto/batch-events.dto';
 import { QueryLogDto } from './dto/query-log.dto';
+import { QueryStatsDto } from './dto/query-stats.dto';
 import { LogCenterService } from './log-center.service';
 
 // 上报走 5 秒批量合并（每批最多 50 条），单独放宽限流避免挤占业务接口的全局配额导致日志被 429 丢弃
@@ -44,6 +45,13 @@ export class LogCenterController {
   @Permissions('system:audit:center')
   async list(@Query() query: QueryLogDto) {
     return this.logCenterService.list(query);
+  }
+
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('system:audit:center')
+  async stats(@Query() query: QueryStatsDto) {
+    return this.logCenterService.stats(query);
   }
 
   // 链路聚合必须声明在 :type/:id 之前，否则 "trace/xxx" 会被通配路由当成 type=trace 命中详情

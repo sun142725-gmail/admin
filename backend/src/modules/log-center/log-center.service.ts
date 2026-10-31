@@ -1,12 +1,13 @@
 // 日志中心服务负责写入与查询多类型日志。
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, DataSource, FindOptionsWhere, LessThan, Like, Repository } from 'typeorm';
+import { Between, Brackets, DataSource, FindOptionsWhere, LessThan, Repository } from 'typeorm';
 import { TrackLog } from '../../common/entities/track-log.entity';
 import { FrontendLog } from '../../common/entities/frontend-log.entity';
 import { ErrorLog } from '../../common/entities/error-log.entity';
 import { BatchEventsDto } from './dto/batch-events.dto';
 import { QueryLogDto } from './dto/query-log.dto';
+import { QueryStatsDto } from './dto/query-stats.dto';
 
 type LogType = 'track' | 'frontend' | 'error';
 
@@ -158,38 +159,63 @@ export class LogCenterService {
     }
 
     if (query.type === 'frontend') {
-      const where: FindOptionsWhere<FrontendLog> = {
-        ...(query.userId ? { userId: query.userId } : {}),
-        ...(query.traceId ? { traceId: query.traceId } : {}),
-        ...(query.sessionId ? { sessionId: query.sessionId } : {}),
-        ...(query.source ? { source: query.source } : {}),
-        ...(query.level ? { level: query.level } : {}),
-        ...(query.keyword ? { message: Like(`%${query.keyword}%`) } : {}),
-        ...(start && end ? { createdAt: Between(start, end) } : {})
-      };
-      const [items, total] = await this.frontendRepo.findAndCount({
-        where,
-        order: { createdAt: 'DESC' },
-        skip,
-        take: pageSize
-      });
+      // 关键字需要命中 message 或 stack（OR 语义），FindOptionsWhere 表达不了，改用 QueryBuilder
+      const qb = this.frontendRepo
+        .createQueryBuilder('f')
+        .where('f.created_at BETWEEN :start AND :end', { start, end });
+      if (query.userId) {
+        qb.andWhere('f.user_id = :userId', { userId: query.userId });
+      }
+      if (query.traceId) {
+        qb.andWhere('f.trace_id = :traceId', { traceId: query.traceId });
+      }
+      if (query.sessionId) {
+        qb.andWhere('f.session_id = :sessionId', { sessionId: query.sessionId });
+      }
+      if (query.source) {
+        qb.andWhere('f.source = :source', { source: query.source });
+      }
+      if (query.level) {
+        qb.andWhere('f.level = :level', { level: query.level });
+      }
+      if (query.keyword) {
+        qb.andWhere(
+          new Brackets((sub) => {
+            sub.where('f.message LIKE :keyword').orWhere('f.stack LIKE :keyword');
+          }),
+          { keyword: `%${query.keyword}%` }
+        );
+      }
+      qb.orderBy('f.created_at', 'DESC').skip(skip).take(pageSize);
+      const [items, total] = await qb.getManyAndCount();
       return { items, total, retentionDays: retentionDays(), clamped };
     }
 
-    const where: FindOptionsWhere<ErrorLog> = {
-      ...(query.userId ? { userId: query.userId } : {}),
-      ...(query.traceId ? { traceId: query.traceId } : {}),
-      ...(query.sessionId ? { sessionId: query.sessionId } : {}),
-      ...(query.source ? { source: query.source } : {}),
-      ...(query.keyword ? { message: Like(`%${query.keyword}%`) } : {}),
-      ...(start && end ? { createdAt: Between(start, end) } : {})
-    };
-    const [items, total] = await this.errorRepo.findAndCount({
-      where,
-      order: { createdAt: 'DESC' },
-      skip,
-      take: pageSize
-    });
+    const qb = this.errorRepo
+      .createQueryBuilder('e')
+      .where('e.created_at BETWEEN :start AND :end', { start, end });
+    if (query.userId) {
+      qb.andWhere('e.user_id = :userId', { userId: query.userId });
+    }
+    if (query.traceId) {
+      qb.andWhere('e.trace_id = :traceId', { traceId: query.traceId });
+    }
+    if (query.sessionId) {
+      qb.andWhere('e.session_id = :sessionId', { sessionId: query.sessionId });
+    }
+    if (query.source) {
+      qb.andWhere('e.source = :source', { source: query.source });
+    }
+    if (query.keyword) {
+      qb.andWhere(
+        new Brackets((sub) => {
+          sub.where('e.message LIKE :keyword').orWhere('e.stack LIKE :keyword');
+        }),
+        { keyword: `%${query.keyword}%` }
+      );
+    }
+    qb.orderBy('e.created_at', 'DESC').skip(skip).take(pageSize);
+    const [items, total] = await qb.getManyAndCount();
     return { items, total, retentionDays: retentionDays(), clamped };
   }
 
@@ -261,6 +287,83 @@ export class LogCenterService {
 
   // 返回值带 clamped 标记：调用方显式传入早于保留窗口的 start 时告知前端"范围已被收敛"，
   // 否则用户会误把"查不到"当成"没发生"
+  // 概览统计：趋势/Top 聚合全部限定在请求窗口内，且窗口不能超过保留期（超出部分必然为空，只会误导）。
+  // 按天分组用 substr(created_at,1,10)：MySQL 与 sqlite 均支持 substr，且免依赖各库不同的日期函数
+  async stats(query: QueryStatsDto) {
+    const days = Math.min(Math.max(query.days ?? 7, 1), retentionDays());
+    const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const trend = async (repo: Repository<TrackLog | FrontendLog | ErrorLog>, alias: string) =>
+      repo
+        .createQueryBuilder(alias)
+        .select(`substr(${alias}.created_at, 1, 10)`, 'day')
+        .addSelect('count(*)', 'count')
+        .where(`${alias}.created_at >= :start`, { start })
+        .groupBy('day')
+        .orderBy('day', 'ASC')
+        .getRawMany<{ day: string; count: number }>();
+
+    const [errorTrend, pvTrend, frontendTrend] = await Promise.all([
+      trend(this.errorRepo, 'e'),
+      trend(this.trackRepo, 't'),
+      trend(this.frontendRepo, 'f')
+    ]);
+
+    const [topErrors, topSlowRequests, topPages, errorBySource] = await Promise.all([
+      this.errorRepo
+        .createQueryBuilder('e')
+        .select('substr(e.message, 1, 120)', 'message')
+        .addSelect('count(*)', 'count')
+        .addSelect('min(e.created_at)', 'firstSeen')
+        .addSelect('max(e.created_at)', 'lastSeen')
+        .where('e.created_at >= :start', { start })
+        .groupBy('message')
+        .orderBy('count', 'DESC')
+        .take(10)
+        .getRawMany<{ message: string; count: number; firstSeen: string; lastSeen: string }>(),
+      this.frontendRepo
+        .createQueryBuilder('f')
+        .select('f.message', 'message')
+        .addSelect('count(*)', 'count')
+        .addSelect('max(f.created_at)', 'lastSeen')
+        .where('f.created_at >= :start', { start })
+        .andWhere('f.level = :level', { level: 'warn' })
+        .andWhere('f.message LIKE :prefix', { prefix: '慢请求%' })
+        .groupBy('f.message')
+        .orderBy('count', 'DESC')
+        .take(10)
+        .getRawMany<{ message: string; count: number; lastSeen: string }>(),
+      this.trackRepo
+        .createQueryBuilder('t')
+        .select('t.page_code', 'pageCode')
+        .addSelect('count(*)', 'count')
+        .where('t.created_at >= :start', { start })
+        .groupBy('t.page_code')
+        .orderBy('count', 'DESC')
+        .take(10)
+        .getRawMany<{ pageCode: string; count: number }>(),
+      this.errorRepo
+        .createQueryBuilder('e')
+        .select('e.source', 'source')
+        .addSelect('count(*)', 'count')
+        .where('e.created_at >= :start', { start })
+        .groupBy('e.source')
+        .getRawMany<{ source: string | null; count: number }>()
+    ]);
+
+    return {
+      days,
+      start,
+      errorTrend,
+      pvTrend,
+      frontendTrend,
+      topErrors,
+      topSlowRequests,
+      topPages,
+      errorBySource
+    };
+  }
+
   private normalizeRange(start?: string, end?: string) {
     const now = new Date();
     const days = retentionDays();
