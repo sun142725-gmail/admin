@@ -1,9 +1,25 @@
 // 通知发布页面提供发布弹窗与发送记录查询。
 import React, { useEffect, useMemo, useState } from 'react';
 import { sanitizeHtml } from '../../utils/sanitize';
-import { Alert, Button, Descriptions, Drawer, Form, Input, Modal, Select, Space, Tag, Typography, message } from 'antd';
-import { AppTable } from '../../components/AppTable';
+import Alert from 'antd/es/alert';
+import Button from 'antd/es/button';
+import Descriptions from 'antd/es/descriptions';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Tag from 'antd/es/tag';
+import Typography from 'antd/es/typography';
 import { Permission } from '../../components/permission/Permission';
+import { SelfDrawer } from '../../components/base/SelfDrawer';
+import { SelfForm } from '../../components/base/SelfForm';
+import { SelfModal } from '../../components/base/SelfModal';
+import { SelfTable } from '../../components/base/SelfTable';
+import { FilterBar } from '../../components/business/FilterBar';
+import { StatusTag } from '../../components/business/StatusTag';
+import { useApiMessage } from '../../hooks/useApiMessage';
+import { useTableQuery } from '../../hooks/useTableQuery';
+import type { StatusMeta } from '../../types/ui';
 import {
   getNotificationPublishDetail,
   listNotificationPublishes,
@@ -75,9 +91,15 @@ const DEFAULT_CHANNEL_OPTIONS = [
   { label: '飞书', value: 'feishu' }
 ];
 
+// 状态色刻度（components/README.md）：收编原 renderStatusTag 页内映射表，未命中回退原值 default Tag。
+const PUBLISH_STATUS_META: Record<string, StatusMeta> = {
+  pending: { label: '待发送', color: 'default' },
+  sending: { label: '发送中', color: 'processing' },
+  success: { label: '成功', color: 'green' },
+  failed: { label: '失败', color: 'red' }
+};
+
 export const PublishPage: React.FC = () => {
-  const [data, setData] = useState<PublishItem[]>([]);
-  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -85,34 +107,24 @@ export const PublishPage: React.FC = () => {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [users, setUsers] = useState<Array<{ id: number; nickname?: string; username: string }>>([]);
   const [publishForm] = Form.useForm();
-  const [queryForm] = Form.useForm();
-  const [query, setQuery] = useState<QueryValues>({});
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [total, setTotal] = useState(0);
+  const [queryForm] = Form.useForm<QueryValues>();
   const [channelLabelMap, setChannelLabelMap] = useState<Record<string, string>>({});
   const [channelItems, setChannelItems] = useState<Array<{ value: string; label: string }>>([]);
+  const msg = useApiMessage();
+
+  const table = useTableQuery<PublishItem, QueryValues>({
+    fetcher: ({ page, pageSize, filters }) =>
+      listNotificationPublishes({
+        ...filters,
+        templateId: filters.templateId ? Number(filters.templateId) : undefined,
+        page,
+        pageSize
+      }),
+    defaultPageSize: 20
+  });
 
   const channelType = Form.useWatch('channelType', publishForm);
   const templateId = Form.useWatch('templateId', publishForm);
-
-  const fetchData = async (nextQuery: QueryValues, nextPage = page, nextPageSize = pageSize) => {
-    setLoading(true);
-    try {
-      const res = await listNotificationPublishes({
-        ...nextQuery,
-        templateId: nextQuery.templateId ? Number(nextQuery.templateId) : undefined,
-        page: nextPage,
-        pageSize: nextPageSize
-      });
-      setData(res.items ?? []);
-      setTotal(res.total ?? 0);
-      setPage(nextPage);
-      setPageSize(nextPageSize);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchTemplates = async () => {
     const res = await listNotificationTemplates({ status: 1, pageSize: 200 });
@@ -127,7 +139,6 @@ export const PublishPage: React.FC = () => {
   useEffect(() => {
     fetchTemplates();
     fetchUsers();
-    fetchData({}, 1, pageSize);
   }, []);
 
   useEffect(() => {
@@ -221,15 +232,16 @@ export const PublishPage: React.FC = () => {
       title: values.title,
       variables
     });
-    message.success('发布成功');
+    msg.success('发布成功');
     setOpen(false);
-    fetchData(query, 1, pageSize);
+    // 发布成功后按当前筛选回第 1 页（等价原 fetchData(query, 1, pageSize)）
+    table.search({ ...table.filters });
   };
 
   const onRetry = async (item: PublishItem) => {
     await retryNotificationPublish(item.id);
-    message.success('已触发重试');
-    fetchData(query, page, pageSize);
+    msg.success('已触发重试');
+    table.reload();
   };
 
   const onViewDetail = async (item: PublishItem) => {
@@ -252,17 +264,6 @@ export const PublishPage: React.FC = () => {
     });
   };
 
-  const renderStatusTag = (value?: string) => {
-    const map: Record<string, { color: string; label: string }> = {
-      pending: { color: 'default', label: '待发送' },
-      sending: { color: 'processing', label: '发送中' },
-      success: { color: 'green', label: '成功' },
-      failed: { color: 'red', label: '失败' }
-    };
-    const item = map[value ?? ''] ?? { color: 'default', label: value ?? '-' };
-    return <Tag color={item.color}>{item.label}</Tag>;
-  };
-
   const onSearch = async () => {
     const values = queryForm.getFieldsValue();
     const nextQuery: QueryValues = {
@@ -271,15 +272,12 @@ export const PublishPage: React.FC = () => {
       channelType: values.channelType || undefined,
       status: values.status || undefined
     };
-    setQuery(nextQuery);
-    fetchData(nextQuery, 1, pageSize);
+    table.search(nextQuery);
   };
 
   const onReset = async () => {
     queryForm.resetFields();
-    const nextQuery: QueryValues = {};
-    setQuery(nextQuery);
-    fetchData(nextQuery, 1, pageSize);
+    table.reset();
   };
 
   const isVariableRequired = (item: { key: string; required?: boolean }) => {
@@ -302,13 +300,16 @@ export const PublishPage: React.FC = () => {
     {
       title: '状态',
       dataIndex: 'status',
-      render: (value: string) => renderStatusTag(value)
+      render: (value: string) => (
+        <StatusTag value={value} map={PUBLISH_STATUS_META} fallback={{ label: value ?? '-', color: 'default' }} />
+      )
     },
     { title: '重试次数', dataIndex: 'retryCount' },
     { title: '失败原因', dataIndex: 'failReason' },
     { title: '创建时间', dataIndex: 'createdAt' },
     {
       title: '操作',
+      // 重试按钮带动态 disabled（status !== 'failed'），ActionCell 不支持逐项 disabled，保留原生写法
       render: (_: unknown, item: PublishItem) => (
         <Space>
           <Button size="small" onClick={() => onViewDetail(item)}>
@@ -326,7 +327,7 @@ export const PublishPage: React.FC = () => {
 
   return (
     <div>
-      <Form form={queryForm} layout="inline" className="mb-4 gap-y-3">
+      <FilterBar form={queryForm} onSearch={onSearch} onReset={onReset} formClassName="gap-y-3">
         <Form.Item name="templateId" label="模板">
           <Select
             allowClear
@@ -352,15 +353,7 @@ export const PublishPage: React.FC = () => {
         <Form.Item name="keyword" label="关键词">
           <Input className="w-[220px]" placeholder="模板名/失败原因" />
         </Form.Item>
-        <Form.Item>
-          <Space>
-            <Button type="primary" onClick={onSearch}>
-              查询
-            </Button>
-            <Button onClick={onReset}>重置</Button>
-          </Space>
-        </Form.Item>
-      </Form>
+      </FilterBar>
 
       <Space className="mb-4">
         <Permission code="system:notification:publish:create" mode="disable">
@@ -370,23 +363,16 @@ export const PublishPage: React.FC = () => {
         </Permission>
       </Space>
 
-      <AppTable
+      <SelfTable
         rowKey="id"
         columns={columns}
-        loading={loading}
-        dataSource={data}
-        pagination={{
-          current: page,
-          pageSize,
-          total
-        }}
-        onChange={(pagination) => {
-          fetchData(query, pagination.current, pagination.pageSize);
-        }}
+        loading={table.loading}
+        dataSource={table.data}
+        pagination={table.pagination}
       />
 
-      <Modal title="发布通知" open={open} onOk={onSubmit} onCancel={() => setOpen(false)} width={720}>
-        <Form layout="vertical" form={publishForm}>
+      <SelfModal title="发布通知" open={open} onOk={onSubmit} onCancel={() => setOpen(false)} width="lg">
+        <SelfForm form={publishForm}>
           <Form.Item label="选择模板" name="templateId" rules={[{ required: true, message: '请选择模板' }]}>
             <Select
               options={templates.map((item) => ({ value: item.id, label: item.name }))}
@@ -456,10 +442,11 @@ export const PublishPage: React.FC = () => {
           ) : (
             <Alert type="warning" showIcon message="当前模板未配置变量，如模板中引用变量可能导致发送失败。" />
           )}
-        </Form>
-      </Modal>
+        </SelfForm>
+      </SelfModal>
 
-      <Drawer
+      {/* 860 为刻度外散值（README 归档映射要求专项截图比对后方可收敛，未复核前保持透传） */}
+      <SelfDrawer
         title="发送详情"
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
@@ -476,7 +463,9 @@ export const PublishPage: React.FC = () => {
               <Descriptions.Item label="发布ID">{detail.id}</Descriptions.Item>
               <Descriptions.Item label="模板">{detail.template?.name ?? '-'}</Descriptions.Item>
               <Descriptions.Item label="通道">{channelLabelMap[detail.channelType] ?? detail.channelType}</Descriptions.Item>
-              <Descriptions.Item label="状态">{renderStatusTag(detail.status)}</Descriptions.Item>
+              <Descriptions.Item label="状态">
+                <StatusTag value={detail.status} map={PUBLISH_STATUS_META} fallback={{ label: detail.status ?? '-', color: 'default' }} />
+              </Descriptions.Item>
               <Descriptions.Item label="标题" span={2}>
                 {detail.payload?.title ?? detail.template?.name ?? '-'}
               </Descriptions.Item>
@@ -490,7 +479,7 @@ export const PublishPage: React.FC = () => {
             <div className="preview-card">
               <Typography.Text strong>变量映射</Typography.Text>
               {Object.keys(detail.payload?.variables ?? {}).length ? (
-                <AppTable
+                <SelfTable
                   rowKey="key"
                   size="small"
                   pagination={false}
@@ -545,7 +534,7 @@ export const PublishPage: React.FC = () => {
             {detail.messages?.length ? (
               <div className="preview-card">
                 <Typography.Text strong>站内信发送明细</Typography.Text>
-                <AppTable
+                <SelfTable
                   rowKey="id"
                   size="small"
                   className="mt-2"
@@ -571,7 +560,7 @@ export const PublishPage: React.FC = () => {
             ) : null}
           </Space>
         )}
-      </Drawer>
+      </SelfDrawer>
     </div>
   );
 };

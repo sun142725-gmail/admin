@@ -1,21 +1,23 @@
 // 智能体管理页：提示词/参数/绑定模型（native）或 Dify 渠道（dify）。
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Button,
-  Card,
-  Drawer,
-  Form,
-  Input,
-  InputNumber,
-  Popconfirm,
-  Select,
-  Space,
-  Tag,
-  message
-} from 'antd';
+import Button from 'antd/es/button';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import InputNumber from 'antd/es/input-number';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Tag from 'antd/es/tag';
 import { PlusOutlined } from '@ant-design/icons';
-import { AppTable } from '../../components/AppTable';
 import { Permission } from '../../components/permission/Permission';
+import { SelfDrawer } from '../../components/base/SelfDrawer';
+import { SelfForm } from '../../components/base/SelfForm';
+import { SelfTable } from '../../components/base/SelfTable';
+import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { PageHeader } from '../../components/business/PageHeader';
+import { PagePanel } from '../../components/business/PagePanel';
+import { StatusTag } from '../../components/business/StatusTag';
+import { useApiMessage } from '../../hooks/useApiMessage';
+import type { StatusMeta } from '../../types/ui';
 import { AiAgent, AiModel, createAgent, listAgents, listModels, removeAgent, updateAgent } from '../../api/ai';
 
 interface AgentFormValues {
@@ -34,6 +36,12 @@ interface AgentFormValues {
   sort?: number;
 }
 
+// 状态色刻度表（components/README.md）：启用=green、停用=default（无色，原红色收敛到刻度表）。
+const AGENT_STATUS_META: Record<number, StatusMeta> = {
+  1: { label: '启用', color: 'green' },
+  0: { label: '停用', color: 'default' }
+};
+
 export const AgentsPage: React.FC = () => {
   const [agents, setAgents] = useState<AiAgent[]>([]);
   const [models, setModels] = useState<AiModel[]>([]);
@@ -43,6 +51,7 @@ export const AgentsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [kind, setKind] = useState<'native' | 'dify'>('native');
   const [form] = Form.useForm<AgentFormValues>();
+  const msg = useApiMessage();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,17 +104,17 @@ export const AgentsPage: React.FC = () => {
     try {
       if (editing) {
         await updateAgent(editing.id, values);
-        message.success('智能体已更新');
+        msg.success('智能体已更新');
       } else {
         await createAgent(values);
-        message.success('智能体已创建');
+        msg.success('智能体已创建');
       }
       setDrawerOpen(false);
       await load();
     } finally {
       setSaving(false);
     }
-  }, [editing, form, load]);
+  }, [editing, form, load, msg]);
 
   const columns = useMemo(
     () => [
@@ -136,24 +145,24 @@ export const AgentsPage: React.FC = () => {
         dataIndex: 'status',
         key: 'status',
         width: 80,
-        render: (status: number) =>
-          status === 1 ? <Tag color="green">启用</Tag> : <Tag color="red">停用</Tag>
+        render: (status: number) => <StatusTag value={status} map={AGENT_STATUS_META} />
       },
       {
         title: '操作',
         key: 'actions',
         width: 150,
+        // 整组操作包在 Permission（hide 模式）内；ActionCell 固定 disable 模式无法承载，保留原生写法
         render: (_: unknown, record: AiAgent) => (
           <Permission code="ai:agent:manage">
             <Space>
               <Button size="small" type="link" onClick={() => openEdit(record)}>
                 编辑
               </Button>
-              <Popconfirm
+              <ConfirmPopconfirm
                 title="确认删除该智能体？"
                 onConfirm={() => {
                   void removeAgent(record.id).then(() => {
-                    message.success('已删除');
+                    msg.success('已删除');
                     return load();
                   });
                 }}
@@ -161,32 +170,34 @@ export const AgentsPage: React.FC = () => {
                 <Button size="small" type="link" danger>
                   删除
                 </Button>
-              </Popconfirm>
+              </ConfirmPopconfirm>
             </Space>
           </Permission>
         )
       }
     ],
-    [load, openEdit]
+    [load, openEdit, msg]
   );
 
   return (
-    <Card
-      title="智能体管理"
-      styles={{ body: { padding: 12 } }}
-      extra={
-        <Permission code="ai:agent:manage">
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建智能体
-          </Button>
-        </Permission>
-      }
-    >
-      <AppTable<AiAgent> rowKey="id" loading={loading} columns={columns} dataSource={agents} pagination={false} />
+    <div>
+      <PageHeader
+        title="智能体管理"
+        actions={
+          <Permission code="ai:agent:manage">
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              新建智能体
+            </Button>
+          </Permission>
+        }
+      />
+      <PagePanel>
+        <SelfTable<AiAgent> rowKey="id" loading={loading} columns={columns} dataSource={agents} pagination={false} />
+      </PagePanel>
 
-      <Drawer
+      {/* width=560 即 SelfDrawer md 档默认，零变更（components/README.md AgentsPage 560=md） */}
+      <SelfDrawer
         title={editing ? `编辑智能体：${editing.name}` : '新建智能体'}
-        width={560}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         extra={
@@ -198,9 +209,8 @@ export const AgentsPage: React.FC = () => {
           </Space>
         }
       >
-        <Form
+        <SelfForm
           form={form}
-          layout="vertical"
           initialValues={{ kind: 'native', temperature: 0.7, sort: 0 }}
           onValuesChange={(changed) => {
             if (changed.kind) {
@@ -299,8 +309,8 @@ export const AgentsPage: React.FC = () => {
           <Form.Item name="openingLine" label="开场白">
             <Input maxLength={255} placeholder="你好，我是…" />
           </Form.Item>
-        </Form>
-      </Drawer>
-    </Card>
+        </SelfForm>
+      </SelfDrawer>
+    </div>
   );
 };

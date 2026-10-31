@@ -1,6 +1,14 @@
 // AI 对话页：左侧会话列表 + 右侧聊天区，选智能体或裸模型，两段式 SSE 流式输出。
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Card, Empty, Input, List, Popconfirm, Select, Space, Tooltip, Typography, message } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Empty from 'antd/es/empty';
+import Input from 'antd/es/input';
+import List from 'antd/es/list';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Tooltip from 'antd/es/tooltip';
+import Typography from 'antd/es/typography';
 import { DeleteOutlined, EditOutlined, PlusOutlined, SendOutlined, StopOutlined } from '@ant-design/icons';
 import {
   AiAgentSummary,
@@ -16,6 +24,8 @@ import {
   streamChat,
   submitChat
 } from '../../api/ai';
+import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { useApiMessage } from '../../hooks/useApiMessage';
 
 interface ChatBubble extends Pick<AiChatMessage, 'role' | 'content' | 'status'> {
   streaming?: boolean;
@@ -39,6 +49,7 @@ export const ChatPage: React.FC = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   // 流式/本地生成的气泡没有消息 id，用自增序号生成稳定 key
   const bubbleKeySeq = useRef(0);
+  const msg = useApiMessage();
   const nextBubbleKey = () => `b${++bubbleKeySeq.current}`;
 
   const { agentId, modelId } = useMemo(() => {
@@ -151,7 +162,7 @@ export const ChatPage: React.FC = () => {
           },
           onFatal: () => {
             if (!abortRef.current) {
-              message.error('连接中断');
+              msg.error('连接中断');
             }
           }
         });
@@ -160,7 +171,7 @@ export const ChatPage: React.FC = () => {
         await loadConversations(); // 刷新标题/排序
       }
     },
-    [loadConversations]
+    [loadConversations, msg]
   );
 
   const send = useCallback(async () => {
@@ -177,9 +188,9 @@ export const ChatPage: React.FC = () => {
       }
       await runStream(result.conversationId, result.messageId);
     } catch {
-      message.error('发送失败，请稍后重试');
+      msg.error('发送失败，请稍后重试');
     }
-  }, [activeId, agentId, generating, input, modelId, runStream]);
+  }, [activeId, agentId, generating, input, modelId, runStream, msg]);
 
   const stop = useCallback(() => {
     abortRef.current = true;
@@ -223,10 +234,10 @@ export const ChatPage: React.FC = () => {
         }
         await runStream(result.conversationId, result.messageId);
       } catch {
-        message.error('重新生成失败');
+        msg.error('重新生成失败');
       }
     })();
-  }, [activeId, agentId, bubbles, generating, modelId, runStream]);
+  }, [activeId, agentId, bubbles, generating, modelId, runStream, msg]);
 
   const handleRename = useCallback(
     async (conversation: AiConversation) => {
@@ -306,14 +317,14 @@ export const ChatPage: React.FC = () => {
                       }}
                     />
                   </Tooltip>,
-                  <Popconfirm
+                  <ConfirmPopconfirm
                     key="delete"
                     title="删除该会话及全部消息？"
-                    onConfirm={(event) => {
+                    onConfirm={(event?: React.MouseEvent) => {
                       event?.stopPropagation();
                       void handleRemove(item);
                     }}
-                    onCancel={(event) => event?.stopPropagation()}
+                    onCancel={(event?: React.MouseEvent) => event?.stopPropagation()}
                   >
                     <Button
                       size="small"
@@ -322,7 +333,7 @@ export const ChatPage: React.FC = () => {
                       icon={<DeleteOutlined />}
                       onClick={(event) => event.stopPropagation()}
                     />
-                  </Popconfirm>
+                  </ConfirmPopconfirm>
                 ]}
               >
                 <Typography.Text ellipsis className="max-w-[140px]">

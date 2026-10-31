@@ -1,21 +1,24 @@
 // 模型管理页：一行模型 = 一个可调用端点（协议 + 请求地址 + API Key），同名模型多行互为备份。
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Button,
-  Card,
-  Drawer,
-  Form,
-  Input,
-  InputNumber,
-  Popconfirm,
-  Select,
-  Space,
-  Tag,
-  message
-} from 'antd';
+import Button from 'antd/es/button';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import InputNumber from 'antd/es/input-number';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Tag from 'antd/es/tag';
+import message from 'antd/es/message';
 import { ApiOutlined, PlusOutlined } from '@ant-design/icons';
-import { AppTable } from '../../components/AppTable';
 import { Permission } from '../../components/permission/Permission';
+import { SelfDrawer } from '../../components/base/SelfDrawer';
+import { SelfForm } from '../../components/base/SelfForm';
+import { SelfTable } from '../../components/base/SelfTable';
+import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { PageHeader } from '../../components/business/PageHeader';
+import { PagePanel } from '../../components/business/PagePanel';
+import { StatusTag } from '../../components/business/StatusTag';
+import { useApiMessage } from '../../hooks/useApiMessage';
+import type { StatusMeta } from '../../types/ui';
 import {
   AiModel,
   createModel,
@@ -39,6 +42,12 @@ const CAPABILITY_OPTIONS = [
   { value: 'embedding', label: '向量' }
 ];
 
+// 状态色刻度表（components/README.md）：启用=green、停用=default（无色，原红色收敛到刻度表）。
+const MODEL_STATUS_META: Record<number, StatusMeta> = {
+  1: { label: '启用', color: 'green' },
+  0: { label: '停用', color: 'default' }
+};
+
 const typeLabel = (type: string) => TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
 
 interface ModelFormValues {
@@ -61,6 +70,7 @@ export const ModelsPage: React.FC = () => {
   const [editing, setEditing] = useState<AiModel | null>(null);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm<ModelFormValues>();
+  const msg = useApiMessage();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,7 +121,7 @@ export const ModelsPage: React.FC = () => {
         }
         defaultParams = parsed as Record<string, unknown>;
       } catch {
-        message.error('扩展参数必须是合法的 JSON 对象');
+        msg.error('扩展参数必须是合法的 JSON 对象');
         return;
       }
     }
@@ -129,55 +139,57 @@ export const ModelsPage: React.FC = () => {
           delete payload.apiKey; // 留空不修改密钥
         }
         await updateModel(editing.id, payload);
-        message.success('模型已更新');
+        msg.success('模型已更新');
       } else {
         await createModel(payload);
-        message.success('模型已创建');
+        msg.success('模型已创建');
       }
       setDrawerOpen(false);
       await load();
     } finally {
       setSaving(false);
     }
-  }, [editing, form, load]);
+  }, [editing, form, load, msg]);
 
+  // useApiMessage.loading 不返回 hide 句柄，loading 保留裸调用（现状 0 时长手动 hide 模式）
   const handleTest = useCallback(async (record: AiModel) => {
     const hide = message.loading('测试连通中…', 0);
     try {
       const result = await testModel(record.id);
       if (result.ok) {
-        message.success('连通正常');
+        msg.success('连通正常');
       } else {
-        message.error(result.message ?? '连通失败');
+        msg.error(result.message ?? '连通失败');
       }
     } finally {
       hide();
     }
-  }, []);
+  }, [msg]);
 
+  // 同上：loading 裸调用
   const handleProbe = useCallback(async (record: AiModel) => {
     const hide = message.loading('探测模型中…', 0);
     try {
       const result = await probeModelModels(record.id);
       if (result.ok && result.models?.length) {
-        message.info(`探测到 ${result.models.length} 个模型：${result.models.slice(0, 8).join('、')}`);
+        msg.info(`探测到 ${result.models.length} 个模型：${result.models.slice(0, 8).join('、')}`);
       } else if (result.ok) {
-        message.info('连接正常，但未探测到模型列表');
+        msg.info('连接正常，但未探测到模型列表');
       } else {
-        message.error(result.message ?? '探测失败');
+        msg.error(result.message ?? '探测失败');
       }
     } finally {
       hide();
     }
-  }, []);
+  }, [msg]);
 
   const handleRemove = useCallback(
     async (record: AiModel) => {
       await removeModel(record.id);
-      message.success('已删除');
+      msg.success('已删除');
       await load();
     },
-    [load]
+    [load, msg]
   );
 
   const columns = useMemo(
@@ -204,13 +216,13 @@ export const ModelsPage: React.FC = () => {
         dataIndex: 'status',
         key: 'status',
         width: 80,
-        render: (status: number) =>
-          status === 1 ? <Tag color="green">启用</Tag> : <Tag color="red">停用</Tag>
+        render: (status: number) => <StatusTag value={status} map={MODEL_STATUS_META} />
       },
       {
         title: '操作',
         key: 'actions',
         width: 260,
+        // 测试/探测无权限码，编辑/删除包在 Permission（hide 模式）内；ActionCell 固定 disable 模式无法承载，保留原生写法
         render: (_: unknown, record: AiModel) => (
           <Space>
             <Button size="small" icon={<ApiOutlined />} onClick={() => void handleTest(record)}>
@@ -224,14 +236,14 @@ export const ModelsPage: React.FC = () => {
                 <Button size="small" type="link" onClick={() => openEdit(record)}>
                   编辑
                 </Button>
-                <Popconfirm
+                <ConfirmPopconfirm
                   title="删除后引用该模型的智能体将无法使用，确认？"
                   onConfirm={() => void handleRemove(record)}
                 >
                   <Button size="small" type="link" danger>
                     删除
                   </Button>
-                </Popconfirm>
+                </ConfirmPopconfirm>
               </>
             </Permission>
           </Space>
@@ -242,22 +254,24 @@ export const ModelsPage: React.FC = () => {
   );
 
   return (
-    <Card
-      title="模型管理"
-      styles={{ body: { padding: 12 } }}
-      extra={
-        <Permission code="ai:model:manage">
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            新建模型
-          </Button>
-        </Permission>
-      }
-    >
-      <AppTable<AiModel> rowKey="id" loading={loading} columns={columns} dataSource={models} pagination={false} />
+    <div>
+      <PageHeader
+        title="模型管理"
+        actions={
+          <Permission code="ai:model:manage">
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              新建模型
+            </Button>
+          </Permission>
+        }
+      />
+      <PagePanel>
+        <SelfTable<AiModel> rowKey="id" loading={loading} columns={columns} dataSource={models} pagination={false} />
+      </PagePanel>
 
-      <Drawer
+      <SelfDrawer
         title={editing ? `编辑模型：${editing.displayName}` : '新建模型'}
-        width={480}
+        width="sm"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         extra={
@@ -269,9 +283,8 @@ export const ModelsPage: React.FC = () => {
           </Space>
         }
       >
-        <Form
+        <SelfForm
           form={form}
-          layout="vertical"
           initialValues={{
             type: 'openai-compatible',
             capabilities: ['chat'],
@@ -335,8 +348,8 @@ export const ModelsPage: React.FC = () => {
           <Form.Item name="remark" label="备注">
             <Input.TextArea rows={2} maxLength={255} />
           </Form.Item>
-        </Form>
-      </Drawer>
-    </Card>
+        </SelfForm>
+      </SelfDrawer>
+    </div>
   );
 };

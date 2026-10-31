@@ -1,10 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { sanitizeHtml } from '../../utils/sanitize';
-import { Button, Drawer, Form, Input, Modal, Select, Space, Switch, Tag, message } from 'antd';
+import Button from 'antd/es/button';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Switch from 'antd/es/switch';
+import Tag from 'antd/es/tag';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import { AppTable } from '../../components/AppTable';
 import { Permission } from '../../components/permission/Permission';
+import { SelfDrawer } from '../../components/base/SelfDrawer';
+import { SelfForm } from '../../components/base/SelfForm';
+import { SelfTable } from '../../components/base/SelfTable';
+import { ActionCell } from '../../components/business/ActionCell';
+import { confirmAction } from '../../components/business/ConfirmAction';
+import { StatusTag } from '../../components/business/StatusTag';
+import { useApiMessage } from '../../hooks/useApiMessage';
+import type { StatusMeta } from '../../types/ui';
 import {
   createNotificationTemplate,
   deleteNotificationTemplate,
@@ -37,6 +50,7 @@ const BUILTIN_VARIABLES: TemplateVariable[] = [
   { key: 'systemParam', label: '系统参数', source: 'system' }
 ];
 
+// 双色结构（color+bgColor）StatusMeta 无法承载，按 README 保留页内私有
 const SOURCE_COLOR_MAP: Record<string, { color: string; bgColor: string }> = {
   user: { color: '#0958d9', bgColor: '#e6f4ff' },
   event: { color: '#389e0d', bgColor: '#f6ffed' },
@@ -51,6 +65,12 @@ const DEFAULT_CHANNEL_OPTIONS = [
   { label: '飞书', value: 'feishu' }
 ];
 
+// 状态色刻度表（components/README.md）：启用=green、停用=default（无色，与迁移前写法一致）
+const TEMPLATE_STATUS_META: Record<number, StatusMeta> = {
+  1: { label: '启用', color: 'green' },
+  0: { label: '停用', color: 'default' }
+};
+
 export const TemplatePage: React.FC = () => {
   const [data, setData] = useState<TemplateItem[]>([]);
   const [open, setOpen] = useState(false);
@@ -63,6 +83,7 @@ export const TemplatePage: React.FC = () => {
   const editorInitRef = useRef(false);
   const contentValue = Form.useWatch('content', form) ?? '';
   const customVariables = Form.useWatch('customVariables', form) ?? [];
+  const msg = useApiMessage();
 
   const fetchData = async () => {
     const res = await listNotificationTemplates();
@@ -127,6 +148,7 @@ export const TemplatePage: React.FC = () => {
     }, {} as Record<string, { label: string; source: string }>);
   }, [variableList]);
 
+  // ReactQuill blot 注册与表单回填时序（依赖 open effect）勿动（components/README.md 红线）
   useEffect(() => {
     if (!open) {
       editorInitRef.current = false;
@@ -179,7 +201,7 @@ export const TemplatePage: React.FC = () => {
         BUILTIN_VARIABLES.some((builtin) => builtin.key === item.key)
       );
       if (duplicateKey) {
-        message.error(`自定义变量不能使用内置 key: ${duplicateKey.key}`);
+        msg.error(`自定义变量不能使用内置 key: ${duplicateKey.key}`);
         return;
       }
       setSaving(true);
@@ -193,22 +215,22 @@ export const TemplatePage: React.FC = () => {
       };
       if (editItem) {
         await updateNotificationTemplate(resolveTemplateKey(editItem), payload);
-        message.success('模板更新成功');
+        msg.success('模板更新成功');
       } else {
         await createNotificationTemplate(payload);
-        message.success('模板创建成功');
+        msg.success('模板创建成功');
       }
       setOpen(false);
       fetchData();
     } catch (error) {
-      message.error(getErrorMessage(error, '操作失败'));
+      msg.errorFrom(error, '操作失败');
     } finally {
       setSaving(false);
     }
   };
 
-  const onDelete = async (item: TemplateItem) => {
-    Modal.confirm({
+  const onDelete = (item: TemplateItem) => {
+    confirmAction({
       title: '确认删除模板',
       content: `将删除模板「${item.name}」，是否继续？`,
       okText: '确认删除',
@@ -216,10 +238,10 @@ export const TemplatePage: React.FC = () => {
       onOk: async () => {
         try {
           await deleteNotificationTemplate(resolveTemplateKey(item));
-          message.success('模板删除成功');
+          msg.success('模板删除成功');
           fetchData();
         } catch (error) {
-          message.error(getErrorMessage(error, '删除失败'));
+          msg.errorFrom(error, '删除失败');
         }
       }
     });
@@ -228,10 +250,10 @@ export const TemplatePage: React.FC = () => {
   const onToggleStatus = async (item: TemplateItem) => {
     try {
       await updateNotificationTemplate(item.id, { status: item.status === 1 ? 0 : 1 });
-      message.success(item.status === 1 ? '模板已停用' : '模板已启用');
+      msg.success(item.status === 1 ? '模板已停用' : '模板已启用');
       fetchData();
     } catch (error) {
-      message.error(getErrorMessage(error, '更新状态失败'));
+      msg.errorFrom(error, '更新状态失败');
     }
   };
 
@@ -272,28 +294,30 @@ export const TemplatePage: React.FC = () => {
     {
       title: '状态',
       dataIndex: 'status',
-      render: (value: number) => (value === 1 ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>)
+      render: (value: number) => <StatusTag value={value} map={TEMPLATE_STATUS_META} />
     },
     {
       title: '操作',
       render: (_: unknown, item: TemplateItem) => (
-        <Space>
-          <Permission code="system:notification:template:update" mode="disable">
-            <Button size="small" onClick={() => onEdit(item)}>
-              编辑
-            </Button>
-          </Permission>
-          <Permission code="system:notification:template:update" mode="disable">
-            <Button size="small" onClick={() => onToggleStatus(item)}>
-              {item.status === 1 ? '停用' : '启用'}
-            </Button>
-          </Permission>
-          <Permission code="system:notification:template:delete" mode="disable">
-            <Button size="small" danger onClick={() => onDelete(item)}>
-              删除
-            </Button>
-          </Permission>
-        </Space>
+        <ActionCell
+          record={item}
+          items={[
+            { key: 'edit', label: '编辑', permission: 'system:notification:template:update', onClick: onEdit },
+            {
+              key: 'toggle',
+              label: item.status === 1 ? '停用' : '启用',
+              permission: 'system:notification:template:update',
+              onClick: (record: TemplateItem) => void onToggleStatus(record)
+            },
+            {
+              key: 'delete',
+              label: '删除',
+              danger: true,
+              permission: 'system:notification:template:delete',
+              onClick: onDelete
+            }
+          ]}
+        />
       )
     }
   ];
@@ -308,9 +332,10 @@ export const TemplatePage: React.FC = () => {
         </Permission>
       </Space>
 
-      <AppTable rowKey="id" columns={columns} dataSource={data} />
+      <SelfTable rowKey="id" columns={columns} dataSource={data} />
 
-      <Drawer
+      {/* width="66vw" 为响应式合法特例（components/README.md），SelfDrawer 字符串透传保留 */}
+      <SelfDrawer
         title={editItem ? '编辑模板' : '新增模板'}
         open={open}
         onClose={() => setOpen(false)}
@@ -325,7 +350,7 @@ export const TemplatePage: React.FC = () => {
           </Space>
         }
       >
-        <Form layout="vertical" form={form}>
+        <SelfForm form={form}>
           <div className="grid gap-4">
             <div>
               <div className="text-sm font-semibold mb-3">基础设置</div>
@@ -460,21 +485,8 @@ export const TemplatePage: React.FC = () => {
               </Form.Item>
             </div>
           </div>
-        </Form>
-      </Drawer>
+        </SelfForm>
+      </SelfDrawer>
     </div>
   );
 };
-  const getErrorMessage = (error: unknown, fallback: string) => {
-    if (error && typeof error === 'object') {
-      const responseMessage = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
-      if (responseMessage) {
-        return responseMessage;
-      }
-      const directMessage = (error as { message?: string }).message;
-      if (directMessage) {
-        return directMessage;
-      }
-    }
-    return fallback;
-  };
