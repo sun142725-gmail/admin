@@ -1,4 +1,4 @@
-// 选股纯函数单测：重采样、金叉检测、即将金叉启发式、整段评估（不依赖网络与 Nest 容器）。
+// 选股纯函数单测：重采样、分钟重采样、金叉检测、即将金叉启发式、整段评估（不依赖网络与 Nest 容器）。
 import {
   KlineItem,
   detectGoldenCross,
@@ -6,7 +6,8 @@ import {
   evaluateScreener,
   macd,
   kdj,
-  resampleKlines
+  resampleKlines,
+  resampleMinuteKlines
 } from '../src/modules/stock/indicators.util';
 
 /** 构造一根日 K。 */
@@ -77,6 +78,69 @@ describe('resampleKlines', () => {
     expect(monthly).toHaveLength(2);
     expect(monthly[0].close).toBe(11);
     expect(monthly[1].close).toBe(13);
+  });
+});
+
+describe('resampleMinuteKlines', () => {
+  it('两根聚合：首开/末收/组内高低/量额求和，pct 以组首 open 为基准，date 取组内末根', () => {
+    const minute = [
+      { ...bar('2026-10-30 10:30', 12, 10, 13, 9.5, 100), pct: 1.0 },
+      { ...bar('2026-10-30 11:30', 11, 12, 12.5, 10.5, 200), pct: 2.0 }
+    ];
+    const [merged] = resampleMinuteKlines(minute, 2);
+    expect(merged.open).toBe(10); // 组首 open
+    expect(merged.close).toBe(11); // 组末 close
+    expect(merged.high).toBe(13);
+    expect(merged.low).toBe(9.5);
+    expect(merged.volume).toBe(300);
+    expect(merged.amount).toBe(3400); // 100*12 + 200*11 求和
+    // pct 以组首 open 为基准：(11-10)/10*100=10（组内各自 pct 1.0/2.0 不参与）
+    expect(merged.pct).toBeCloseTo(10);
+    expect(merged.date).toBe('2026-10-30 11:30'); // 组内末根 date
+  });
+
+  it('四根 60 分钟线两两聚合为 2 根 120 分钟线（A 股上午/下午半场）', () => {
+    const minute = [
+      bar('2026-10-30 10:30', 10.8, 10, 11, 9.8, 100),
+      bar('2026-10-30 11:30', 11.2, 10.9, 11.4, 10.9, 110),
+      bar('2026-10-30 14:00', 11.9, 11.3, 12.1, 11, 120),
+      bar('2026-10-30 15:00', 12.4, 12, 12.6, 11.7, 130)
+    ];
+    const halfDay = resampleMinuteKlines(minute, 2);
+    expect(halfDay).toHaveLength(2);
+    // 上午半场：10 开 → 11.2 收
+    expect(halfDay[0].open).toBe(10);
+    expect(halfDay[0].close).toBe(11.2);
+    expect(halfDay[0].high).toBe(11.4);
+    expect(halfDay[0].low).toBe(9.8);
+    expect(halfDay[0].volume).toBe(210);
+    expect(halfDay[0].date).toBe('2026-10-30 11:30');
+    // 下午半场：11.3 开 → 12.4 收
+    expect(halfDay[1].open).toBe(11.3);
+    expect(halfDay[1].close).toBe(12.4);
+    expect(halfDay[1].date).toBe('2026-10-30 15:00');
+  });
+
+  it('末尾落单根自成一组（首尾不完整组），长度 = ceil(n/2)', () => {
+    const minute = [
+      bar('2026-10-30 10:30', 11, 10),
+      bar('2026-10-30 11:30', 11, 11),
+      bar('2026-10-30 14:00', 12, 11.5) // 落单根
+    ];
+    const result = resampleMinuteKlines(minute, 2);
+    expect(result).toHaveLength(2); // ceil(3/2)
+    // 落单根的聚合即自身
+    expect(result[1].open).toBe(11.5);
+    expect(result[1].close).toBe(12);
+    expect(result[1].volume).toBe(10000); // bar() 默认量
+  });
+
+  it('空数组与单元素输入', () => {
+    expect(resampleMinuteKlines([], 2)).toEqual([]);
+    const single = [bar('2026-10-30 10:30', 11, 10)];
+    const result = resampleMinuteKlines(single, 2);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ date: '2026-10-30 10:30', open: 10, close: 11 });
   });
 });
 

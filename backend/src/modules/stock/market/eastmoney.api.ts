@@ -60,8 +60,9 @@ export function parseEastmoneyKline(payload: EastmoneyKlineResponse): { name: st
   return { name: payload?.data?.name ?? '', items };
 }
 
-/** 东财 K 线周期码：101 日 / 102 周 / 103 月（原生聚合，口径对齐行情软件）。 */
-export type EastmoneyKlt = 101 | 102 | 103;
+/** 东财 K 线周期码：101 日 / 102 周 / 103 月 / 60 分钟（原生聚合，口径对齐行情软件）。
+ *  2026-10-31 实测 klt=60 返回 date "2026-10-30 10:30" 带时分、11 字段与日 K 同构，解析零改动兼容。 */
+export type EastmoneyKlt = 60 | 101 | 102 | 103;
 
 export function buildEastmoneyKlineUrl(symbol: string, limit = 250, klt: EastmoneyKlt = 101): string {
   return (
@@ -80,8 +81,8 @@ export interface SectorItem {
   leaderName?: string;
   leaderCode?: string;
   leaderPct?: number | null;
-  /** 数据源标识：eastmoney（BKxxxx）/ sina（new_xxx）。 */
-  source?: 'eastmoney' | 'sina';
+  /** 数据源标识：eastmoney（BKxxxx）/ sina（new_xxx）/ tencent（qqt_xxx）。 */
+  source?: 'eastmoney' | 'sina' | 'tencent';
 }
 
 interface EastmoneyClistRow {

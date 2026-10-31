@@ -1,32 +1,39 @@
 // 行情数据服务：聚合免费公开行情（腾讯实时快照 / 东财 K 线与板块），内存 TTL 缓存 + 双源互备。
 // 仅供学习研究，接口为公开非官方通道，失败时抛出明确错误由上层降级提示。
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { KlineFreq, KlineItem, resampleKlines } from '../indicators.util';
+import { KlineFreq, KlineItem, resampleKlines, resampleMinuteKlines } from '../indicators.util';
 import { fetchGbk, fetchJson, fetchText } from './http.util';
 
-/** K 线周期 → 东财 klt 码（101 日 / 102 周 / 103 月）。 */
-export const KLINE_FREQ_KLT: Record<KlineFreq, 101 | 102 | 103> = {
+/** K 线周期 → 东财 klt 码（101 日 / 102 周 / 103 月 / 60 分钟）。
+ *  120min 无上游原生档：主源与容灾链统一先取 60min、本地两两重采样（口径一致）。 */
+export const KLINE_FREQ_KLT: Record<KlineFreq, 60 | 101 | 102 | 103> = {
   day: 101,
   week: 102,
-  month: 103
+  month: 103,
+  '60min': 60,
+  '120min': 60
 };
 import {
   QuoteSnapshot,
   SuggestItem,
   TencentKlineResponse,
+  TencentMinuteKlineResponse,
   buildSinaKlineUrl,
   buildSinaQuoteUrl,
   buildTencentKlineUrl,
+  buildTencentMinuteKlineUrl,
   buildTencentQuoteUrl,
   buildTencentSuggestUrl,
   normalizeSymbol,
   parseSinaKline,
   parseSinaQuotes,
   parseTencentKline,
+  parseTencentMinuteKline,
   parseTencentQuotes,
   parseTencentSuggest
 } from './tencent-quote.api';
 import {
+  EastmoneyClistResponse,
   EastmoneyKlineResponse,
   SectorItem,
   SearchItem,
@@ -42,8 +49,15 @@ import {
   isEastmoneySectorCode,
   isSinaSectorCode,
   parseSinaConstituents,
-  parseSinaSectorList
+  parseSinaSectorList,
+  SinaSectorRaw
 } from './sina-sector.api';
+import {
+  TencentSectorRankResponse,
+  buildTencentSectorRankUrl,
+  isTencentSectorCode,
+  parseTencentSectorRank
+} from './tencent-sector.api';
 import {
   AnnouncementItem,
   CninfoAnnouncementRow,
@@ -78,6 +92,25 @@ export interface MarketOverview {
 interface CacheEntry<T> {
   at: number;
   data: T;
+}
+
+/**
+ * 跨源板块结果合并去重（纯函数）：按 name 先到先得，调用方按优先级顺序传参（东财→腾讯→新浪）。
+ * 单源内部的去重（如东财 desc+asc 按 code）由各源自行处理，本函数只管跨源。
+ */
+export function mergeSectorResults(...lists: SectorItem[][]): { total: number; items: SectorItem[] } {
+  const seen = new Set<string>();
+  const items: SectorItem[] = [];
+  for (const list of lists) {
+    for (const item of list) {
+      if (seen.has(item.name)) {
+        continue;
+      }
+      seen.add(item.name);
+      items.push(item);
+    }
+  }
+  return { total: items.length, items };
 }
 
 @Injectable()
@@ -181,9 +214,10 @@ export class MarketDataService {
     return snapshot;
   }
 
-  /** K 线（前复权）：东财主源（含板块 BK，原生支持日/周/月）→ 腾讯 → 新浪三级容灾，个股/指数 sh/sz。
-   *  新浪体系板块（new_xxx）无公开 K 线源，抛出特定错误由会议简报层降级为成分股聚合。
-   *  周/月线主源为东财原生聚合；若东财不可用，回退为拉日 K 后本地重采样（口径近似行情软件）。 */
+  /** K 线（前复权）：东财主源（含板块 BK，原生支持日/周/月/60分）→ 腾讯 → 新浪三级容灾，个股/指数 sh/sz。
+   *  新浪体系板块（new_xxx）无公开 K 线源、腾讯板块（qqt_xxx）仅列表可用，均抛特定错误由上层降级提示。
+   *  周/月线主源为东财原生聚合；若东财不可用，回退为拉日 K 后本地重采样（口径近似行情软件）。
+   *  60min 主源为东财原生分钟线，回退腾讯 mkline → 新浪 scale=60；120min 无上游原生，统一取 60min 后本地两两重采样。 */
   async kline(
     symbol: string,
     limit = 250,
@@ -197,13 +231,21 @@ export class MarketDataService {
     if (isSinaSectorCode(symbol)) {
       throw new ServiceUnavailableException('新浪板块暂无 K 线数据源');
     }
+    if (isTencentSectorCode(symbol)) {
+      throw new ServiceUnavailableException('腾讯板块暂无 K 线数据源');
+    }
+    // 主源请求：120min 先取 2×limit 根 60min（本地重采样后仍满足 limit 根）
+    const eastLimit = freq === '120min' ? Math.min(800, limit * 2) : limit;
     let parsed: { name: string; items: KlineItem[] } | null = null;
 
     try {
       const payload = await fetchJson<EastmoneyKlineResponse>(
-        buildEastmoneyKlineUrl(symbol, limit, KLINE_FREQ_KLT[freq])
+        buildEastmoneyKlineUrl(symbol, eastLimit, KLINE_FREQ_KLT[freq])
       );
       parsed = parseEastmoneyKline(payload);
+      if (freq === '120min' && parsed.items.length > 0) {
+        parsed = { name: parsed.name, items: resampleMinuteKlines(parsed.items, 2) };
+      }
     } catch (error) {
       this.logger.warn(`东财 K 线失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
@@ -217,6 +259,16 @@ export class MarketDataService {
         if (!parsed || parsed.items.length === 0) {
           parsed = await this.fetchKlineFromSina(symbol, limit).catch(() => null);
         }
+      } else if (freq === '60min') {
+        // 60min 回退：腾讯 mkline → 新浪 scale=60（板块无分钟级兜底源，BK/new_/qqt_ 均已在上方拦截）
+        parsed = await this.fetchKlineMinuteFromTencent(symbol, 'm60', limit).catch(() => null);
+        if (!parsed || parsed.items.length === 0) {
+          parsed = await this.fetchKlineMinuteFromSina(symbol, limit).catch(() => null);
+        }
+      } else if (freq === '120min') {
+        // 120min 回退：拉足 60min 后本地两两重采样（递归带独立缓存 key，不会死循环）
+        const minute = await this.kline(symbol, Math.min(800, limit * 2), '60min');
+        parsed = { name: minute.name, items: resampleMinuteKlines(minute.items, 2) };
       } else {
         // 腾讯/新浪仅支持日 K：拉足日 K 后本地重采样为周/月
         const dailyLimit = freq === 'month' ? 800 : Math.min(800, limit * 5);
@@ -250,32 +302,94 @@ export class MarketDataService {
     return parsed;
   }
 
-  /** 行业/概念板块列表（含涨跌家数与领涨股）。 */
+  /** 腾讯分钟 K（mkline m60）：60min 回退二级。 */
+  private async fetchKlineMinuteFromTencent(symbol: string, period: 'm60', limit: number) {
+    const payload = await fetchJson<TencentMinuteKlineResponse>(
+      buildTencentMinuteKlineUrl(symbol, period, limit + 20)
+    );
+    const parsed = parseTencentMinuteKline(payload, period, limit);
+    if (parsed.items.length === 0) {
+      throw new Error('腾讯分钟 K 线为空');
+    }
+    return parsed;
+  }
+
+  /** 新浪分钟 K（scale=60）：60min 回退三级。 */
+  private async fetchKlineMinuteFromSina(symbol: string, limit: number) {
+    const raw = await fetchText(buildSinaKlineUrl(symbol, limit + 20, 60));
+    const parsed = parseSinaKline(raw, limit);
+    if (parsed.items.length === 0) {
+      throw new Error('新浪分钟 K 线为空');
+    }
+    return parsed;
+  }
+
+  /** 行业/概念板块列表：东财（desc 100 + asc 5）→ 腾讯 rank → 新浪列表三级容灾。
+   *  东财主请求（desc）可用时维持既有行为直接返回；东财全挂/为空时腾讯补位（hy 行业 / gn 概念）；
+   *  asc 跌幅榜仅在 desc 成功时作末位补充，desc 失败时 asc 数据不参与兜底（直接由腾讯补位，
+   *  腾讯源自带涨跌幅反而更全）；再失败落新浪（仅代码+名称）。 */
   async sectors(type: 'industry' | 'concept' = 'industry'): Promise<{ total: number; items: SectorItem[] }> {
     const cached = this.getCache(this.sectorCache, type, SECTOR_TTL_MS);
     if (cached) {
       return cached;
     }
     const [desc, asc] = await Promise.all([
-      fetchJson(buildEastmoneySectorsUrl(type, 100, true)).catch(() => null),
-      fetchJson(buildEastmoneySectorsUrl(type, 5, false)).catch(() => null)
+      fetchJson<EastmoneyClistResponse>(buildEastmoneySectorsUrl(type, 100, true)).catch(() => null),
+      fetchJson<EastmoneyClistResponse>(buildEastmoneySectorsUrl(type, 5, false)).catch(() => null)
     ]);
-    const parsed = desc ? parseEastmoneySectors(desc) : { total: 0, items: [] };
-    if (parsed.items.length === 0) {
-      throw new ServiceUnavailableException('板块数据暂时不可用，请稍后重试');
-    }
-    // 末位板块补充（跌幅榜）：desc 前 100 + asc 前 5 去重。
-    if (asc) {
-      const known = new Set(parsed.items.map((item) => item.code));
+    const eastParsed = desc
+      ? parseEastmoneySectors(desc)
+      : { total: 0, items: [] as SectorItem[] };
+    // 末位板块补充（跌幅榜）：desc 前 100 + asc 前 5 按 code 去重（单源内部既有口径）。
+    if (asc && eastParsed.items.length > 0) {
+      const known = new Set(eastParsed.items.map((item) => item.code));
       for (const item of parseEastmoneySectors(asc).items) {
         if (!known.has(item.code)) {
-          parsed.items.push(item);
+          eastParsed.items.push(item);
         }
       }
     }
-    this.sectorCache.set(type, { at: Date.now(), data: parsed });
+    // 东财主请求可用：维持既有行为，直接返回。
+    if (desc && eastParsed.items.length > 0) {
+      this.sectorCache.set(type, { at: Date.now(), data: eastParsed });
+      this.evictIfNeeded(this.sectorCache, SECTOR_TTL_MS);
+      return eastParsed;
+    }
+    // 东财失败或为空：腾讯 rank 兜底（type 与 board_type 一一映射）。
+    const boardType = type === 'concept' ? 'gn' : 'hy';
+    const tencentItems = await fetchJson<TencentSectorRankResponse>(buildTencentSectorRankUrl(boardType))
+      .then((payload) => parseTencentSectorRank(payload))
+      .catch(() => [] as SectorItem[]);
+    const lists: SectorItem[][] = [];
+    if (eastParsed.items.length > 0) {
+      lists.push(eastParsed.items);
+    }
+    if (tencentItems.length > 0) {
+      lists.push(tencentItems);
+    }
+    // 腾讯也失败：新浪列表兜底（无涨跌幅，仅代码+名称，同 search 兜底映射口径）。
+    if (lists.length === 0) {
+      const sinaItems = await fetchGbk(buildSinaSectorListUrl())
+        .then((raw) => parseSinaSectorList(raw))
+        .catch(() => [] as SinaSectorRaw[])
+        .then((rows) => rows.map((item) => ({ code: item.code, name: item.name, pct: null, source: 'sina' as const })));
+      if (sinaItems.length > 0) {
+        lists.push(sinaItems);
+      }
+    }
+    const merged = mergeSectorResults(...lists);
+    if (merged.items.length === 0) {
+      throw new ServiceUnavailableException('板块数据暂时不可用，请稍后重试');
+    }
+    // total 沿用东财口径需同时确认 items 非空：desc 成功但解析 0 条（上游畸形响应）时
+    // eastParsed.total 是东财的数字、merged.items 已是腾讯/新浪数据，直接沿用会张冠李戴。
+    const result = {
+      total: eastParsed.total > 0 && eastParsed.items.length > 0 ? eastParsed.total : merged.items.length,
+      items: merged.items
+    };
+    this.sectorCache.set(type, { at: Date.now(), data: result });
     this.evictIfNeeded(this.sectorCache, SECTOR_TTL_MS);
-    return parsed;
+    return result;
   }
 
   async sectorInfo(sectorCode: string): Promise<SectorItem | null> {
@@ -286,7 +400,9 @@ export class MarketDataService {
     const upper = code.toUpperCase();
     for (const type of ['industry', 'concept'] as const) {
       const list = await this.sectors(type).catch(() => null);
-      const found = list?.items.find((item) => item.code === upper);
+      // 列表项统一大写化后再比对：腾讯兜底 code 为小写/混合大小写（qqt_pt01801120 / qqt_pt02GN2174），
+      // 严格相等会永远失配导致 qqt_ 板块详情恒空。
+      const found = list?.items.find((item) => item.code.toUpperCase() === upper);
       if (found) {
         return found;
       }
@@ -361,7 +477,9 @@ export class MarketDataService {
       return { stocks: [], sectors: [] };
     }
     const [tencentSuggest, eastSectors, sinaSectors] = await Promise.all([
-      fetchGbk(buildTencentSuggestUrl(trimmed, 10))
+      // l=30 与函数默认值一致：上游实测加大 l 对行业词无效，但提高具体股票名场景召回余量
+      // （实测记录见 tencent-quote.api.ts buildTencentSuggestUrl 注释）；解析端 slice(0,10) 收口。
+      fetchGbk(buildTencentSuggestUrl(trimmed, 30))
         .then((raw) => parseTencentSuggest(raw))
         .catch(() => [] as SuggestItem[]),
       this.sectorSearchFromEastmoney(trimmed),

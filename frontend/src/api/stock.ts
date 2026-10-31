@@ -197,14 +197,17 @@ export interface RoundtableListResult {
 
 // ---------- 行情接口 ----------
 
+/** K 线周期（与后端 KlineFreq 对齐）：日/周/月 + 分钟档。 */
+export type KlineFreq = 'day' | 'week' | 'month' | '60min' | '120min';
+
 export const searchMarket = async (keyword: string): Promise<SearchResult> =>
   http.get('/stock/market/search', { params: { keyword } });
 
 export const fetchQuotes = async (symbols: string[]): Promise<QuoteSnapshot[]> =>
   http.get('/stock/market/quote', { params: { symbols: symbols.join(',') } });
 
-export const fetchKline = async (symbol: string, limit = 250): Promise<KlineResult> =>
-  http.get('/stock/market/kline', { params: { symbol, limit } });
+export const fetchKline = async (symbol: string, limit = 250, freq: KlineFreq = 'day'): Promise<KlineResult> =>
+  http.get('/stock/market/kline', { params: { symbol, limit, freq } });
 
 export const fetchOverview = async (): Promise<MarketOverview> =>
   http.get('/stock/market/overview');

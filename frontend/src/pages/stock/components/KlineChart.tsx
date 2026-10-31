@@ -3,14 +3,36 @@
 // 光标悬停时读取栏联动显示：日期 / MA值 / 开收高低 / 涨跌幅涨跌额 / 成交量成交额振幅换手率。
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
-import type { KlineResult } from '../../../api/stock';
+import type { KlineFreq, KlineResult } from '../../../api/stock';
 
 type SubIndicator = 'macd' | 'kdj' | 'rsi' | 'boll';
 
 interface Props {
   result: KlineResult;
   height?: number;
+  /** 受控周期：与 onFreqChange 同时传入才渲染周期页签（默认不传保持旧有纯展示用法）。 */
+  freq?: KlineFreq;
+  onFreqChange?: (freq: KlineFreq) => void;
 }
+
+// 周期页签（档位顺序对齐行情软件：日/周/月/120分/60分）；标题文案导出供 StockPage Card title 复用
+export const FREQ_LABEL: Record<KlineFreq, string> = {
+  day: '日K（前复权）',
+  week: '周K（前复权）',
+  month: '月K（前复权）',
+  '120min': '120分',
+  '60min': '60分'
+};
+// 页签用短标签：5 个周期页签与 4 个指标页签同排，长文案（"日K（前复权）"）在 80vw 抽屉
+// 或窄卡片下有横向挤压风险；FREQ_LABEL 保留给头部标题动态文案。
+const FREQ_TAB_LABEL: Record<KlineFreq, string> = {
+  day: '日',
+  week: '周',
+  month: '月',
+  '120min': '120分',
+  '60min': '60分'
+};
+const FREQ_TABS: KlineFreq[] = ['day', 'week', 'month', '120min', '60min'];
 
 // 同花顺配色：黑底、红涨绿跌、MA 白/黄/紫/青
 const T = {
@@ -340,11 +362,14 @@ const buildOption = (result: KlineResult, sub: SubIndicator) => {
   };
 };
 
-export const KlineChart: React.FC<Props> = ({ result, height = 480 }) => {
+export const KlineChart: React.FC<Props> = ({ result, height = 480, freq, onFreqChange }) => {
   const [sub, setSub] = useState<SubIndicator>('macd');
   const chartRef = useRef<ReactECharts>(null);
   // 光标离开后保持最后位置的读取栏（同花顺行为）
   const hoverIndex = useRef<number>(result.items.length - 1);
+  // 两者齐备才渲染周期页签（KlineDrawer/StockPage 接线后生效，纯展示用法保持旧观感）
+  const showFreqTabs = Boolean(freq && onFreqChange);
+  const activeFreq: KlineFreq = freq ?? 'day';
 
   const option = useMemo(() => buildOption(result, sub), [result, sub]);
 
@@ -376,9 +401,25 @@ export const KlineChart: React.FC<Props> = ({ result, height = 480 }) => {
     <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: '8px 10px 6px' }}>
       <div className="flex items-center justify-between" style={{ padding: '0 4px 4px' }}>
         <span style={{ color: T.text, fontSize: 13, fontWeight: 500 }}>
-          {result.name} <span style={{ color: T.sub, fontSize: 11 }}>日K（前复权）</span>
+          {result.name} <span style={{ color: T.sub, fontSize: 11 }}>{FREQ_LABEL[activeFreq]}</span>
         </span>
         <div className="flex items-center">
+          {showFreqTabs &&
+            FREQ_TABS.map((tab) => (
+              <span
+                key={tab}
+                onClick={() => onFreqChange?.(tab)}
+                style={{
+                  marginLeft: 12,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  color: activeFreq === tab ? T.accent : T.sub,
+                  fontWeight: activeFreq === tab ? 600 : 400
+                }}
+              >
+                {FREQ_TAB_LABEL[tab]}
+              </span>
+            ))}
           {SUB_TABS.map((tab) => (
             <span
               key={tab.key}

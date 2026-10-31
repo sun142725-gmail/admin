@@ -20,6 +20,7 @@ import { IndicatorSummary, summarizeIndicators } from './indicators.util';
 import { MarketDataService, MarketOverview } from './market/market-data.service';
 import { ThsFinancials } from './market/ths-f10.api';
 import { QuoteSnapshot, normalizeSymbol } from './market/tencent-quote.api';
+import { isTencentSectorCode } from './market/tencent-sector.api';
 import {
   DISCLAIMER,
   EXPERT_DEFINITIONS,
@@ -135,9 +136,10 @@ export class RoundtableService implements OnModuleInit, OnModuleDestroy {
         }
       } else if (subjectType === 'sector') {
         const code = dto.symbol?.trim() ?? '';
-        // 双体系板块代码：东财 BKxxxx / 新浪 new_xxx。
-        if (!/^(BK\d{4,6}|new_[a-z0-9_]+)$/i.test(code)) {
-          throw new BadRequestException('请提供板块代码（BK 或 new_ 开头，从搜索结果中选择）');
+        // 三体系板块代码：东财 BKxxxx / 新浪 new_xxx / 腾讯兜底 qqt_ptxxxx（容灾扩源后
+        // 搜索联想会返回腾讯板块，白名单必须同步放行，否则用户从搜索结果选中的板块被拒）。
+        if (!/^(BK\d{4,6}|new_[a-z0-9_]+|qqt_[a-z0-9_]+)$/i.test(code)) {
+          throw new BadRequestException('请提供板块代码（BK、new_ 或 qqt_ 开头，从搜索结果中选择）');
         }
         subjectCode = code;
         const info = await this.market.sectorInfo(subjectCode);
@@ -595,9 +597,16 @@ export class RoundtableService implements OnModuleInit, OnModuleDestroy {
 
     if (row.subjectType === 'sector' && row.subjectCode) {
       // 板块 K 线仅东财支持：拿不到时降级为"板块概况 + 成分股聚合"简报（无技术指标），会议照常进行。
+      // 腾讯兜底板块（qqt_）同样没有东财 K 线/成分股通道：跳过两路注定失败的网络请求，
+      // 与 new_ 板块的降级同风格，只保留"板块概况"（sectorInfo 从容灾合并列表命中）。
+      const tencentFallback = isTencentSectorCode(row.subjectCode);
       const info = await this.market.sectorInfo(row.subjectCode);
-      constituents = await this.market.sectorConstituents(row.subjectCode, 10).catch(() => []);
-      const kline = await this.market.kline(row.subjectCode, 250).catch(() => null);
+      constituents = tencentFallback
+        ? []
+        : await this.market.sectorConstituents(row.subjectCode, 10).catch(() => []);
+      const kline = tencentFallback
+        ? null
+        : await this.market.kline(row.subjectCode, 250).catch(() => null);
       if (kline) {
         summary = summarizeIndicators(kline.items);
       }
@@ -608,7 +617,11 @@ export class RoundtableService implements OnModuleInit, OnModuleDestroy {
             upCount: info.upCount,
             downCount: info.downCount,
             leaderName: info.leaderName,
-            note: summary ? undefined : '板块 K 线暂缺，以下为成分股聚合视图'
+            note: summary
+              ? undefined
+              : tencentFallback
+                ? '腾讯兜底板块暂无 K 线/成分股，以下为板块概况'
+                : '板块 K 线暂缺，以下为成分股聚合视图'
           }
         : null;
     } else {

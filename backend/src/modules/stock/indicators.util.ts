@@ -566,7 +566,8 @@ export function scoreToStance(score: number): { direction: 'bull' | 'bear' | 'ne
 
 // ==================== 选股（Screener）纯函数 ====================
 
-export type KlineFreq = 'day' | 'week' | 'month';
+/** K 线周期：日/周/月 + 分钟档（60/120 分）。选股器只扫日/周/月（resolveFreqs 硬编码），分钟档仅供 K 线图。 */
+export type KlineFreq = 'day' | 'week' | 'month' | '60min' | '120min';
 
 /** 日 K 重采样为周/月 K（东财原生周期不可用时的兜底；ISO 周一锚定 / 自然月聚合）。 */
 export function resampleKlines(daily: KlineItem[], freq: 'week' | 'month'): KlineItem[] {
@@ -595,6 +596,25 @@ export function resampleKlines(daily: KlineItem[], freq: 'week' | 'month'): Klin
     buckets.set(monthKey, list);
   }
   return [...buckets.values()].map(aggregateBucket).filter((bar): bar is KlineItem => bar !== null);
+}
+
+/**
+ * 分钟 K 本地两两（groupSize 根）聚合为更大周期（如 60min → 120min，120min 无上游原生 K 线源）：
+ * - 按序列顺序每 groupSize 根一桶（KlineItem 需按时间升序传入——东财/腾讯/新浪分钟线均升序返回）；
+ * - 末尾不足 groupSize 的落单根自成一组（首尾不完整组边界，口径与行情软件"从序列起点切分"一致）；
+ * - 不按时间戳对齐：A 股 60min 锚点 10:30/11:30/14:00/15:00，两两分组恰好等于上午/下午半场聚合，
+ *   与行情软件 120 分 K 一致；跨日截断起点造成的半组差异接受。
+ * - 聚合复用 aggregateBucket：date 取组内末根、首开/末收/组内高低、量额求和、pct 以组首 open 为基准。
+ */
+export function resampleMinuteKlines(minute: KlineItem[], groupSize = 2): KlineItem[] {
+  if (groupSize <= 1) {
+    return [...minute];
+  }
+  const buckets: KlineItem[][] = [];
+  for (let i = 0; i < minute.length; i += groupSize) {
+    buckets.push(minute.slice(i, i + groupSize));
+  }
+  return buckets.map(aggregateBucket).filter((bar): bar is KlineItem => bar !== null);
 }
 
 const aggregateBucket = (bars: KlineItem[]): KlineItem | null => {

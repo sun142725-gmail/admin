@@ -11,10 +11,10 @@ import type {InputProps} from 'antd/es/input';
 import { useSearchParams } from 'react-router-dom';
 import { Permission } from '../../components/permission/Permission';
 import { useApiMessage } from '../../hooks/useApiMessage';
-import { KlineResult, RoundtableMode, StockModelOption, fetchKline, fetchStockModels } from '../../api/stock';
+import { KlineFreq, KlineResult, RoundtableMode, StockModelOption, fetchKline, fetchStockModels } from '../../api/stock';
 import { SubjectPicker, SubjectSelection } from './components/SubjectPicker';
 import { WatchStarButton } from './components/WatchStarButton';
-import { KlineChart } from './components/KlineChart';
+import { KlineChart, FREQ_LABEL } from './components/KlineChart';
 import { RoundtableStage } from './components/RoundtableStage';
 import { HistoryTable } from './components/HistoryTable';
 import { useRoundtableFlow } from './useRoundtableFlow';
@@ -52,11 +52,13 @@ export const StockPage: React.FC = () => {
   const [modelId, setModelId] = useState<number | undefined>(undefined);
   const [kline, setKline] = useState<KlineResult | null>(null);
   const [klineLoading, setKlineLoading] = useState(false);
+  // K 线周期（分析台内嵌图记忆；KlineDrawer 另有独立 state）
+  const [klineFreq, setKlineFreq] = useState<KlineFreq>('day');
   const [refreshKey, setRefreshKey] = useState(0);
   const { session, start, stop, restore } = useRoundtableFlow();
   const msg = useApiMessage();
 
-  // K 线对象：板块走东财 BK 体系（新浪板块无 K 线源）。
+  // K 线对象：板块走东财 BK 体系（新浪/腾讯板块无 K 线源，选中时 klineSymbol 为空即不展示）。
   const klineSymbol =
     subject.subjectType === 'market'
       ? 'sh000001'
@@ -73,7 +75,7 @@ export const StockPage: React.FC = () => {
     }
     let stopped = false;
     setKlineLoading(true);
-    fetchKline(klineSymbol)
+    fetchKline(klineSymbol, 250, klineFreq)
       .then((result) => {
         if (!stopped && result.items.length > 0) {
           setKline(result);
@@ -94,7 +96,7 @@ export const StockPage: React.FC = () => {
     return () => {
       stopped = true;
     };
-  }, [klineSymbol]);
+  }, [klineSymbol, klineFreq]);
 
   const canStart =
     session.phase !== 'running' &&
@@ -246,16 +248,16 @@ export const StockPage: React.FC = () => {
         <>
           {kline && !running && !showStagePanel && (
             <Card loading={klineLoading} styles={{ body: { padding: '12px 16px' } }}>
-              <KlineChart result={kline} />
+              <KlineChart result={kline} freq={klineFreq} onFreqChange={setKlineFreq} />
             </Card>
           )}
           {kline && !running && showStagePanel && (
             <Card
               size="small"
               styles={{ body: { padding: '12px 16px' } }}
-              title={<span className="text-sm">{kline.name || subject.name} · 日K</span>}
+              title={<span className="text-sm">{kline.name || subject.name} · {FREQ_LABEL[klineFreq]}</span>}
             >
-              <KlineChart result={kline} height={380} />
+              <KlineChart result={kline} height={380} freq={klineFreq} onFreqChange={setKlineFreq} />
             </Card>
           )}
           {showStagePanel ? (

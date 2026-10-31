@@ -12,6 +12,11 @@ import {
 } from '../src/modules/stock/indicators.util';
 import { DISCLAIMER, parseConclusion, parseStance, computeDebateConvergence } from '../src/modules/stock/experts.definitions';
 import { parseSinaSectorList, parseSinaConstituents, isSinaSectorCode, isEastmoneySectorCode } from '../src/modules/stock/market/sina-sector.api';
+import { parseTencentSectorRank, buildTencentSectorRankUrl, isTencentSectorCode } from '../src/modules/stock/market/tencent-sector.api';
+import { mergeSectorResults } from '../src/modules/stock/market/market-data.service';
+// 数据取自 ./fixtures/tencent-sector-fixtures.data（纯数据模块；不含 describe 的同路径
+// 文件是 fixture 自检套件，避免被 import 时把顶层 describe 注册进本套件）。
+import { TENCENT_SECTOR_RANK_HY_JSON, TENCENT_SECTOR_RANK_GN_JSON } from './fixtures/tencent-sector-fixtures.data';
 import { parseCninfoOrg, parseCninfoAnnouncements } from '../src/modules/stock/market/cninfo.api';
 import { parseThsFinancials } from '../src/modules/stock/market/ths-f10.api';
 import {
@@ -19,7 +24,12 @@ import {
   parseSinaQuotes,
   parseTencentKline,
   parseSinaKline,
+  parseTencentMinuteKline,
+  buildTencentMinuteKlineUrl,
+  buildSinaKlineUrl,
   buildSinaQuoteUrl,
+  buildTencentSuggestUrl,
+  parseTencentSuggest,
   normalizeSymbol
 } from '../src/modules/stock/market/tencent-quote.api';
 import { parseEastmoneyKline, parseEastmoneySectors, parseEastmoneySuggest, secidFor } from '../src/modules/stock/market/eastmoney.api';
@@ -429,5 +439,261 @@ describe('stock expert definitions', () => {
     expect(isSinaSectorCode('BK0475')).toBe(false);
     expect(isEastmoneySectorCode('BK0475')).toBe(true);
     expect(isEastmoneySectorCode('new_blhy')).toBe(false);
+  });
+});
+
+// 腾讯板块 rank（东财板块列表被网络屏蔽时的兜底源）：fixture 取自 2026-10-31 实抓响应。
+describe('tencent sector rank', () => {
+  it('parses tencent sector rank with verified field layout', () => {
+    const items = parseTencentSectorRank(JSON.parse(TENCENT_SECTOR_RANK_HY_JSON));
+    // 6 行 fixture 中第 6 行缺 code 被过滤 → 5 条
+    expect(items).toHaveLength(5);
+
+    const first = items[0];
+    // qqt_ 前缀防三体系冲突（东财 BKxxxx / 新浪 new_xxx / 腾讯 ptxxxx）
+    expect(first.code).toBe('qqt_pt01801120');
+    expect(first.name).toBe('食品饮料');
+    expect(first.source).toBe('tencent');
+    expect(first.pct).toBeCloseTo(2.84);
+    // 领涨股三件套：lzg → leaderName/leaderCode/leaderPct（SectorItem 既有字段名 leaderPct）
+    expect(first.leaderName).toBe('黑芝麻');
+    expect(first.leaderCode).toBe('sz000716');
+    expect(first.leaderPct).toBeCloseTo(10.08);
+    // zgb "71/122"：涨 71、跌 122-71=51
+    expect(first.upCount).toBe(71);
+    expect(first.downCount).toBe(51);
+
+    const homeAppliance = items[4];
+    expect(homeAppliance.name).toBe('家用电器');
+    // 缺 zgb：涨跌家数不可知，字段省略（可空字段以 undefined 表达，消费端 ?? 0 兜底）
+    expect(homeAppliance.upCount ?? null).toBeNull();
+    expect(homeAppliance.downCount ?? null).toBeNull();
+    expect(homeAppliance.pct).toBeCloseTo(0.6);
+  });
+
+  it('parses gn concept board through the same layout', () => {
+    const items = parseTencentSectorRank(JSON.parse(TENCENT_SECTOR_RANK_GN_JSON));
+    expect(items).toHaveLength(2);
+    expect(items[0].code).toBe('qqt_pt02090002');
+    expect(items[0].name).toBe('波罗的海干散货指数(BDI)');
+    expect(items[0].upCount).toBe(7);
+    expect(items[0].downCount).toBe(0);
+    // 概念板 code 含大写（pt02GN2174）
+    expect(items[1].code).toBe('qqt_pt02GN2174');
+  });
+
+  it('returns empty array on non-zero code / missing rank_list / empty list', () => {
+    expect(parseTencentSectorRank({ code: 1, msg: 'error' })).toEqual([]);
+    expect(parseTencentSectorRank({ code: 0 })).toEqual([]);
+    expect(parseTencentSectorRank({ code: 0, data: { rank_list: [] } })).toEqual([]);
+    expect(parseTencentSectorRank({})).toEqual([]);
+  });
+
+  it('filters rows without code or name', () => {
+    const items = parseTencentSectorRank({
+      code: 0,
+      data: { rank_list: [{ name: '只有名字', zdf: '1' }, { code: 'pt01', zdf: '1' }, { code: 'pt02', name: '齐全', zdf: '2' }] }
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ code: 'qqt_pt02', name: '齐全' });
+  });
+
+  it('keeps pct null when zdf is not a finite number', () => {
+    const items = parseTencentSectorRank({
+      code: 0,
+      data: { rank_list: [{ code: 'pt01', name: '异动板块', zdf: '-' }, { code: 'pt02', name: '缺涨跌' }] }
+    });
+    expect(items[0].pct ?? null).toBeNull();
+    expect(items[1].pct ?? null).toBeNull();
+  });
+
+  it('builds rank url with board_type / sort / direct / offset / count', () => {
+    expect(buildTencentSectorRankUrl('hy', 100)).toBe(
+      'https://proxy.finance.qq.com/cgi/cgi-bin/rank/pt/getRank?board_type=hy&sort_type=PriceRatio&direct=down&offset=0&count=100'
+    );
+    expect(buildTencentSectorRankUrl('gn')).toContain('board_type=gn');
+    expect(buildTencentSectorRankUrl('gn', 50)).toContain('count=50');
+  });
+
+  it('identifies qqt_ sector codes only', () => {
+    expect(isTencentSectorCode('qqt_pt01801120')).toBe(true);
+    expect(isTencentSectorCode('QQT_PT02GN2174')).toBe(true);
+    expect(isTencentSectorCode('BK0475')).toBe(false);
+    expect(isTencentSectorCode('new_blhy')).toBe(false);
+    expect(isTencentSectorCode('sh600519')).toBe(false);
+    expect(isTencentSectorCode('qqt_')).toBe(false);
+  });
+});
+
+describe('mergeSectorResults', () => {
+  const east = { code: 'BK0475', name: '银行', pct: 1.2, source: 'eastmoney' as const };
+  const eastSemiconductor = { code: 'BK0998', name: '半导体', pct: -2.1, source: 'eastmoney' as const };
+  const tencentBank = { code: 'qqt_pt01', name: '银行', pct: 1.15, source: 'tencent' as const };
+  const tencentOnly = { code: 'qqt_pt02GN2174', name: '高压氧舱', pct: 1.3, source: 'tencent' as const };
+
+  it('dedupes across sources by name with first-list priority (eastmoney wins)', () => {
+    const merged = mergeSectorResults([east, eastSemiconductor], [tencentBank, tencentOnly]);
+    expect(merged.items).toHaveLength(3);
+    // 同名板块东财优先（先到先得）
+    expect(merged.items[0].code).toBe('BK0475');
+    // 顺序保持插入序：东财在前，腾讯独有板块追加在后
+    expect(merged.items[1].code).toBe('BK0998');
+    expect(merged.items[2].code).toBe('qqt_pt02GN2174');
+    expect(merged.total).toBe(3);
+  });
+
+  it('keeps tencent full list when eastmoney is empty', () => {
+    const merged = mergeSectorResults([], [tencentBank, tencentOnly]);
+    expect(merged.items).toHaveLength(2);
+    expect(merged.items.map((item) => item.code)).toEqual(['qqt_pt01', 'qqt_pt02GN2174']);
+    expect(merged.total).toBe(2);
+  });
+
+  it('returns empty result with no input', () => {
+    expect(mergeSectorResults()).toEqual({ total: 0, items: [] });
+  });
+});
+
+// 腾讯 smartbox 联想（主搜索源）：fixture 按 2026-10-31 实抓 v_hint 格式构造（GBK 解码后的 \uXXXX 转义形态）。
+// 实测结论（写入 tencent-quote.api.ts 注释）：行业词「银行」t=all 只回 ETF，GP-A 股票靠本解析过滤后所剩无几，
+// 行业词场景由 sectors() 三级容灾恢复后的板块名称匹配兜底（market-data.service.ts sectorSearchFromEastmoney）。
+describe('parseTencentSuggest (bank t=all&l=30 form)', () => {
+  // 8 条真实形态的银行 ETF（全被过滤）+ 12 条 GP-A 银行股（slice(0,10) 后剩 10 条）。
+  const BANK_HINT = [
+    'v_hint="',
+    [
+      'sh~512800~\\u94f6\\u884cETF\\u534e\\u5b9d~yhetfhb~ETF',
+      'sz~159887~\\u94f6\\u884cETF\\u5bcc\\u56fd~yhetffg~ETF',
+      'sh~515020~\\u94f6\\u884cETF\\u534e\\u590f~yhetfhx~ETF',
+      'sh~516310~\\u94f6\\u884cETF\\u6613\\u65b9\\u8fbe~yhetfyfd~ETF',
+      'sh~512700~\\u94f6\\u884cETF\\u5357\\u65b9~yhetfnf~ETF',
+      'sh~512820~\\u94f6\\u884cETF\\u6c47\\u6cbb\\u5bcc~yhetfhtf~ETF',
+      'sh~515290~\\u94f6\\u884cETF\\u5929\\u5f18~yhetfth~ETF',
+      'sh~517900~\\u94f6\\u884cAH\\u4f18\\u9009ETF\\u62db\\u5546~yhahyxetfzs~ETF',
+      'sh~600000~\\u6d66\\u53d1\\u94f6\\u884c~pfyh~GP-A',
+      'sz~000001~\\u5e73\\u5b89\\u94f6\\u884c~payh~GP-A',
+      'sh~601398~\\u5de5\\u5546\\u94f6\\u884c~gsyh~GP-A',
+      'sh~601939~\\u5efa\\u8bbe\\u94f6\\u884c~jsyh~GP-A',
+      'sh~601988~\\u4e2d\\u56fd\\u94f6\\u884c~zgyh~GP-A',
+      'sh~601328~\\u4ea4\\u901a\\u94f6\\u884c~jtyh~GP-A',
+      'sh~601658~\\u90ae\\u50a8\\u94f6\\u884c~ycyh~GP-A',
+      'sh~600036~\\u62db\\u5546\\u94f6\\u884c~zsyh~GP-A',
+      'sh~601166~\\u5174\\u4e1a\\u94f6\\u884c~xyyh~GP-A',
+      'sz~002142~\\u5b81\\u6ce2\\u94f6\\u884c~nbyh~GP-A',
+      'sh~601229~\\u4e0a\\u6d77\\u94f6\\u884c~shyh~GP-A',
+      'sz~002936~\\u90d1\\u5dde\\u94f6\\u884c~zzyh~GP-A'
+    ].join('^'),
+    '";'
+  ].join('');
+
+  it('keeps GP-A stocks, filters ETFs and slices to 10', () => {
+    const items = parseTencentSuggest(BANK_HINT);
+    expect(items).toHaveLength(10);
+    // 全部为 GP-A 股票：ETF（type=ETF）一个不剩
+    items.forEach((item) => {
+      expect(item.type).toBe('stock');
+      expect(item.name).toContain('银行');
+    });
+    // decodeName 分支：\uXXXX 转义正确解码
+    expect(items[0]).toMatchObject({ symbol: 'sh600000', code: '600000', name: '浦发银行' });
+    expect(items[1]).toMatchObject({ symbol: 'sz000001', name: '平安银行' });
+  });
+
+  it('returns empty on v_hint="N" (t=stock for industry word)', () => {
+    expect(parseTencentSuggest('v_hint="N";')).toEqual([]);
+  });
+
+  it('builds suggest url with t=all and limit', () => {
+    expect(buildTencentSuggestUrl('银行', 30)).toBe(
+      `https://smartbox.gtimg.cn/s3/?v=2&q=${encodeURIComponent('银行')}&t=all&l=30`
+    );
+    // 默认 limit=30
+    expect(buildTencentSuggestUrl('银行')).toContain('l=30');
+  });
+});
+
+// 腾讯分钟 K 线（60min 容灾兜底）：行结构取自 tencent-quote.api.ts 实测记录
+// （2026-10-31 curl sh600519 m60）——[YYYYMMDDHHmm, 开, 收, 高, 低, 量(手), 占位对象, 附加字段]。
+describe('parseTencentMinuteKline (m60 fallback form)', () => {
+  const M60_PAYLOAD = {
+    code: 0,
+    data: {
+      sh600519: {
+        m60: [
+          ['202610301000', '1360.00', '1363.00', '1366.00', '1358.00', '12000.00'],
+          ['202610301030', '1363.00', '1370.71', '1376.00', '1354.25', '21469.00', {}, '17.17'],
+          // 末根跨午休（11:30 收盘 → 13:00 开盘），date 仍按 12 位数字形态格式化
+          ['202610301300', '1370.71', '1369.00', '1372.00', '1365.00', '9800.00']
+        ]
+      }
+    }
+  };
+
+  it('parses rows and normalizes 12-digit date to YYYY-MM-DD HH:mm', () => {
+    const { items } = parseTencentMinuteKline(M60_PAYLOAD, 'm60', 250);
+    expect(items).toHaveLength(3);
+    expect(items[0].date).toBe('2026-10-30 10:00');
+    expect(items[1].date).toBe('2026-10-30 10:30');
+    expect(items[2].date).toBe('2026-10-30 13:00');
+    expect(items[0]).toMatchObject({ open: 1360, close: 1363, high: 1366, low: 1358, volume: 12000, amount: 0 });
+    // 附加字段（占位对象/额外字符串）不进入解析结果
+    expect(items[1].close).toBe(1370.71);
+  });
+
+  it('computes pct from previous bar close, first bar pct undefined', () => {
+    const { items } = parseTencentMinuteKline(M60_PAYLOAD, 'm60', 250);
+    expect(items[0].pct).toBeUndefined();
+    expect(items[1].pct).toBeCloseTo(((1370.71 - 1363) / 1363) * 100, 6);
+    expect(items[2].pct).toBeCloseTo(((1369 - 1370.71) / 1370.71) * 100, 6);
+  });
+
+  it('filters short rows and non-positive prices; prev-close chain skips filtered bars', () => {
+    const payload = {
+      code: 0,
+      data: {
+        sh600519: {
+          m60: [
+            ['202610301000', '1360.00', '1363.00', '1366.00', '1358.00', '12000.00'],
+            ['202610301030', '1363.00', '1363.00'], // 短行（<6 列）
+            ['202610301100', '0', '1363.00', '1376.00', '1354.25', '100'], // 开盘 0
+            ['202610301130', '-1', '1363.00', '1376.00', '1354.25', '100'], // 开盘负数
+            ['202610301200', '1363.00', '1364.00', '1370.00', '1360.00', '500']
+          ]
+        }
+      }
+    };
+    const { items } = parseTencentMinuteKline(payload, 'm60', 250);
+    expect(items).toHaveLength(2);
+    expect(items[1].date).toBe('2026-10-30 12:00');
+    // pct 前收链基于成功入列的上一根（10:00 收 1363），被过滤行不参与
+    expect(items[1].pct).toBeCloseTo(((1364 - 1363) / 1363) * 100, 6);
+  });
+
+  it('keeps only the last `limit` bars', () => {
+    const { items } = parseTencentMinuteKline(M60_PAYLOAD, 'm60', 2);
+    expect(items.map((item) => item.date)).toEqual(['2026-10-30 10:30', '2026-10-30 13:00']);
+  });
+
+  it('returns empty on code!==0, missing data, missing period key or non-array rows', () => {
+    expect(parseTencentMinuteKline({ code: -1, data: {} }, 'm60', 250).items).toEqual([]);
+    expect(parseTencentMinuteKline({ code: 0, data: {} }, 'm60', 250).items).toEqual([]);
+    expect(parseTencentMinuteKline({ code: 0, data: { sh600519: {} } }, 'm60', 250).items).toEqual([]);
+    expect(parseTencentMinuteKline({ code: 0, data: { sh600519: { m60: 'bad' } } }, 'm60', 250).items).toEqual([]);
+  });
+
+  it('builds minute kline url with period and limit', () => {
+    expect(buildTencentMinuteKlineUrl('sh600519', 'm60', 120)).toBe(
+      'https://proxy.finance.qq.com/ifzqgtimg/appstock/app/kline/mkline?param=sh600519,m60,,120'
+    );
+    // 默认 limit=250
+    expect(buildTencentMinuteKlineUrl('sh600519', 'm60')).toContain('param=sh600519,m60,,250');
+  });
+
+  it('builds sina kline url with scale=60 for minute bars (default 240)', () => {
+    const minuteUrl = buildSinaKlineUrl('sh600519', 200, 60);
+    expect(minuteUrl).toContain('symbol=sh600519');
+    expect(minuteUrl).toContain('scale=60');
+    expect(minuteUrl).toContain('datalen=200');
+    expect(buildSinaKlineUrl('sh600519', 280)).toContain('scale=240');
   });
 });

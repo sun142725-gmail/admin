@@ -142,6 +142,13 @@ export function normalizeSymbol(input: string): string {
 
 // ---------- 腾讯搜索联想（smartbox，主搜索源） ----------
 
+// 上游实测记录（2026-10-31，curl smartbox.gtimg.cn）：
+// ① 「银行」t=all&l=30 → 10 条全 type=ETF（无 GP-A）；l=30 与 l=10 返回完全相同 → 加大 l 仅提高
+//    具体股票名/多候选场景的召回余量，对行业词无效（l=50 也只回 20 条 ETF，同结论）；
+// ② t=husband「银行」→ v_hint="N"（无效类型）；
+// ③ 「工商银行」t=all → 首条 sh601398 GP-A；拼音「yh」→ 全 GP-A；具体名/拼音联想在现有解析下正常。
+// 因此行业词的空结果不由本接口修复：由 sectors() 三级容灾（东财→腾讯 rank→新浪）恢复后，
+// search() 的 sectorSearchFromEastmoney 名称包含匹配可命中「银行」等板块（market-data.service.ts）。
 export function buildTencentSuggestUrl(keyword: string, limit = 30): string {
   return `https://smartbox.gtimg.cn/s3/?v=2&q=${encodeURIComponent(keyword)}&t=all&l=${limit}`;
 }
@@ -229,12 +236,75 @@ export function parseTencentKline(payload: TencentKlineResponse, limit: number):
   return { name: '', items: items.slice(-limit) };
 }
 
+// ---------- 腾讯分钟 K 线（60min 兜底源） ----------
+
+// 上游实测记录（2026-10-31，curl sh600519 m60）：
+// - web.ifzq.gtimg.cn/appstock/app/kline/mkline 返回 301 Moved Permanently（不可直连）；
+// - 同路径经 proxy.finance.qq.com/ifzqgtimg/... 返回 code:0，data.<symbol> 含 qt/m60/prec 三键，
+//   m60 行结构 ["202610301030","1363.00","1370.71","1376.00","1354.25","21469.00",{},"17.17"]，
+//   即 [YYYYMMDDHHmm, 开, 收, 高, 低, 量(手), 信息占位对象, 附加字段]；12 位数字 date 解析时
+//   格式化为 "YYYY-MM-DD HH:mm"，与东财/新浪口径一致（非 12 位形态原样保留，容错）。
+export interface TencentMinuteKlineResponse {
+  code?: number;
+  data?: Record<string, Record<string, unknown>>;
+}
+
+/** 腾讯分钟 K URL：period=m60（60 分钟），limit 为根数。 */
+export function buildTencentMinuteKlineUrl(symbol: string, period: 'm60', limit = 250): string {
+  return `https://proxy.finance.qq.com/ifzqgtimg/appstock/app/kline/mkline?param=${symbol},${period},,${limit}`;
+}
+
+/** 腾讯分钟 K 解析：行结构见上方实测记录；date 格式化为 "YYYY-MM-DD HH:mm"，涨跌幅由前收推算，成交额缺失记 0。 */
+export function parseTencentMinuteKline(
+  payload: TencentMinuteKlineResponse,
+  period: 'm60',
+  limit: number
+): { name: string; items: KlineItem[] } {
+  const first = Object.values(payload?.data ?? {})[0] as Record<string, unknown> | undefined;
+  const raw = first?.[period];
+  const rows = Array.isArray(raw) ? (raw as unknown[][]) : [];
+  const items: KlineItem[] = [];
+  for (const row of rows) {
+    if (row.length < 6) {
+      continue;
+    }
+    const open = Number(row[1]);
+    const close = Number(row[2]);
+    const high = Number(row[3]);
+    const low = Number(row[4]);
+    const volume = Number(row[5]);
+    if (![open, close, high, low].every((v) => Number.isFinite(v) && v > 0)) {
+      continue;
+    }
+    const prev = items[items.length - 1];
+    // 12 位 YYYYMMDDHHmm 统一格式化为 "YYYY-MM-DD HH:mm"（与东财/新浪展示口径一致），
+    // 其余形态（异常字段）原样保留，不做猜测性解析。
+    const rawDate = String(row[0] ?? '');
+    const date = /^\d{12}$/.test(rawDate)
+      ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)} ${rawDate.slice(8, 10)}:${rawDate.slice(10, 12)}`
+      : rawDate;
+    items.push({
+      date,
+      open,
+      close,
+      high,
+      low,
+      volume: Number.isFinite(volume) ? volume : 0,
+      amount: 0,
+      pct: prev && prev.close > 0 ? ((close - prev.close) / prev.close) * 100 : undefined
+    });
+  }
+  return { name: '', items: items.slice(-limit) };
+}
+
 // ---------- 新浪日 K 线（第三级备用） ----------
 
-export function buildSinaKlineUrl(symbol: string, limit = 280): string {
+/** 新浪 K 线：scale=240 日 K（默认不变）/ 60 分钟；分钟档 date 为 "2026-10-29 15:00:00" 带时分秒，
+ *  parseSinaKline 对 date 原样保留、解析通用（2026-10-31 实测 scale=60 返回 JSONP 数组正常）。 */
+export function buildSinaKlineUrl(symbol: string, limit = 280, scale: 60 | 240 = 240): string {
   return (
     `https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20_%3D%20/CN_MarketDataService.getKLineData` +
-    `?symbol=${symbol}&scale=240&ma=no&datalen=${limit}`
+    `?symbol=${symbol}&scale=${scale}&ma=no&datalen=${limit}`
   );
 }
 

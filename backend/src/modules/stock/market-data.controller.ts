@@ -2,7 +2,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { computeIndicatorSeries } from './indicators.util';
+import { KlineFreq, computeIndicatorSeries } from './indicators.util';
 import { MarketDataService } from './market/market-data.service';
 import { normalizeSymbol } from './market/tencent-quote.api';
 
@@ -36,15 +36,19 @@ export class MarketDataController {
     return this.market.quotes(list);
   }
 
-  /** K 线 + 后端算好的指标序列（MA/MACD/KDJ/RSI/BOLL），前端直接绘图。 */
+  /** K 线 + 后端算好的指标序列（MA/MACD/KDJ/RSI/BOLL），前端直接绘图。
+   *  freq 支持日/周/月/60min/120min；非法值回落 day（与 limit 夹取同风格，不抛 400）。 */
   @Get('kline')
-  async kline(@Query('symbol') symbol?: string, @Query('limit') limit?: string) {
+  async kline(@Query('symbol') symbol?: string, @Query('limit') limit?: string, @Query('freq') freq?: string) {
     const target = normalizeSymbol(symbol ?? '');
     const parsedLimit = Math.min(250, Math.max(30, Number(limit ?? 250) || 250));
-    if (!/^(sh|sz)\d{6}$|^(BK\d{4,6}|new_[a-z0-9_]+)$/i.test(target)) {
+    const parsedFreq = (['day', 'week', 'month', '60min', '120min'] as string[]).includes(freq ?? '')
+      ? (freq as KlineFreq)
+      : 'day';
+    if (!/^(sh|sz)\d{6}$|^(BK\d{4,6}|new_[a-z0-9_]+|qqt_[a-z0-9_]+)$/i.test(target)) {
       return { name: '', items: [], indicators: null };
     }
-    const { name, items } = await this.market.kline(target, parsedLimit);
+    const { name, items } = await this.market.kline(target, parsedLimit, parsedFreq);
     return { name, items, indicators: computeIndicatorSeries(items) };
   }
 

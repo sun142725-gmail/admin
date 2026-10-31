@@ -13,6 +13,7 @@ import * as request from 'supertest';
 import { User } from '../src/common/entities/user.entity';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { MarketDataService } from '../src/modules/stock/market/market-data.service';
+import { RoundtableService } from '../src/modules/stock/roundtable.service';
 import { KlineItem } from '../src/modules/stock/indicators.util';
 
 // 确定性 K 线：前 40 日下跌、其后上行，让规则信号产生可断言的多头结构。
@@ -201,6 +202,88 @@ describe('Stock Roundtable (e2e)', () => {
       .set(auth())
       .send({ subjectType: 'stock', symbol: '' })
       .expect(422);
+  });
+
+  it('admits tencent fallback sector codes (qqt_) now that search suggests them', async () => {
+    // 容灾扩源后搜索联想会返回 qqt_ 板块：白名单放行 + sectorInfo 从容灾合并列表命中（mock 返回非空）。
+    // 自含清理：SSE 至 done 后删除本会话，避免新会话抢占 list 用例的 items[0]（保持用例顺序无关）。
+    const created = await request(app.getHttpServer())
+      .post('/api/stock/roundtable')
+      .set(auth())
+      .send({ subjectType: 'sector', symbol: 'qqt_pt01801120', mode: 'quick', question: '板块轮动怎么看' })
+      .expect(201);
+    const id = created.body.data.id;
+    expect(id).toBeDefined();
+
+    let raw = '';
+    await request(app.getHttpServer())
+      .get(`/api/stock/roundtable/${id}/stream`)
+      .set(auth())
+      .expect(200)
+      .buffer(false)
+      .parse((res, callback) => {
+        res.on('data', (chunk: Buffer) => {
+          raw += chunk.toString();
+        });
+        res.on('end', () => callback(null, raw));
+      });
+    expect(raw).toContain('event: done');
+
+    // qqt_ 会话简报走"板块概况"降级：无行情快照，sectorInfo 带腾讯兜底 note。
+    const detail = await request(app.getHttpServer())
+      .get(`/api/stock/roundtable/${id}`)
+      .set(auth())
+      .expect(200);
+    expect(detail.body.data.brief.snapshot).toBeNull();
+    const sectorInfo = detail.body.data.brief.sectorInfo as { note?: string } | null;
+    expect(sectorInfo?.note).toBe('腾讯兜底板块暂无 K 线/成分股，以下为板块概况');
+
+    await request(app.getHttpServer()).delete(`/api/stock/roundtable/${id}`).set(auth()).expect(200);
+    await request(app.getHttpServer()).get(`/api/stock/roundtable/${id}`).set(auth()).expect(404);
+
+    // 非三体系格式的板块代码仍拒绝（项目约定 BadRequest 统一映射为 422）。
+    await request(app.getHttpServer())
+      .post('/api/stock/roundtable')
+      .set(auth())
+      .send({ subjectType: 'sector', symbol: 'xx12345' })
+      .expect(422);
+  });
+
+  it('skips kline/constituents calls for qqt_ sectors in brief building', async () => {
+    // 腾讯兜底板块无东财 K 线/成分股通道：buildBrief 跳过两路注定失败的请求，走"板块概况"简报。
+    const service = app.get(RoundtableService);
+    const klineSpy = jest.spyOn(fakeMarket, 'kline');
+    const constituentsSpy = jest.spyOn(fakeMarket, 'sectorConstituents');
+    const infoSpy = jest.spyOn(fakeMarket, 'sectorInfo');
+    klineSpy.mockClear();
+    constituentsSpy.mockClear();
+    infoSpy.mockClear();
+    try {
+      const brief = await (service as unknown as {
+        buildBrief(row: unknown): Promise<{ briefText: string; briefJson: Record<string, unknown> }>;
+      }).buildBrief({
+        id: 99999,
+        userId: 0,
+        subjectType: 'sector',
+        subjectCode: 'qqt_pt01801120',
+        subjectName: '银行',
+        status: 'preparing'
+      });
+      expect(klineSpy).not.toHaveBeenCalled();
+      expect(constituentsSpy).not.toHaveBeenCalled();
+      expect(infoSpy).toHaveBeenCalledWith('qqt_pt01801120');
+      expect(brief.briefText).toContain('【板块概况】');
+      expect(brief.briefText).toContain('腾讯兜底板块暂无 K 线/成分股');
+      expect(brief.briefText).not.toContain('【板块成分股涨幅前列】');
+      expect(brief.briefText).not.toContain('【技术指标】');
+      // 简报 JSON 同步记录降级 note，便于前端/复盘排查
+      const sectorInfo = brief.briefJson.sectorInfo as { note?: string } | null;
+      expect(sectorInfo?.note).toBe('腾讯兜底板块暂无 K 线/成分股，以下为板块概况');
+    } finally {
+      klineSpy.mockRestore();
+      constituentsSpy.mockRestore();
+      infoSpy.mockRestore();
+    }
   });
 
   it('should create roundtable and stream full session via SSE', async () => {

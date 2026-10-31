@@ -1,9 +1,9 @@
-// K 线抽屉：在自选股 / 选股结果等列表里点击股票，弹出日K（蜡烛 + MA + 成交量 + 副图指标）。
+// K 线抽屉：在自选股 / 选股结果等列表里点击股票，弹出 K 线（蜡烛 + MA + 成交量 + 副图指标 + 周期页签）。
 // 数据走 GET /api/stock/market/kline（后端算好指标），支持个股 / 指数 / 东财板块代码。
 import React, { useEffect, useState } from 'react';
 import Alert from 'antd/es/alert';
 import Spin from 'antd/es/spin';
-import { KlineResult, fetchKline } from '../../../api/stock';
+import { KlineFreq, KlineResult, fetchKline } from '../../../api/stock';
 import { SelfDrawer } from '../../../components/base/SelfDrawer';
 import { KlineChart } from './KlineChart';
 
@@ -26,6 +26,8 @@ export const KlineDrawer: React.FC<Props> = ({ open, symbol, name, onClose }) =>
   const [result, setResult] = useState<KlineResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 周期与各复用方独立记忆（不进 redux）：切换标的时保留用户所选周期
+  const [freq, setFreq] = useState<KlineFreq>('day');
 
   useEffect(() => {
     if (!open || !symbol) {
@@ -37,13 +39,13 @@ export const KlineDrawer: React.FC<Props> = ({ open, symbol, name, onClose }) =>
     setLoading(true);
     setError(null);
     setResult(null);
-    fetchKline(symbol)
+    fetchKline(symbol, 250, freq)
       .then((res) => {
         if (stopped) {
           return;
         }
         if (!res.items.length) {
-          setError('该标的暂无日K数据');
+          setError('该标的暂无K线数据');
         } else {
           setResult(res);
         }
@@ -61,7 +63,7 @@ export const KlineDrawer: React.FC<Props> = ({ open, symbol, name, onClose }) =>
     return () => {
       stopped = true;
     };
-  }, [open, symbol]);
+  }, [open, symbol, freq]);
 
   const last = result?.items[result.items.length - 1];
   const displayName = result?.name || name || symbol || '';
@@ -102,7 +104,7 @@ export const KlineDrawer: React.FC<Props> = ({ open, symbol, name, onClose }) =>
               {last.date} 收盘
             </span>
           </div>
-          <KlineChart result={result} height={520} />
+          <KlineChart result={result} height={520} freq={freq} onFreqChange={setFreq} />
         </div>
       ) : null}
     </SelfDrawer>

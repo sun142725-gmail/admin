@@ -50,11 +50,15 @@ const BATCH_SIZE = 50;
 const BATCH_PAUSE_MS = 1000;
 // K 线请求并发上限
 const SCAN_CONCURRENCY = 6;
-// 各周期所需 K 线根数：MACD(12,26,9) 至少 35 根成型，多取保证 EMA 收敛
+// 各周期所需 K 线根数：MACD(12,26,9) 至少 35 根成型，多取保证 EMA 收敛。
+// 60min/120min 仅为 Record<KlineFreq,…> 类型完整性补条目：resolveFreqs 硬编码日/周/月，
+// 选股器语义不扫分钟档（分钟档仅服务 K 线图），这两个档位实际不会被取到。
 const FREQ_KLINE_LIMIT: Record<KlineFreq, number> = {
   day: 120,
   week: 120,
-  month: 60
+  month: 60,
+  '60min': 240,
+  '120min': 240
 };
 
 export const BOARD_LABEL: Record<EastmoneyBoard, string> = {
@@ -473,7 +477,8 @@ export class ScreenerService {
 
   private sortMatches(matches: ScreenerMatch[]): ScreenerMatch[] {
     const statusRank = (s: 'golden' | 'upcoming' | null) => (s === 'golden' ? 0 : s === 'upcoming' ? 1 : 2);
-    const freqRank: Record<KlineFreq, number> = { day: 0, week: 1, month: 2 };
+    // 分钟档仅为 Record 完整性补位（选股器不扫分钟档，sortMatches 实际只收到日/周/月）
+    const freqRank: Record<KlineFreq, number> = { day: 0, week: 1, month: 2, '60min': 3, '120min': 4 };
     return [...matches].sort((a, b) => {
       const bestA = Math.min(...['kdj', 'macd'].map((k) => statusRank(a.signals[k as ScreenerIndicator].status)));
       const bestB = Math.min(...['kdj', 'macd'].map((k) => statusRank(b.signals[k as ScreenerIndicator].status)));
