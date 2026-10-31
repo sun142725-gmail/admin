@@ -36,10 +36,16 @@
   margin-bottom: 12px;
 }
 
+/* 瀑布流：CSS 多列布局，卡片保持自然高度不强行等高；列宽 240px 自动按视口分列。
+   子项 break-inside 防止卡片被拦腰截断，margin-bottom 充当行距（多列布局 gap 只管列间）。 */
 .prompt-library-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+  columns: 240px;
+  column-gap: 16px;
+}
+
+.prompt-library-grid > * {
+  break-inside: avoid;
+  margin-bottom: 16px;
 }
 
 .prompt-library-card-placeholder {
@@ -60,7 +66,7 @@
 
 @media (max-width: 640px) {
   .prompt-library-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    columns: 160px;
   }
 
   .prompt-library-pagination {

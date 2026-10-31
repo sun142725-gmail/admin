@@ -28,7 +28,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({ tpl, canManage, onCo
         <Image
           src={tpl.exampleImageUrl}
           alt={tpl.name}
-          className="h-40 object-cover"
+          className="w-full object-cover max-h-72"
           preview={false}
         />
       ) : (

@@ -79,7 +79,7 @@ describe('planSeedTemplates（四分支 + trim 变体）', () => {
 });
 
 describe('SEED_PROMPT_TEMPLATES 种子数据自检（防改坏：MySQL 严格模式失败或静默截断）', () => {
-  it('共 9 条：fantasy/starry/xianxia 各 3 条', () => {
+  it('共 15 条：fantasy/starry/xianxia/anime 各 3-6 条（anime 二次元 6 条）', () => {
     expect(SEED_PROMPT_TEMPLATES).toHaveLength(9);
     const byCategory = SEED_PROMPT_TEMPLATES.reduce<Record<string, number>>((acc, item) => {
       acc[item.category] = (acc[item.category] ?? 0) + 1;
