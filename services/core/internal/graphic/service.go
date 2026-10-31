@@ -110,12 +110,17 @@ func (s *Service) segment(ctx context.Context, userID int, sourceText string, mo
 // ---------- 提示词渲染 ----------
 
 // 风格兜底提示：未指定模板时按分类追加风格指引（提示词库是推荐项，不是必需项）。
+// 2026-10 主题分类体系：Node 侧 category 已放开为自由字符串（prompt-categories.ts 单一来源），
+// 这里补 fantasy/starry/xianxia 三条主题兜底；未知 key 仍落 general（下方 categoryHint 回退不变）。
 var categoryHints = map[string]string{
 	"illustrated": "水彩手绘插画风格，线条柔和，色调温暖",
 	"poster":      "平面海报设计风格，构图大胆，主体突出",
 	"anime":       "日系动漫风格，赛璐璐上色，清晰线条",
 	"ui":          "现代 UI 界面设计风格，干净简洁",
 	"general":     "高质量数字插画，细节丰富",
+	"fantasy":     "东方玄幻风格，气势恢宏，金光瑞霭，电影感构图",
+	"starry":      "浩瀚星空风格，紫蓝渐变星云，深邃宁静",
+	"xianxia":     "国风仙侠风格，水墨意境，灵气飘渺",
 }
 
 // renderPrompt 把场景内容渲染进模板（{{content}} 占位），无模板时用分类兜底。

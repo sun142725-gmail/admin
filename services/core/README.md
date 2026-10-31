@@ -39,7 +39,7 @@ internal/
 - 接口：`/api/v1/graphic/stories`（列表/详情/创建/run/cancel/stream，经 Node 网关 `/api/svc/core/...` 访问）
 - 关键约定：gpt-image 类渠道可能返回数百 KB 的 base64 data URL，**统一落盘换成本地相对路径**（与 novel-pipeline 的本地化约定一致）
 - 环境变量：`DB_*`（复用 backend 的库）、`NODE_BASE_URL`（默认 http://127.0.0.1:3000）、`INTERNAL_API_TOKEN`（与 backend 一致，未配置时 Node 内部接口 fail-closed）、`UPLOAD_DIR`（默认 ../../backend/uploads，compose 内 /app/uploads 同卷）、`IMAGE_CONCURRENT`（默认 3）
-- 前端：`/graphic` 页面 + `frontend/src/api/graphic.ts`；提示词库 CRUD 在 Node `/api/prompt-templates`（模板 `{{content}}` 占位由 Go 渲染）
+- 前端：`/graphic` 页面 + `frontend/src/api/graphic.ts`；提示词库统一在 Node `/api/prompt-library`（browse/stats/sync + CRUD 单轨，模板 `{{content}}` 占位由 Go 渲染）
 
 ## 二期：动漫模式（anime）
 
@@ -58,6 +58,8 @@ internal/
 ```bash
 cd services/core
 make run          # 监听 :8081；未配 JWT_ACCESS_SECRET 时跳过鉴权（开发模式）
+./dev.sh          # 一键启动：自动从 backend/.env 取 DB_PASSWORD，连本机 MySQL(3307)，
+                  # 未配 INTERNAL_API_TOKEN 时默认 dev_internal_token
 
 # 配置项（环境变量）
 # PORT=8081

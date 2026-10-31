@@ -1,11 +1,10 @@
 // 提示词库 DTO：创建/更新/查询 + 批量同步/筛选分页。
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
-  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -14,9 +13,15 @@ import {
   Min,
   ValidateNested
 } from 'class-validator';
+import { PROMPT_CATEGORIES } from '../prompt-categories';
 
-// 与图文流水线约定的风格 key，扩展新流水线时在此补充。
-export const PROMPT_CATEGORIES = ['illustrated', 'poster', 'anime', 'ui', 'general'] as const;
+// 常用分类 key 单一来源迁至 ../prompt-categories（2026-10 主题分类体系）：
+// 5 个流水线基础风格 key + 中文名表；此处 re-export 兼容既有引用。
+export { PROMPT_CATEGORIES };
+
+/** category 自由字符串放开（与实体 varchar(64) 容量一致）：trim 后 1..64。 */
+const trimCategory = ({ value }: { value: unknown }): unknown =>
+  typeof value === 'string' ? value.trim() : value;
 
 export class CreatePromptTemplateDto {
   @ApiProperty({ description: '模板名称', maxLength: 128 })
@@ -24,8 +29,16 @@ export class CreatePromptTemplateDto {
   @Length(1, 128)
   name!: string;
 
-  @ApiProperty({ description: '风格分类 key', enum: PROMPT_CATEGORIES })
-  @IsIn(PROMPT_CATEGORIES as unknown as string[])
+  // 2026-10 主题分类体系：category 从 IsIn 五 key 放开为自由字符串——
+  // 「按主题组织示例库」（玄幻/星空/修仙等）是一等诉求，sync 轨本就允许自由扩展，
+  // 未知分类在 Go categoryHints 兜底落 general（graphic/service.go），行为可预期。
+  @ApiProperty({
+    description: '风格/主题分类 key（自由字符串，常用值见 PROMPT_CATEGORIES）',
+    enum: PROMPT_CATEGORIES
+  })
+  @Transform(trimCategory)
+  @IsString()
+  @Length(1, 64)
   category!: string;
 
   @ApiPropertyOptional({ description: '风格标签，逗号分隔' })
@@ -65,25 +78,8 @@ export class CreatePromptTemplateDto {
 // PATCH 语义：所有字段可选（曾误用全必填继承导致 PATCH 只传 name 报 422）。
 export class UpdatePromptTemplateDto extends PartialType(CreatePromptTemplateDto) {}
 
-export class QueryPromptTemplateDto {
-  @ApiPropertyOptional({ description: '按风格分类过滤' })
-  @IsOptional()
-  @IsIn(PROMPT_CATEGORIES as unknown as string[])
-  category?: string;
-
-  @ApiPropertyOptional({ description: '按名称/标签模糊搜索' })
-  @IsOptional()
-  @IsString()
-  @Length(0, 64)
-  keyword?: string;
-
-  @ApiPropertyOptional({ description: '条数，默认 50' })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  take?: number;
-}
+// 旧 list 轨 QueryPromptTemplateDto（take 裸数组）已随 GET /prompt-templates 一并裁剪：
+// 查询统一走 QueryPromptLibraryDto（page/pageSize 分页，见文件末尾）。
 
 // ---------- 批量同步（幂等导入）：按 sha256(trim(prompt)) 去重 ----------
 
