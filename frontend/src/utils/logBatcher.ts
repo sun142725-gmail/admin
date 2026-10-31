@@ -10,6 +10,7 @@
 import { postLogEvents, LogEvent } from '../api/logCenter';
 import { store } from '../store';
 import { uuid } from './uuid';
+import { parseUserAgent } from './ua';
 
 const SESSION_KEY = 'rbac_session_id';
 const SOURCE = 'web';
@@ -53,7 +54,21 @@ export const getSessionId = () => {
 const truncate = (value: string, max: number) =>
   value.length > max ? `${value.slice(0, max)}…[截断，原长 ${value.length}]` : value;
 
-// 前端/错误事件自动带上构建版本；打点事件保持纯净
+// 会话级环境快照：UA 识别（浏览器/系统/设备/机型）+ 屏幕/语言/构建版本。
+// 模块加载时固化一次（同一会话内环境不变），随每条前端/错误事件注入 meta.env，
+// 使所有日志都能还原"用什么设备什么浏览器报的错"
+const buildEnvMeta = (): Record<string, unknown> => {
+  const ua = parseUserAgent(navigator.userAgent);
+  return {
+    ...(ua ?? {}),
+    appVersion: __APP_VERSION__,
+    screen: `${window.screen.width}x${window.screen.height}`,
+    language: navigator.language
+  };
+};
+const ENV_META = buildEnvMeta();
+
+// 前端/错误事件自动带上构建版本与环境快照；打点事件保持原样（UA 已单独入库由展示端解析）
 const injectAppVersion = (event: LogEvent): LogEvent => {
   if (event.type === 'track') {
     return event;
@@ -64,7 +79,10 @@ const injectAppVersion = (event: LogEvent): LogEvent => {
       : {};
   return {
     ...event,
-    payload: { ...event.payload, meta: { appVersion: __APP_VERSION__, ...baseMeta } }
+    payload: {
+      ...event.payload,
+      meta: { appVersion: __APP_VERSION__, env: ENV_META, ...baseMeta }
+    }
   };
 };
 

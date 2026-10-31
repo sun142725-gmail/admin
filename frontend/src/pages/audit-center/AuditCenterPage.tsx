@@ -313,6 +313,20 @@ export const AuditCenterPage: React.FC = () => {
     );
   };
 
+  // 环境短格式：优先取事件注入的 meta.env，打点等老数据回退解析 userAgent
+  const renderEnvShort = (record: AuditItem) => {
+    const env = record.meta?.env as
+      | { browser?: string; browserVersion?: string; os?: string; osVersion?: string; device?: string }
+      | undefined;
+    if (env?.browser) {
+      const browser = env.browserVersion ? `${env.browser} ${env.browserVersion}` : env.browser;
+      const os = env.osVersion ? `${env.os} ${env.osVersion}` : env.os;
+      const device = env.device && env.device !== '桌面端' ? ` · ${env.device}` : '';
+      return `${browser} · ${os}${device}`;
+    }
+    return formatUaShort(record.userAgent);
+  };
+
   const timeColumn: ColumnDef = {
     columnKey: 'createdAt',
     title: '时间',
@@ -428,9 +442,9 @@ export const AuditCenterPage: React.FC = () => {
     const envColumn: ColumnDef = {
       columnKey: 'env',
       title: '环境',
-      width: 180,
+      width: 200,
       ellipsis: true,
-      render: (_: unknown, record) => formatUaShort(record.userAgent)
+      render: (_: unknown, record) => renderEnvShort(record)
     };
     if (activeTab === 'audit') {
       return [
@@ -473,6 +487,7 @@ export const AuditCenterPage: React.FC = () => {
         methodColumn,
         hostColumn,
         apiPathColumn,
+        envColumn,
         traceIdColumn,
         sessionColumn,
         sourceColumn,
@@ -489,6 +504,7 @@ export const AuditCenterPage: React.FC = () => {
         methodColumn,
         hostColumn,
         apiPathColumn,
+        envColumn,
         traceIdColumn,
         sessionColumn,
         sourceColumn,
@@ -680,7 +696,45 @@ export const AuditCenterPage: React.FC = () => {
       | { status?: number; duration?: number; headers?: unknown; body?: unknown }
       | undefined;
     const hasCapture = Boolean(metaRequest || metaResponse);
-    const uaInfo = item.userAgent ? parseUserAgent(item.userAgent) : null;
+    // 环境拆行：前端/错误事件读注入的 meta.env；打点等老数据回退解析 userAgent（无屏幕/语言/版本）
+    const metaEnv = item.meta?.env as
+      | {
+          browser?: string;
+          browserVersion?: string;
+          os?: string;
+          osVersion?: string;
+          device?: string;
+          model?: string;
+          screen?: string;
+          language?: string;
+          appVersion?: string;
+        }
+      | undefined;
+    const uaInfo = !metaEnv && item.userAgent ? parseUserAgent(item.userAgent) : null;
+    const envRows: Array<[string, string]> = [];
+    if (metaEnv) {
+      if (metaEnv.browser) {
+        envRows.push(['浏览器', metaEnv.browserVersion ? `${metaEnv.browser} ${metaEnv.browserVersion}` : metaEnv.browser]);
+      }
+      if (metaEnv.os) {
+        envRows.push(['操作系统', metaEnv.osVersion ? `${metaEnv.os} ${metaEnv.osVersion}` : metaEnv.os]);
+      }
+      if (metaEnv.model) {
+        envRows.push(['机型', metaEnv.model]);
+      }
+      if (metaEnv.device) {
+        envRows.push(['设备', metaEnv.device]);
+      }
+      if (metaEnv.screen) {
+        envRows.push(['屏幕', metaEnv.screen]);
+      }
+      if (metaEnv.language) {
+        envRows.push(['语言', metaEnv.language]);
+      }
+      if (metaEnv.appVersion) {
+        envRows.push(['版本', metaEnv.appVersion]);
+      }
+    }
     return (
       <>
         <FieldRow label="用户" copyText={item.userId != null ? String(item.userId) : undefined}>
@@ -700,7 +754,15 @@ export const AuditCenterPage: React.FC = () => {
             {item.path ?? '-'}
           </FieldRow>
         )}
-        {uaInfo ? (
+        {envRows.length > 0 ? (
+          <>
+            {envRows.map(([label, value]) => (
+              <FieldRow key={label} label={label}>
+                {value}
+              </FieldRow>
+            ))}
+          </>
+        ) : uaInfo ? (
           <>
             <FieldRow label="Useragent" copyText={item.userAgent}>
               {item.userAgent}
@@ -711,6 +773,7 @@ export const AuditCenterPage: React.FC = () => {
             <FieldRow label="操作系统">
               {uaInfo.osVersion ? `${uaInfo.os} ${uaInfo.osVersion}` : uaInfo.os}
             </FieldRow>
+            {uaInfo.model && <FieldRow label="机型">{uaInfo.model}</FieldRow>}
             <FieldRow label="设备">{uaInfo.device}</FieldRow>
           </>
         ) : (

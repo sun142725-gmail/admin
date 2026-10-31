@@ -7,6 +7,8 @@ export interface UaInfo {
   os: string;
   osVersion?: string;
   device: '桌面端' | '移动端' | '平板';
+  // 机型：安卓取 UA 里的设备型号（如 Pixel 7 / SM-G991B），iOS 为 iPhone/iPad，桌面端通常无
+  model?: string;
 }
 
 interface BrowserRule {
@@ -84,13 +86,29 @@ export const parseUserAgent = (userAgent?: string | null): UaInfo | null => {
   }
 
   let device: UaInfo['device'] = '桌面端';
+  let model: string | undefined;
   if (/iPad|Tablet/i.test(ua)) {
     device = '平板';
+    model = 'iPad';
   } else if (/Mobi|iPhone|iPod|Android.*Mobile/i.test(ua)) {
     device = '移动端';
+    if (/iPhone/i.test(ua)) {
+      model = 'iPhone';
+    } else if (/iPod/i.test(ua)) {
+      model = 'iPod';
+    }
+  }
+  // 安卓机型在 UA 的设备段："(Linux; Android 13; Pixel 7)" / "(Linux; Android 10; SM-G9810 Build/QP1A)"
+  if (!model && /Android/i.test(ua)) {
+    const matched = ua.match(/Android [\d.]+;\s*([^;)]+?)\s*(?:Build\/[^;)]+)?[;)]/i);
+    const candidate = matched?.[1]?.trim();
+    // "K" 是安卓通用占位机型，不算识别结果
+    if (candidate && candidate.toUpperCase() !== 'K') {
+      model = candidate;
+    }
   }
 
-  return { browser, browserVersion, os, osVersion, device };
+  return { browser, browserVersion, os, osVersion, device, model };
 };
 
 // 列表列用的短格式："Chrome 120 · macOS 14"；浏览器与系统都识别不出时回退原始 UA

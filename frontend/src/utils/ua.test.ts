@@ -48,6 +48,7 @@ describe('parseUserAgent', () => {
     expect(info?.os).toBe('iOS');
     expect(info?.osVersion).toBe('17.1');
     expect(info?.device).toBe('移动端');
+    expect(info?.model).toBe('iPhone');
   });
 
   it('Android Chrome 识别为移动端', () => {
@@ -59,6 +60,20 @@ describe('parseUserAgent', () => {
     expect(info?.os).toBe('Android');
     expect(info?.osVersion).toBe('13');
     expect(info?.device).toBe('移动端');
+    expect(info?.model).toBe('Pixel 7');
+  });
+
+  it('安卓机型去掉 Build 后缀，K 占位不作为机型', () => {
+    const withBuild = parseUserAgent(
+      'Mozilla/5.0 (Linux; Android 10; SM-G9810 Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/116.0.0.0 Mobile Safari/537.36'
+    );
+    expect(withBuild?.model).toBe('SM-G9810');
+
+    const generic = parseUserAgent(
+      'Mozilla/5.0 (Linux; Android 12; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+    );
+    expect(generic?.model).toBeUndefined();
+    expect(generic?.device).toBe('移动端');
   });
 
   it('iPad 识别为平板', () => {
@@ -67,6 +82,7 @@ describe('parseUserAgent', () => {
     );
     expect(info?.device).toBe('平板');
     expect(info?.os).toBe('iOS');
+    expect(info?.model).toBe('iPad');
   });
 
   it('微信内置浏览器优先于 Chrome', () => {
