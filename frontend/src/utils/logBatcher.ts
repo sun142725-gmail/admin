@@ -109,10 +109,13 @@ const sanitizeEvent = (event: LogEvent): LogEvent => {
         ...(request.body !== undefined ? { body: truncateCapture(request.body, CAPTURE_BODY_CHARS) } : {})
       };
     }
-    const response = meta.response as { body?: unknown } | undefined;
+    const response = meta.response as { headers?: unknown; body?: unknown } | undefined;
     if (response && typeof response === 'object') {
       meta.response = {
         ...response,
+        ...(response.headers !== undefined
+          ? { headers: truncateCapture(response.headers, CAPTURE_HEADER_CHARS) }
+          : {}),
         ...(response.body !== undefined ? { body: truncateCapture(response.body, CAPTURE_BODY_CHARS) } : {})
       };
     }

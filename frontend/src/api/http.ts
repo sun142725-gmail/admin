@@ -74,24 +74,44 @@ interface CaptureConfig {
   url?: string;
   headers?: unknown;
   data?: unknown;
+  params?: unknown;
 }
 
-// 请求快照：方法/URL/脱敏请求头/脱敏请求体（请求拦截器阶段 data 还是原始对象，尚未序列化）
-const buildRequestCapture = (config?: CaptureConfig) => {
+// 从完整/相对 URL 解析 host；相对地址按当前站点 origin 解析
+const resolveHost = (rawUrl?: string): string | undefined => {
+  if (!rawUrl) {
+    return undefined;
+  }
+  try {
+    return new URL(rawUrl, window.location.origin).host;
+  } catch {
+    return undefined;
+  }
+};
+
+// 请求快照：方法/host/URL/query/脱敏请求头/脱敏请求体（请求拦截器阶段 data 还是原始对象）。
+// response 存在时优先取 XHR 的 responseURL（含重定向后的真实地址与 host）
+const buildRequestCapture = (config?: CaptureConfig, response?: { responseURL?: string }) => {
   if (!config) {
     return undefined;
   }
+  const rawUrl = response?.responseURL ?? axios.getUri(config as AxiosRequestConfig);
   return {
     method: (config.method ?? 'GET').toUpperCase(),
+    ...(resolveHost(rawUrl) ? { host: resolveHost(rawUrl) } : {}),
     url: config.url,
+    ...(config.params !== undefined && Object.keys(config.params as object).length
+      ? { query: redactValue('query', config.params) }
+      : {}),
     ...(config.headers ? { headers: redactHeaders(config.headers) } : {}),
     ...(config.data !== undefined ? { body: redactValue('body', config.data) } : {})
   };
 };
 
-const buildResponseCapture = (payload: unknown, status?: number, duration?: number) => ({
+const buildResponseCapture = (payload: unknown, status?: number, duration?: number, headers?: unknown) => ({
   ...(status !== undefined ? { status } : {}),
   ...(duration !== undefined ? { duration } : {}),
+  ...(headers ? { headers: redactHeaders(headers) } : {}),
   ...(payload !== undefined ? { body: redactValue('responseBody', payload) } : {})
 });
 
@@ -159,8 +179,8 @@ http.interceptors.response.use(
               code: payload?.code,
               url,
               duration,
-              request: buildRequestCapture(config),
-              response: buildResponseCapture(payload, response.status, duration)
+              request: buildRequestCapture(config, response.request),
+              response: buildResponseCapture(payload, response.status, duration, response.headers)
             }
           }
         });
@@ -178,8 +198,8 @@ http.interceptors.response.use(
             meta: isSlow
               ? {
                   duration,
-                  request: buildRequestCapture(config),
-                  response: buildResponseCapture(payload, response.status, duration)
+                  request: buildRequestCapture(config, response.request),
+                  response: buildResponseCapture(payload, response.status, duration, response.headers)
                 }
               : { duration }
           }
@@ -208,8 +228,8 @@ http.interceptors.response.use(
             meta: {
               status: response.status,
               url,
-              request: buildRequestCapture(config),
-              response: buildResponseCapture(response.data, response.status)
+              request: buildRequestCapture(config, response.request),
+              response: buildResponseCapture(response.data, response.status, undefined, response.headers)
             }
           }
         });
