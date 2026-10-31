@@ -19,10 +19,13 @@ const FLUSH_INTERVAL = 5000;
 const MAX_QUEUE = 300;
 // 单批最大重试次数：超过后放弃该批，避免后端持续 5xx 时无限重排
 const MAX_RETRY = 3;
-// 与服务端 MAX_PAYLOAD_CHARS（4000 字符）保持安全余量
+// 与服务端 MAX_PAYLOAD_CHARS（4000 字符）保持安全余量：meta 整体预算放大以容纳请求/响应捕获
 const MAX_MESSAGE_CHARS = 1000;
 const MAX_STACK_CHARS = 2000;
-const MAX_META_CHARS = 1200;
+const MAX_META_CHARS = 3200;
+// 请求/响应捕获单字段上限（headers/body 分别控制，避免一大块挤掉其他字段）
+const CAPTURE_HEADER_CHARS = 600;
+const CAPTURE_BODY_CHARS = 1000;
 // 去重窗口与单条事件重复计数上限
 const DEDUPE_WINDOW_MS = 3000;
 const MAX_REPEAT = 9999;
@@ -65,7 +68,27 @@ const injectAppVersion = (event: LogEvent): LogEvent => {
   };
 };
 
-// 入队前收敛单条事件体积，防止一条超大日志让整批上报被服务端拒绝
+// 捕获字段截断：对象超长时序列化进 raw，保留结构提示而不是丢弃
+const truncateCapture = (value: unknown, max: number): unknown => {
+  if (typeof value === 'string') {
+    return truncate(value, max);
+  }
+  if (value && typeof value === 'object') {
+    try {
+      const raw = JSON.stringify(value);
+      if (raw && raw.length <= max) {
+        return value;
+      }
+      return { notice: `内容超长已截断（原 ${raw?.length ?? 0} 字符）`, raw: truncate(raw ?? '', max) };
+    } catch {
+      return String(value);
+    }
+  }
+  return value;
+};
+
+// 入队前收敛单条事件体积，防止一条超大日志让整批上报被服务端拒绝。
+// 请求/响应捕获按字段独立截断（headers/body），避免整体截断挤掉关键字段
 const sanitizeEvent = (event: LogEvent): LogEvent => {
   const payload = { ...event.payload };
   if (typeof payload.message === 'string') {
@@ -75,6 +98,25 @@ const sanitizeEvent = (event: LogEvent): LogEvent => {
     payload.stack = truncate(payload.stack, MAX_STACK_CHARS);
   }
   if (payload.meta && typeof payload.meta === 'object') {
+    const meta = { ...(payload.meta as Record<string, unknown>) };
+    const request = meta.request as { headers?: unknown; body?: unknown } | undefined;
+    if (request && typeof request === 'object') {
+      meta.request = {
+        ...request,
+        ...(request.headers !== undefined
+          ? { headers: truncateCapture(request.headers, CAPTURE_HEADER_CHARS) }
+          : {}),
+        ...(request.body !== undefined ? { body: truncateCapture(request.body, CAPTURE_BODY_CHARS) } : {})
+      };
+    }
+    const response = meta.response as { body?: unknown } | undefined;
+    if (response && typeof response === 'object') {
+      meta.response = {
+        ...response,
+        ...(response.body !== undefined ? { body: truncateCapture(response.body, CAPTURE_BODY_CHARS) } : {})
+      };
+    }
+    payload.meta = meta;
     const raw = JSON.stringify(payload.meta);
     if (raw.length > MAX_META_CHARS) {
       payload.meta = { notice: '原始 meta 超长已截断', raw: truncate(raw, MAX_META_CHARS) };
