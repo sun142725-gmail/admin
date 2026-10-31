@@ -1,16 +1,15 @@
-// 提示词库服务：CRUD + 引用计数 + 批量同步（prompt_hash 幂等）+ 筛选统计。
+// 提示词库服务：CRUD + 引用计数（删除保护）+ 批量同步（prompt_hash 幂等）+ 筛选统计。
 // 模板正文由流水线（Go 侧）渲染，这里只管存储。
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { PromptTemplate } from '../../common/entities/prompt-template.entity';
 import {
   CreatePromptTemplateDto,
   QueryPromptLibraryDto,
-  QueryPromptTemplateDto,
   SyncPromptTemplateItemDto,
   UpdatePromptTemplateDto
 } from './dto/prompt-template.dto';
@@ -18,6 +17,19 @@ import { assertPublicHost, readBodyWithLimit } from './ssrf-guard.util';
 
 // 示例图下载上限：5MB（流式读取超限即中止），防超大响应撑爆内存。
 const EXAMPLE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+// sync 查重分块大小：200 条上限按 100/批做 IN 预查（≤2 次往返），取代逐条 SELECT。
+const SYNC_DEDUP_CHUNK = 100;
+
+// content-type → 示例图落盘扩展名映射：修此前一律 .jpg 硬编码（image/png 内容落 .jpg 语义错误）。
+// 未收录的 image/* 兜底 .jpg（与历史落盘行为一致）。
+const IMAGE_EXT_BY_CONTENT_TYPE: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif'
+};
 
 /**
  * LIKE 关键字转义：把 \ % _ ! 视为字面量（! 同时是转义符，需先转义防悬挂）。
@@ -42,18 +54,6 @@ export class PromptLibraryService {
   }
 
   // ---------- CRUD ----------
-
-  async list(query: QueryPromptTemplateDto): Promise<PromptTemplate[]> {
-    const qb = this.repo.createQueryBuilder('t').orderBy('t.id', 'DESC');
-    if (query.category) {
-      qb.andWhere('t.category = :category', { category: query.category });
-    }
-    if (query.keyword) {
-      const kw = `%${escapeLike(query.keyword)}%`;
-      qb.andWhere("(t.name LIKE :kw ESCAPE '!' OR t.styleTags LIKE :kw ESCAPE '!')", { kw });
-    }
-    return qb.take(query.take ?? 50).getMany();
-  }
 
   async detail(id: number): Promise<PromptTemplate> {
     const row = await this.repo.findOne({ where: { id } });
@@ -99,8 +99,17 @@ export class PromptLibraryService {
     return this.detail(id);
   }
 
-  async remove(id: number): Promise<{ success: boolean }> {
-    await this.detail(id);
+  /**
+   * 删除保护：已被流水线引用（referenceCount>0）且未带 force 时拒绝物理删（409，
+   * 消息含引用次数与 force 提示）——防高引用模板被一键误删；force=true 才执行删除。
+   */
+  async remove(id: number, force = false): Promise<{ success: boolean }> {
+    const row = await this.detail(id);
+    if ((row.referenceCount ?? 0) > 0 && !force) {
+      throw new ConflictException(
+        `该模板已被流水线引用 ${row.referenceCount} 次，删除后相关流水线将回退默认风格；确认删除请带 force=true 重新提交`
+      );
+    }
     await this.repo.delete(id);
     return { success: true };
   }
@@ -113,8 +122,9 @@ export class PromptLibraryService {
   // ---------- 批量同步（幂等） ----------
 
   /**
-   * 批量同步（幂等）：先并发按 hash 查重（命中计 skipped），再插入未命中的条目——
-   * 跨请求并发的同 hash 插入由 prompt_hash 唯一索引兜底，冲突 catch 计 skipped。
+   * 批量同步（幂等）：先按 hash 分块 IN 预查重（命中计 skipped），再插入未命中的条目——
+   * 跨请求并发的同 hash 插入由 prompt_hash 唯一索引兜底，冲突 catch 计 skipped；
+   * 同一批内的重复 prompt 首条入库、余条撞唯一索引计 skipped（语义与逐条查重一致）。
    * 注意用 repo.insert（不包事务）：sqlite 单连接上并发 save 的事务交错会让
    * 失败语句的 ROLLBACK 连带回滚相邻已成功的 INSERT，insert 单语句无此问题。
    * 示例图 best-effort 下载落本地（失败保留原 URL），不阻塞同步结果。
@@ -126,16 +136,24 @@ export class PromptLibraryService {
     let inserted = 0;
     let skipped = 0;
     const downloaded: Array<{ id: number; localUrl: string }> = [];
-    // 1) 并发查重：同一批内相同 prompt 只放行首条。
-    const checked = await Promise.all(
-      dto.items.map(async (item) => {
-        const promptHash = this.hashPrompt(item.prompt);
-        const exists = Boolean(
-          await this.repo.findOne({ where: { promptHash }, select: ['id'] })
-        );
-        return { item, promptHash, exists };
-      })
-    );
+    // 1) hash 分块 IN 预查（SYNC_DEDUP_CHUNK/批）：取代逐条 SELECT（200 条 ≈400 次往返 → ≤2 次）。
+    const hashes = dto.items.map((item) => this.hashPrompt(item.prompt));
+    const existingHashes = new Set<string>();
+    for (let start = 0; start < hashes.length; start += SYNC_DEDUP_CHUNK) {
+      const chunk = [...new Set(hashes.slice(start, start + SYNC_DEDUP_CHUNK))];
+      const rows = await this.repo.find({ where: { promptHash: In(chunk) }, select: ['promptHash'] });
+      for (const row of rows) {
+        if (row.promptHash) {
+          existingHashes.add(row.promptHash);
+        }
+      }
+    }
+    // 同一批内相同 prompt 只放行首条：预查未命中的进入插入循环，批内重复由唯一索引兜底。
+    const checked = dto.items.map((item, index) => ({
+      item,
+      promptHash: hashes[index],
+      exists: existingHashes.has(hashes[index])
+    }));
     // 2) 逐条插入：唯一键冲突（跨请求并发）计 skipped。
     for (const { item, promptHash, exists } of checked) {
       if (exists) {
@@ -176,7 +194,8 @@ export class PromptLibraryService {
   }
 
   /**
-   * http(s) 示例图下载落盘 uploads/prompt-library/{hash}.jpg；任何失败返回 null（保留原 URL）。
+   * http(s) 示例图下载落盘 uploads/prompt-library/{hash}.{ext}（ext 按 content-type 映射，
+   * 未收录的 image/* 兜底 .jpg）；任何失败返回 null（保留原 URL）。
    * SSRF 防护：解析主机名并拒绝私网/环回/链路本地/保留 IP 段；响应须为 image/* 且不超过
    * EXAMPLE_IMAGE_MAX_BYTES（流式读取，超限中止）。失败 best-effort，不影响入库。
    */
@@ -199,7 +218,10 @@ export class PromptLibraryService {
       if (!buffer || buffer.length === 0) {
         return null;
       }
-      const relative = `prompt-library/${promptHash}.jpg`;
+      // content-type 可能带参数（如 image/png; charset=binary），取主类型做映射。
+      const mimeType = contentType.split(';')[0].trim().toLowerCase();
+      const ext = IMAGE_EXT_BY_CONTENT_TYPE[mimeType] ?? 'jpg';
+      const relative = `prompt-library/${promptHash}.${ext}`;
       const absolute = join(process.cwd(), 'uploads', relative);
       await mkdir(join(absolute, '..'), { recursive: true });
       await writeFile(absolute, buffer);
@@ -228,16 +250,29 @@ export class PromptLibraryService {
       qb.andWhere('t.source = :sourceTool', { sourceTool: query.sourceTool });
     }
     if (query.keyword) {
+      // 统一搜索口径：name + template + styleTags 三字段（修 audit issue8——
+      // 旧双轨下 list 轨搜不到正文、search 轨搜不到标签）。
       const kw = `%${escapeLike(query.keyword)}%`;
-      qb.andWhere("(t.name LIKE :kw ESCAPE '!' OR t.template LIKE :kw ESCAPE '!')", { kw });
+      qb.andWhere(
+        "(t.name LIKE :kw ESCAPE '!' OR t.template LIKE :kw ESCAPE '!' OR t.styleTags LIKE :kw ESCAPE '!')",
+        { kw }
+      );
     }
     qb.orderBy('t.id', 'DESC').skip((page - 1) * pageSize).take(pageSize);
     const [items, total] = await qb.getManyAndCount();
     return { items, total, page, pageSize };
   }
 
-  /** 统计口径：总数 + 按分类分组计数。 */
-  async stats(): Promise<{ total: number; byCategory: Array<{ category: string; count: number }> }> {
+  /**
+   * 统计口径：总数 + 按分类分组计数 + 按来源分组计数（bySource facets）。
+   * bySource 过滤空值来源（null/空串不构成可筛选项），供前端来源筛选下拉做完整选项
+   * （修 audit issue4：选项不再随分页漂移）。
+   */
+  async stats(): Promise<{
+    total: number;
+    byCategory: Array<{ category: string; count: number }>;
+    bySource: Array<{ source: string; count: number }>;
+  }> {
     const total = await this.repo.count();
     const rows = await this.repo
       .createQueryBuilder('t')
@@ -245,9 +280,18 @@ export class PromptLibraryService {
       .addSelect('COUNT(*)', 'count')
       .groupBy('t.category')
       .getRawMany<{ category: string; count: string }>();
+    const sourceRows = await this.repo
+      .createQueryBuilder('t')
+      .select('t.source', 'source')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('t.source')
+      .getRawMany<{ source: string | null; count: string }>();
     return {
       total,
-      byCategory: rows.map((row) => ({ category: row.category, count: Number(row.count) }))
+      byCategory: rows.map((row) => ({ category: row.category, count: Number(row.count) })),
+      bySource: sourceRows
+        .filter((row) => typeof row.source === 'string' && row.source.length > 0)
+        .map((row) => ({ source: row.source as string, count: Number(row.count) }))
     };
   }
 

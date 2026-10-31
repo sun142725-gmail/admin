@@ -1,5 +1,8 @@
 // PromptLibrary 模块测试：JWT + 权限码（view 读 / manage 写，与菜单/前端同口径）、参数校验、
-// CRUD 与分类/关键字过滤（LIKE 通配符转义）、引用计数容错、内部接口令牌。
+// CRUD 与分类/关键字过滤（LIKE 通配符转义，统一三字段口径）、删除保护（引用计数 force 二段确认）、
+// 引用计数容错、内部接口令牌。
+// 2026-10 单轨化：/prompt-templates CRUD 已并入 /prompt-library，全部断言切换统一路由
+// （/api/internal/prompt-templates 为 Go 回调红线，路径不动）。
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -46,7 +49,7 @@ describe('PromptLibrary (e2e)', () => {
     const userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     const roleRepo = moduleFixture.get<Repository<Role>>(getRepositoryToken(Role));
     const permissionRepo = moduleFixture.get<Repository<Permission>>(getRepositoryToken(Permission));
-    // 与 guarded 控制器/菜单同口径：view 读、manage 写。
+    // 与统一控制器/菜单同口径：view 读、manage 写。
     const viewPermission = await permissionRepo.save(
       permissionRepo.create({ name: '提示词库查看', code: 'flow:prompt:view' })
     );
@@ -95,39 +98,39 @@ describe('PromptLibrary (e2e)', () => {
   const guestAuth = () => ({ Authorization: `Bearer ${guestToken}` });
 
   it('未携带令牌访问列表应 401（JWT 保护）', async () => {
-    await request(app.getHttpServer()).get('/api/prompt-templates').expect(401);
+    await request(app.getHttpServer()).get('/api/prompt-library').expect(401);
   });
 
   it('无角色 guest 读列表应 403（修复前仅 JWT 校验返回 200）', async () => {
-    await request(app.getHttpServer()).get('/api/prompt-templates').set(guestAuth()).expect(403);
+    await request(app.getHttpServer()).get('/api/prompt-library').set(guestAuth()).expect(403);
   });
 
   it('仅有 view 权限的用户：GET 放行、POST/PATCH/DELETE 一律 403（修复前 201/200/200）', async () => {
     const created = await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(manageAuth())
       .send({ name: '越权验证模板', category: 'ui', template: '越权验证：{{content}}' })
       .expect(201);
     const id = created.body.data.id;
 
-    await request(app.getHttpServer()).get('/api/prompt-templates').set(viewAuth()).expect(200);
+    await request(app.getHttpServer()).get('/api/prompt-library').set(viewAuth()).expect(200);
 
     await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(viewAuth())
       .send({ name: '无权新建', category: 'ui', template: 'x' })
       .expect(403);
     await request(app.getHttpServer())
-      .patch(`/api/prompt-templates/${id}`)
+      .patch(`/api/prompt-library/${id}`)
       .set(viewAuth())
       .send({ name: '无权改' })
       .expect(403);
-    await request(app.getHttpServer()).delete(`/api/prompt-templates/${id}`).set(viewAuth()).expect(403);
+    await request(app.getHttpServer()).delete(`/api/prompt-library/${id}`).set(viewAuth()).expect(403);
   });
 
   it('创建模板：默认引用计数 0 且响应结构统一（code=0）', async () => {
     const response = await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(manageAuth())
       .send({
         name: '水彩绘本',
@@ -142,17 +145,51 @@ describe('PromptLibrary (e2e)', () => {
     expect(response.body.data.template).toContain('{{content}}');
   });
 
-  it('非法分类应被校验拦截（422）', async () => {
-    await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+  it('自由主题分类可创建（有意推翻既有意图：category 放开为自由字符串）', async () => {
+    // 行为变化声明（2026-10 主题分类体系）：原「非法分类 422 拦截」用例有意推翻——
+    // 按主题组织示例库（玄幻/星空/修仙…）需要自由分类一等公民化，sync 轨本就允许自由扩展；
+    // 未知 key 在 Go categoryHints 兜底落 general（graphic/service.go），行为可预期。
+    // 原 422 的校验边界语义收敛到下方「超 64 字符」用例。
+    const response = await request(app.getHttpServer())
+      .post('/api/prompt-library')
       .set(manageAuth())
-      .send({ name: '坏分类', category: 'not-a-category', template: 'x' })
+      .send({ name: '自由分类模板', category: 'not-a-category', template: '自由分类：{{content}}' })
+      .expect(201);
+    expect(response.body.data.category).toBe('not-a-category');
+  });
+
+  it('category 超 64 字符应 422（自由放开的校验边界，对齐实体 varchar(64)）', async () => {
+    await request(app.getHttpServer())
+      .post('/api/prompt-library')
+      .set(manageAuth())
+      .send({ name: '超长分类', category: 'a'.repeat(65), template: '超长分类：{{content}}' })
       .expect(422); // 项目约定：BadRequest 统一映射 422
+  });
+
+  it('sync 塞入的自由分类值可被 PATCH 编辑（存量自由分类回流合法）', async () => {
+    // 回流回归：存量库中 sync 轨塞入的自由分类值，在 CRUD 编辑（含原值回传）时不得被 422 拒绝。
+    const synced = await request(app.getHttpServer())
+      .post('/api/prompt-library/sync')
+      .set(manageAuth())
+      .send({ items: [{ prompt: '自由分类回流样本', category: 'mystic-custom' }] })
+      .expect(201);
+    expect(synced.body.data.inserted).toBe(1);
+    const row = await promptRepo.findOne({ where: { template: '自由分类回流样本' } });
+    expect(row).not.toBeNull();
+    expect(row!.category).toBe('mystic-custom');
+
+    const updated = await request(app.getHttpServer())
+      .patch(`/api/prompt-library/${row!.id}`)
+      .set(manageAuth())
+      .send({ name: '自由分类改名牌', category: 'mystic-custom' })
+      .expect(200);
+    expect(updated.body.data.name).toBe('自由分类改名牌');
+    expect(updated.body.data.category).toBe('mystic-custom');
   });
 
   it('缺失必填字段应 422（模板正文为空）', async () => {
     await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(manageAuth())
       .send({ name: '缺正文', category: 'poster' })
       .expect(422); // 项目约定：BadRequest 统一映射 422
@@ -160,108 +197,166 @@ describe('PromptLibrary (e2e)', () => {
 
   it('未知字段应 422（forbidNonWhitelisted 规矩）', async () => {
     await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(manageAuth())
       .send({ name: '多余字段', category: 'anime', template: 'x', hack: true })
       .expect(422); // 项目约定：BadRequest 统一映射 422
   });
 
-  it('列表按分类过滤且关键字模糊命中', async () => {
+  it('列表按分类过滤且关键字模糊命中（统一 search 分页轨：{items,total}）', async () => {
     await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(manageAuth())
       .send({ name: '赛璐璐动漫风', category: 'anime', template: '动漫：{{content}}' })
       .expect(201);
 
     const byCategory = await request(app.getHttpServer())
-      .get('/api/prompt-templates')
+      .get('/api/prompt-library')
       .set(viewAuth())
       .query({ category: 'anime' })
       .expect(200);
-    expect(byCategory.body.data.length).toBeGreaterThan(0);
-    for (const row of byCategory.body.data) {
+    expect(byCategory.body.data.total).toBeGreaterThan(0);
+    for (const row of byCategory.body.data.items) {
       expect(row.category).toBe('anime');
     }
 
     const byKeyword = await request(app.getHttpServer())
-      .get('/api/prompt-templates')
+      .get('/api/prompt-library')
       .set(viewAuth())
       .query({ keyword: '赛璐璐' })
       .expect(200);
-    expect(byKeyword.body.data.some((row: { name: string }) => row.name === '赛璐璐动漫风')).toBe(true);
+    expect(byKeyword.body.data.items.some((row: { name: string }) => row.name === '赛璐璐动漫风')).toBe(true);
   });
 
-  it("keyword='%' 不应命中全表（LIKE 通配符已转义）；下划线关键字精确命中字面行", async () => {
-    // 修复前：LIKE '%%%%%' 等价全表通配；修复后 %/_ 均为字面量。
-    const all = await request(app.getHttpServer())
-      .get('/api/prompt-templates')
-      .set(viewAuth())
-      .expect(200);
-    expect(all.body.data.length).toBeGreaterThan(0);
-
-    const byPercent = await request(app.getHttpServer())
-      .get('/api/prompt-templates')
-      .set(viewAuth())
-      .query({ keyword: '%' })
-      .expect(200);
-    expect(byPercent.body.data).toHaveLength(0);
-
+  it("下划线关键字精确命中字面行（'_' LIKE 转义，统一 search 查询轨）", async () => {
+    // 断言重组（2026-10 单轨化）：原「keyword='%' 零命中」断言移交下方 sync&stats describe 的
+    // search 轨用例（同口径承载）；本用例保留全 spec 唯一的 '_' 字面转义覆盖，
+    // 查询轨由旧 list 轨切换到 GET /prompt-library。
     await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(manageAuth())
       .send({ name: 'AB风格', category: 'poster', template: 'AB：{{content}}' })
       .expect(201);
     await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(manageAuth())
       .send({ name: 'A_B风格', category: 'poster', template: 'A_B：{{content}}' })
       .expect(201);
     // 修复前 '_' 通配任意单字符，'A_B' 会同时命中 'AB风格'；修复后只命中字面含下划线的行。
     const byUnderline = await request(app.getHttpServer())
-      .get('/api/prompt-templates')
+      .get('/api/prompt-library')
       .set(viewAuth())
       .query({ keyword: 'A_B' })
       .expect(200);
-    expect(byUnderline.body.data).toHaveLength(1);
-    expect(byUnderline.body.data[0].name).toBe('A_B风格');
+    expect(byUnderline.body.data.total).toBe(1);
+    expect(byUnderline.body.data.items[0].name).toBe('A_B风格');
+  });
+
+  it('keyword 命中 styleTags（统一搜索口径：标签维度可检索）', async () => {
+    // 修复前 search 轨 keyword 只搜 name+template，标签未出现在名称/正文里就搜不到。
+    await request(app.getHttpServer())
+      .post('/api/prompt-library')
+      .set(manageAuth())
+      .send({
+        name: '标签检索样本',
+        category: 'general',
+        template: '正文不含检索词：{{content}}',
+        styleTags: '下划线风格,水墨'
+      })
+      .expect(201);
+    const byTag = await request(app.getHttpServer())
+      .get('/api/prompt-library')
+      .set(viewAuth())
+      .query({ keyword: '下划线风格' })
+      .expect(200);
+    expect(byTag.body.data.total).toBe(1);
+    expect(byTag.body.data.items[0].name).toBe('标签检索样本');
   });
 
   it('更新模板后内容生效；删除后再查应 404', async () => {
     const created = await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(manageAuth())
       .send({ name: '待改模板', category: 'ui', template: 'UI：{{content}}' })
       .expect(201);
     const id = created.body.data.id;
 
     const updated = await request(app.getHttpServer())
-      .patch(`/api/prompt-templates/${id}`)
+      .patch(`/api/prompt-library/${id}`)
       .set(manageAuth())
       .send({ name: '改过的模板', category: 'ui', template: 'UI v2：{{content}}' })
       .expect(200);
     expect(updated.body.data.template).toBe('UI v2：{{content}}');
 
-    await request(app.getHttpServer()).delete(`/api/prompt-templates/${id}`).set(manageAuth()).expect(200);
-    await request(app.getHttpServer()).get(`/api/prompt-templates/${id}`).set(manageAuth()).expect(404);
+    await request(app.getHttpServer()).delete(`/api/prompt-library/${id}`).set(manageAuth()).expect(200);
+    await request(app.getHttpServer()).get(`/api/prompt-library/${id}`).set(manageAuth()).expect(404);
   });
 
   it('PATCH 仅传 name 部分字段应 200（修复前 UpdateDto 全必填报 422）', async () => {
     const created = await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(manageAuth())
       .send({ name: '部分更新模板', category: 'ui', template: 'UI 原文：{{content}}' })
       .expect(201);
     const id = created.body.data.id;
 
     const updated = await request(app.getHttpServer())
-      .patch(`/api/prompt-templates/${id}`)
+      .patch(`/api/prompt-library/${id}`)
       .set(manageAuth())
       .send({ name: '只改名' })
       .expect(200);
     expect(updated.body.data.name).toBe('只改名');
     expect(updated.body.data.template).toBe('UI 原文：{{content}}'); // 未传字段保持原值
 
-    await request(app.getHttpServer()).delete(`/api/prompt-templates/${id}`).set(manageAuth()).expect(200);
+    await request(app.getHttpServer()).delete(`/api/prompt-library/${id}`).set(manageAuth()).expect(200);
+  });
+
+  it('删除保护：引用>0 且未带 force 应 409，模板保留', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/prompt-library')
+      .set(manageAuth())
+      .send({ name: '高引用模板', category: 'ui', template: '高引用：{{content}}' })
+      .expect(201);
+    const id = created.body.data.id;
+    await promptRepo.increment({ id }, 'referenceCount', 3);
+
+    const denied = await request(app.getHttpServer())
+      .delete(`/api/prompt-library/${id}`)
+      .set(manageAuth())
+      .expect(409); // ConflictException：项目过滤器仅把 400 映射 422，409 原样透出
+    expect(denied.body.message).toContain('引用 3 次');
+    expect(denied.body.message).toContain('force=true');
+    // 拒绝删除后模板仍在
+    await request(app.getHttpServer()).get(`/api/prompt-library/${id}`).set(manageAuth()).expect(200);
+  });
+
+  it('删除保护：force=true 物理删除成功且再查 404', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/prompt-library')
+      .set(manageAuth())
+      .send({ name: '强制删除模板', category: 'ui', template: '强制删除：{{content}}' })
+      .expect(201);
+    const id = created.body.data.id;
+    await promptRepo.increment({ id }, 'referenceCount', 1);
+
+    await request(app.getHttpServer())
+      .delete(`/api/prompt-library/${id}`)
+      .set(manageAuth())
+      .query({ force: 'true' })
+      .expect(200);
+    await request(app.getHttpServer()).get(`/api/prompt-library/${id}`).set(manageAuth()).expect(404);
+  });
+
+  it('删除保护：引用=0 模板可直接删除（无需 force）', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/prompt-library')
+      .set(manageAuth())
+      .send({ name: '零引用模板', category: 'ui', template: '零引用：{{content}}' })
+      .expect(201);
+    const id = created.body.data.id;
+
+    await request(app.getHttpServer()).delete(`/api/prompt-library/${id}`).set(manageAuth()).expect(200);
+    await request(app.getHttpServer()).get(`/api/prompt-library/${id}`).set(manageAuth()).expect(404);
   });
 
   it('内部模板接口受 X-Internal-Token 保护（fail-closed 由 InternalTokenGuard 保证）', async () => {
@@ -271,7 +366,7 @@ describe('PromptLibrary (e2e)', () => {
 
   it('recordUse 引用计数失败不影响内部读取：GET 仍 200 且无 unhandledRejection', async () => {
     const created = await request(app.getHttpServer())
-      .post('/api/prompt-templates')
+      .post('/api/prompt-library')
       .set(manageAuth())
       .send({ name: '引用计数模板', category: 'ui', template: '计数：{{content}}' })
       .expect(201);
@@ -303,7 +398,7 @@ describe('PromptLibrary (e2e)', () => {
   });
 });
 
-// ---------- 增量端点（/api/prompt-library/*，PermissionsGuard 细粒度权限）：批量同步幂等 / 筛选分页 / 统计 ----------
+// ---------- 统一端点（/api/prompt-library，PermissionsGuard 细粒度权限）：批量同步幂等 / 筛选分页 / 统计 ----------
 import { createHash } from 'crypto';
 import { existsSync } from 'fs';
 import { join } from 'path';
@@ -349,7 +444,7 @@ describe('PromptLibrary sync & stats (e2e)', () => {
     const userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     const roleRepo = moduleFixture.get<Repository<Role>>(getRepositoryToken(Role));
     const permissionRepo = moduleFixture.get<Repository<Permission>>(getRepositoryToken(Permission));
-    // 新控制器挂 PermissionsGuard：flow:prompt:view + flow:prompt:manage 两码齐备才放行。
+    // 统一控制器挂 PermissionsGuard：flow:prompt:view + flow:prompt:manage 两码齐备才放行。
     const permissions = await permissionRepo.save(
       ['flow:prompt:view', 'flow:prompt:manage'].map((code) => permissionRepo.create({ name: code, code }))
     );
@@ -457,7 +552,7 @@ describe('PromptLibrary sync & stats (e2e)', () => {
     expect(paged.body.data.total).toBe(2);
   });
 
-  it("keyword='%' 为字面量不命中任何行（search 路径同口径转义）", async () => {
+  it("keyword='%' 为字面量不命中任何行（search 路径同口径转义；单轨化后本轨继续承载 % 语义）", async () => {
     const byPercent = await request(app.getHttpServer())
       .get(`/api/prompt-library?keyword=${encodeURIComponent('%')}`)
       .set(auth())
@@ -472,5 +567,27 @@ describe('PromptLibrary sync & stats (e2e)', () => {
       (stats.body.data.byCategory as Array<{ category: string; count: number }>).map((row) => [row.category, row.count])
     );
     expect(byCategory).toEqual({ anime: 2, poster: 1, ui: 2, general: 1 });
+  });
+
+  it('stats.bySource：按来源分组计数（空来源不入 facets，来源筛选不随分页漂移）', async () => {
+    // 置于 describe 末尾：自建带 sourceTool 行并自算期望，不干扰其前 total=6 / byCategory 全等断言。
+    // 既有注入：P1/P3=midjourney、P2=novelai；本用例追加 facets-probe×2 与一条无来源行。
+    await sync([
+      { prompt: 'P7 facets 甲', category: 'ui', sourceTool: 'facets-probe' },
+      { prompt: 'P8 facets 乙', category: 'ui', sourceTool: 'facets-probe' },
+      { prompt: 'P9 无来源行', category: 'ui' }
+    ]).expect(201);
+    const stats = await request(app.getHttpServer()).get('/api/prompt-library/stats').set(auth()).expect(200);
+    const bySource = Object.fromEntries(
+      (stats.body.data.bySource as Array<{ source: string; count: number }>).map((row) => [row.source, row.count])
+    );
+    expect(bySource['facets-probe']).toBe(2);
+    expect(bySource['midjourney']).toBe(2); // P1/P3
+    expect(bySource['novelai']).toBe(1); // P2
+    // 空来源（P4/P5/P6/P9 等无 sourceTool 行）不构成筛选选项
+    for (const row of stats.body.data.bySource as Array<{ source: string; count: number }>) {
+      expect(typeof row.source).toBe('string');
+      expect(row.source.length).toBeGreaterThan(0);
+    }
   });
 });
