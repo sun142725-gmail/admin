@@ -56,5 +56,14 @@ module.exports = {
   },
   collectCoverageFrom: ['src/**/*.(t|j)s'],
   coverageDirectory: './coverage',
-  testEnvironment: 'node'
+  testEnvironment: 'node',
+  // 串行执行（等价 --runInBand）：多 worker 并行下 worker 复用（低 worker 数时单进程顺序起停
+  // ~18 个 Nest 应用实例）叠加多任务抢 CPU，实测间歇性随机失败（2026-11-01 终验 stock-roundtable
+  // 10 例 login 404 / 复现轮 divination 404、prompt-library 与 flow-tts-node 随机超时，失败文件
+  // 每轮漂移，时间膨胀 33s vs 串行 25s）；串行两轮实测 377/377 稳定绿且无 open handle 泄漏。
+  // 串行全量 ~25s，稳定性收益远大于速度损失。
+  maxWorkers: 1,
+  // 用例级超时放宽到 15s（默认 5s）：与 stock-roundtable.spec.ts:105 的 30s 局部放宽同因——
+  // 只放开时长上限，失败断言语义不变；串行下单用例实际耗时远低于该阈值。
+  testTimeout: 15000
 };

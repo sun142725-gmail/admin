@@ -165,7 +165,9 @@ describe('AiImageService.generate data URL 结果落盘', () => {
     expect(mockedWriteFile).toHaveBeenCalledTimes(1);
     const [writtenPath, writtenBuffer] = mockedWriteFile.mock.calls[0];
     expect(writtenPath).toMatch(/uploads[\\/]ai-images[\\/]\d+-0\.png$/);
-    expect((writtenBuffer as { data?: number[] }).data?.length ?? 0).toBeGreaterThan(0);
+    // 断言写入非空 Buffer：用 Uint8Array 语义的 .length（Node 原生 Buffer 无 .data 属性，
+    // 旧 jest 的 feross/buffer polyfill 才有 —— .data 口径在 jest ≥28 下恒为 undefined 必红）。
+    expect((writtenBuffer as Buffer).length).toBeGreaterThan(0);
     expect(result.images[0].url).toMatch(/^\/uploads\/ai-images\/\d+-0\.png$/);
     expect(save.mock.calls[0][0][0].url).toMatch(/^\/uploads\/ai-images\//);
   });

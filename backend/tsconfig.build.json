@@ -3,7 +3,11 @@
   "compilerOptions": {
     // 固定源码根目录：否则 backend 根目录出现非 src 的 .ts（如 scripts/、临时调试文件）时，
     // tsc 会把 rootDir 推断为 backend/，产物变成 dist/src/main.js，导致 node dist/main.js 找不到入口。
-    "rootDir": "./src"
+    "rootDir": "./src",
+    // 增量缓存固定放 dist 内：TS 默认把 tsbuildinfo 写在 config 同目录（backend/），手动清 dist /
+    // CI 清产物后缓存仍在，tsc 会按 up-to-date 跳过 emit 并 exit 0，得到「构建成功但 dist 为空」
+    // 的不一致状态。缓存随 dist 同生共死后，清产物必然触发全量重编。
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
   },
   // scripts/ 下的脚本用 ts-node 直接运行（见 package.json 的 sync:ai*），不参与 nest build 编译。
   "exclude": ["node_modules", "test", "dist", "scripts", "**/*spec.ts"]

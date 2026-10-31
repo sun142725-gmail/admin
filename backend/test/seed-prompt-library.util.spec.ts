@@ -1,7 +1,8 @@
 // 种子计划纯函数与种子数据自检（离线：不依赖 DB/网络，AGENTS 规则 1/4）。
 //
 // 数据自检的目的：防种子数据被改坏时 MySQL 严格模式 INSERT 直接失败或静默截断——
-// 容量上限对齐 prompt-template.entity.ts：name varchar(128)、category varchar(64)、
+// 容量上限对齐 prompt-template.entity.ts：name varchar(128)、category varchar(64)（主题 slug
+// 白名单 fantasy/starry/xianxia/anime，见 seed-prompt-library.data.ts）、
 // style_tags varchar(255)、source varchar(64)、template/negative_prompt 为 TEXT（约束走 DTO 口径
 // 8000/2000，与 CreatePromptTemplateDto / 前端表单 maxLength 对齐）。
 import { createHash } from 'crypto';
@@ -79,21 +80,21 @@ describe('planSeedTemplates（四分支 + trim 变体）', () => {
 });
 
 describe('SEED_PROMPT_TEMPLATES 种子数据自检（防改坏：MySQL 严格模式失败或静默截断）', () => {
-  it('共 15 条：fantasy/starry/xianxia/anime 各 3-6 条（anime 二次元 6 条）', () => {
-    expect(SEED_PROMPT_TEMPLATES).toHaveLength(9);
+  it('共 15 条：fantasy/starry/xianxia 各 3 条 + anime 6 条（c7a212e 二次元示例种子）', () => {
+    expect(SEED_PROMPT_TEMPLATES).toHaveLength(15);
     const byCategory = SEED_PROMPT_TEMPLATES.reduce<Record<string, number>>((acc, item) => {
       acc[item.category] = (acc[item.category] ?? 0) + 1;
       return acc;
     }, {});
-    expect(byCategory).toEqual({ fantasy: 3, starry: 3, xianxia: 3 });
+    expect(byCategory).toEqual({ fantasy: 3, starry: 3, xianxia: 3, anime: 6 });
   });
 
   it.each(SEED_PROMPT_TEMPLATES.map((item) => [item.name, item] as const))('%s：字段容量与约束全部达标', (_name, item) => {
     // name：非空 ≤128（entity varchar(128)）
     expect(item.name.trim().length).toBeGreaterThan(0);
     expect(item.name.length).toBeLessThanOrEqual(128);
-    // category：本次种子限定三主题 slug 且 ≤64（entity varchar(64)）
-    expect(['fantasy', 'starry', 'xianxia']).toContain(item.category);
+    // category：本次种子限定四主题 slug 且 ≤64（entity varchar(64)）
+    expect(['fantasy', 'starry', 'xianxia', 'anime']).toContain(item.category);
     expect(item.category.length).toBeLessThanOrEqual(64);
     // template：含 {{content}} 占位，1..8000（DTO 口径；entity 为 TEXT）
     expect(item.template).toContain('{{content}}');
@@ -111,12 +112,14 @@ describe('SEED_PROMPT_TEMPLATES 种子数据自检（防改坏：MySQL 严格模
     }
   });
 
-  it('negativePrompt 仅配在战斗与洞府两条（curated 口径）', () => {
+  it('negativePrompt 仅配在战斗/洞府/二次元主力四条（curated 口径）', () => {
     const withNegative = SEED_PROMPT_TEMPLATES.filter((item) => item.negativePrompt !== undefined);
-    expect(withNegative.map((item) => item.name).sort()).toEqual(['玄幻战斗瞬间', '宗门洞府灵池'].sort());
+    expect(withNegative.map((item) => item.name).sort()).toEqual(
+      ['玄幻战斗瞬间', '宗门洞府灵池', '二次元少女立绘', '二次元战斗名场面'].sort()
+    );
   });
 
-  it('9 条 hash 无重复（trim 后正文两两不同）', () => {
+  it('15 条 hash 无重复（trim 后正文两两不同）', () => {
     const hashes = SEED_PROMPT_TEMPLATES.map((item) => computeTemplateHash(item.template));
     expect(new Set(hashes).size).toBe(hashes.length);
   });
