@@ -177,12 +177,12 @@ export class SeedService implements OnModuleInit {
       { name: '通知模板', type: 'page', path: '/notifications/templates', parentId: config.id, permissionCode: 'system:notification:template:list' },
       { name: '通知发布', type: 'page', path: '/notifications/publish', parentId: config.id, permissionCode: 'system:notification:publish:list' },
       { name: '站内信', type: 'page', path: '/notifications/inbox', parentId: config.id, permissionCode: 'system:notification:inbox:list' },
-      { name: '审计日志', type: 'page', path: '/logs/audit', parentId: logs.id, permissionCode: 'system:audit:list' },
-      { name: '打点日志', type: 'page', path: '/logs/track', parentId: logs.id, permissionCode: 'system:audit:center' },
-      { name: '前端日志', type: 'page', path: '/logs/frontend', parentId: logs.id, permissionCode: 'system:audit:center' },
-      { name: '错误日志', type: 'page', path: '/logs/error', parentId: logs.id, permissionCode: 'system:audit:center' },
-      { name: '日志概览', type: 'page', path: '/logs/overview', parentId: logs.id, permissionCode: 'system:audit:center' },
-      { name: '会话链路', type: 'page', path: '/logs/session', parentId: logs.id, permissionCode: 'system:audit:center' }
+      { name: '日志概览', type: 'page', path: '/logs/overview', parentId: logs.id, permissionCode: 'system:audit:center', sortOrder: 1 },
+      { name: '会话链路', type: 'page', path: '/logs/session', parentId: logs.id, permissionCode: 'system:audit:center', sortOrder: 2 },
+      { name: '审计日志', type: 'page', path: '/logs/audit', parentId: logs.id, permissionCode: 'system:audit:list', sortOrder: 3 },
+      { name: '打点日志', type: 'page', path: '/logs/track', parentId: logs.id, permissionCode: 'system:audit:center', sortOrder: 4 },
+      { name: '前端日志', type: 'page', path: '/logs/frontend', parentId: logs.id, permissionCode: 'system:audit:center', sortOrder: 5 },
+      { name: '错误日志', type: 'page', path: '/logs/error', parentId: logs.id, permissionCode: 'system:audit:center', sortOrder: 6 }
     ];
     await this.resourceRepo.save(this.resourceRepo.create(children));
   }
@@ -401,12 +401,12 @@ export class SeedService implements OnModuleInit {
   private async ensureLogPages() {
     const logMenu = await this.ensureLogMenu();
     const pages = [
-      { name: '审计日志', path: '/logs/audit', permissionCode: 'system:audit:list' },
-      { name: '打点日志', path: '/logs/track', permissionCode: 'system:audit:center' },
-      { name: '前端日志', path: '/logs/frontend', permissionCode: 'system:audit:center' },
-      { name: '错误日志', path: '/logs/error', permissionCode: 'system:audit:center' },
-      { name: '日志概览', path: '/logs/overview', permissionCode: 'system:audit:center' },
-      { name: '会话链路', path: '/logs/session', permissionCode: 'system:audit:center' }
+      { name: '日志概览', path: '/logs/overview', permissionCode: 'system:audit:center', sortOrder: 1 },
+      { name: '会话链路', path: '/logs/session', permissionCode: 'system:audit:center', sortOrder: 2 },
+      { name: '审计日志', path: '/logs/audit', permissionCode: 'system:audit:list', sortOrder: 3 },
+      { name: '打点日志', path: '/logs/track', permissionCode: 'system:audit:center', sortOrder: 4 },
+      { name: '前端日志', path: '/logs/frontend', permissionCode: 'system:audit:center', sortOrder: 5 },
+      { name: '错误日志', path: '/logs/error', permissionCode: 'system:audit:center', sortOrder: 6 }
     ];
 
     for (const page of pages) {
@@ -430,14 +430,16 @@ export class SeedService implements OnModuleInit {
         if (
           resource.parentId !== logMenu.id ||
           resource.permissionCode !== page.permissionCode ||
-          resource.name !== page.name
+          resource.name !== page.name ||
+          resource.sortOrder !== page.sortOrder
         ) {
           await this.resourceRepo.update(
             { id: resource.id },
             {
               name: page.name,
               parentId: logMenu.id,
-              permissionCode: page.permissionCode
+              permissionCode: page.permissionCode,
+              sortOrder: page.sortOrder
             }
           );
         }
@@ -449,7 +451,8 @@ export class SeedService implements OnModuleInit {
           type: 'page',
           path: page.path,
           parentId: logMenu.id,
-          permissionCode: page.permissionCode
+          permissionCode: page.permissionCode,
+          sortOrder: page.sortOrder
         })
       );
     }
