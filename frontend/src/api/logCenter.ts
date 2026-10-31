@@ -3,6 +3,29 @@ import http from './http';
 
 export type LogEventType = 'track' | 'frontend' | 'error';
 
+// 日志条目：四类日志（审计/打点/前端/错误）字段并集，列表与详情共用
+export interface LogItem {
+  id: number;
+  userId?: number;
+  module?: string;
+  action?: string;
+  detail?: string;
+  ip?: string;
+  createdAt: string;
+  traceId?: string;
+  sessionId?: string;
+  source?: string;
+  pageCode?: string;
+  path?: string;
+  level?: string;
+  category?: string;
+  message?: string;
+  stack?: string;
+  meta?: Record<string, unknown>;
+  userAgent?: string;
+  referrer?: string;
+}
+
 export interface LogEvent {
   type: LogEventType;
   payload: Record<string, unknown>;
@@ -53,4 +76,8 @@ export interface LogStats {
 
 export const getLogStats = (days: number) => {
   return http.get<never, LogStats>('/log-center/stats', { params: { days } });
+};
+
+export const getSessionTrace = (sessionId: string, params: { source?: string; days?: number }) => {
+  return http.get<never, TraceResult & { days: number }>(`/log-center/session/${sessionId}`, { params });
 };

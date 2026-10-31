@@ -25,6 +25,8 @@ import {
   RobotOutlined,
   StockOutlined,
   FileImageOutlined,
+  FundOutlined,
+  ApartmentOutlined
 } from '@ant-design/icons';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMenuTree } from '../api/resources';
@@ -45,7 +47,9 @@ const getMenuIcon = (item: MenuItem) => {
       '/users': <UserOutlined />,
       '/roles': <TeamOutlined />,
       '/permissions': <SafetyOutlined />,
+      '/logs/overview': <FundOutlined />,
       '/logs/audit': <FileTextOutlined />,
+      '/logs/session': <ApartmentOutlined />,
       '/logs/track': <FileSearchOutlined />,
       '/logs/frontend': <FileSearchOutlined />,
       '/logs/error': <FileSearchOutlined />,
@@ -106,7 +110,9 @@ const PAGE_CODE_MAP: Record<string, string> = {
   '/users': 'system_user',
   '/roles': 'system_role',
   '/permissions': 'system_permission',
+  '/logs/overview': 'log_overview',
   '/logs/audit': 'log_audit',
+  '/logs/session': 'log_session',
   '/logs/track': 'log_track',
   '/logs/frontend': 'log_frontend',
   '/logs/error': 'log_error',

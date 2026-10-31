@@ -90,6 +90,7 @@ export const router = createBrowserRouter([
       { path: '/roles/:id/permissions', element: <RolePermissionsPage /> },
       { path: '/permissions', element: <PermissionsPage /> },
       { path: '/audit-center', element: <Navigate to="/logs/audit" replace /> },
+      { path: '/logs', element: <Navigate to="/logs/overview" replace /> },
       { path: '/logs/:type', element: <AuditCenterPage /> },
       { path: '/dicts', element: <DictPage /> },
       { path: '/ai/models', element: <ModelsPage /> },
