@@ -1,5 +1,5 @@
 // 股市圆桌主页面：分析台（选对象 → 看行情 → 召集会议）+ 会议记录。
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Button from 'antd/es/button';
 import Card from 'antd/es/card';
 import Input from 'antd/es/input';
@@ -52,6 +52,12 @@ export const StockPage: React.FC = () => {
   const [modelId, setModelId] = useState<number | undefined>(undefined);
   const [kline, setKline] = useState<KlineResult | null>(null);
   const [klineLoading, setKlineLoading] = useState(false);
+  // 与 kline 同步的 ref：fetch 回调里判断「是否已有可展示的旧图」用（闭包里拿不到最新 state）
+  const klineRef = useRef<KlineResult | null>(null);
+  const updateKline = (value: KlineResult | null) => {
+    klineRef.current = value;
+    setKline(value);
+  };
   // K 线周期（分析台内嵌图记忆；KlineDrawer 另有独立 state）
   const [klineFreq, setKlineFreq] = useState<KlineFreq>('day');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -70,22 +76,24 @@ export const StockPage: React.FC = () => {
 
   useEffect(() => {
     if (!klineSymbol) {
-      setKline(null);
+      updateKline(null);
       return;
     }
     let stopped = false;
     setKlineLoading(true);
     fetchKline(klineSymbol, 250, klineFreq)
       .then((result) => {
+        // 切周期/切标的时保留旧图（stale-while-revalidate），只有首载无数据才置空，避免整卡卸载闪烁
         if (!stopped && result.items.length > 0) {
-          setKline(result);
-        } else if (!stopped) {
-          setKline(null);
+          updateKline(result);
+        } else if (!stopped && !klineRef.current) {
+          updateKline(null);
         }
       })
       .catch(() => {
-        if (!stopped) {
-          setKline(null);
+        // 失败同样保留旧图，仅停止 loading；klineRef 同步见 setKline 处
+        if (!stopped && !klineRef.current) {
+          updateKline(null);
         }
       })
       .finally(() => {
@@ -247,8 +255,8 @@ export const StockPage: React.FC = () => {
       {tab === 'stage' && (
         <>
           {kline && !running && !showStagePanel && (
-            <Card loading={klineLoading} styles={{ body: { padding: '12px 16px' } }}>
-              <KlineChart result={kline} freq={klineFreq} onFreqChange={setKlineFreq} />
+            <Card styles={{ body: { padding: '12px 16px' } }}>
+              <KlineChart result={kline} loading={klineLoading} freq={klineFreq} onFreqChange={setKlineFreq} />
             </Card>
           )}
           {kline && !running && showStagePanel && (
@@ -257,7 +265,7 @@ export const StockPage: React.FC = () => {
               styles={{ body: { padding: '12px 16px' } }}
               title={<span className="text-sm">{kline.name || subject.name} · {FREQ_LABEL[klineFreq]}</span>}
             >
-              <KlineChart result={kline} height={380} freq={klineFreq} onFreqChange={setKlineFreq} />
+              <KlineChart result={kline} height={380} loading={klineLoading} freq={klineFreq} onFreqChange={setKlineFreq} />
             </Card>
           )}
           {showStagePanel ? (

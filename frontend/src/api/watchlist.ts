@@ -10,7 +10,8 @@ export interface WatchlistItem {
   createdAt: string;
 }
 
-export const listWatchlist = () => http.get<never, WatchlistItem[]>('/stock/watchlist');
+// 后端返回 { items: [...] } 信封（watchlist.controller.ts list），这里原样透传由消费端解包。
+export const listWatchlist = () => http.get<never, { items: WatchlistItem[] }>('/stock/watchlist');
 
 export const addToWatchlist = (payload: { symbol: string; name: string; note?: string; group?: string }) =>
   http.post<never, WatchlistItem>('/stock/watchlist', payload);

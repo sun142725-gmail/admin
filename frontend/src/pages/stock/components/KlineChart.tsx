@@ -2,6 +2,7 @@
 // 结构：主图（蜡烛+MA/BOLL+最新价虚线）→ 成交量副图 → 指标副图（MACD/KDJ/RSI/BOLL 可切换）。
 // 光标悬停时读取栏联动显示：日期 / MA值 / 开收高低 / 涨跌幅涨跌额 / 成交量成交额振幅换手率。
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Spin from 'antd/es/spin';
 import ReactECharts from 'echarts-for-react';
 import type { KlineFreq, KlineResult } from '../../../api/stock';
 
@@ -10,6 +11,8 @@ type SubIndicator = 'macd' | 'kdj' | 'rsi' | 'boll';
 interface Props {
   result: KlineResult;
   height?: number;
+  /** 数据刷新中：图表保持挂载渲染旧数据，仅头部提示加载（stale-while-revalidate，防整卡闪烁）。 */
+  loading?: boolean;
   /** 受控周期：与 onFreqChange 同时传入才渲染周期页签（默认不传保持旧有纯展示用法）。 */
   freq?: KlineFreq;
   onFreqChange?: (freq: KlineFreq) => void;
@@ -362,7 +365,7 @@ const buildOption = (result: KlineResult, sub: SubIndicator) => {
   };
 };
 
-export const KlineChart: React.FC<Props> = ({ result, height = 480, freq, onFreqChange }) => {
+export const KlineChart: React.FC<Props> = ({ result, height = 480, loading = false, freq, onFreqChange }) => {
   const [sub, setSub] = useState<SubIndicator>('macd');
   const chartRef = useRef<ReactECharts>(null);
   // 光标离开后保持最后位置的读取栏（同花顺行为）
@@ -402,6 +405,7 @@ export const KlineChart: React.FC<Props> = ({ result, height = 480, freq, onFreq
       <div className="flex items-center justify-between" style={{ padding: '0 4px 4px' }}>
         <span style={{ color: T.text, fontSize: 13, fontWeight: 500 }}>
           {result.name} <span style={{ color: T.sub, fontSize: 11 }}>{FREQ_LABEL[activeFreq]}</span>
+          {loading && <Spin size="small" style={{ marginLeft: 8 }} />}
         </span>
         <div className="flex items-center">
           {showFreqTabs &&

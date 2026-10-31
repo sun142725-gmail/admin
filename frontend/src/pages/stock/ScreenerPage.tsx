@@ -71,7 +71,7 @@ export const ScreenerPage: React.FC = () => {
   useEffect(() => {
     listWatchlist()
       .then((res) => {
-        setFavoriteSymbols(new Set(((res as WatchlistItem[]) ?? []).map((item) => item.symbol)));
+        setFavoriteSymbols(new Set((Array.isArray(res?.items) ? res.items : []).map((item) => item.symbol)));
       })
       .catch(() => undefined);
   }, []);

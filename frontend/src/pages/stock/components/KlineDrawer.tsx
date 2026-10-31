@@ -38,7 +38,7 @@ export const KlineDrawer: React.FC<Props> = ({ open, symbol, name, onClose }) =>
     let stopped = false;
     setLoading(true);
     setError(null);
-    setResult(null);
+    // 保留旧 result：切周期时旧图继续渲染，新数据到达后原位替换（防抽屉内容整块闪烁）
     fetchKline(symbol, 250, freq)
       .then((res) => {
         if (stopped) {
@@ -82,14 +82,15 @@ export const KlineDrawer: React.FC<Props> = ({ open, symbol, name, onClose }) =>
         </span>
       }
     >
-      {loading ? (
-        <div className="flex items-center justify-center py-24">
-          <Spin tip="加载K线数据…" />
-        </div>
-      ) : error ? (
+      {error && !result ? (
         <Alert type="warning" showIcon message={error} />
       ) : result && last ? (
-        <div className="flex flex-col gap-2">
+        <div className="relative flex flex-col gap-2">
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded bg-black/40">
+              <Spin tip="加载K线数据…" />
+            </div>
+          )}
           <div className="flex items-baseline gap-3">
             <span className={`text-2xl font-semibold font-mono ${(pct ?? 0) > 0 ? 'text-stock-up' : (pct ?? 0) < 0 ? 'text-stock-down' : undefined}`}>
               {last.close.toFixed(2)}
@@ -104,7 +105,11 @@ export const KlineDrawer: React.FC<Props> = ({ open, symbol, name, onClose }) =>
               {last.date} 收盘
             </span>
           </div>
-          <KlineChart result={result} height={520} freq={freq} onFreqChange={setFreq} />
+          <KlineChart result={result} height={520} loading={loading} freq={freq} onFreqChange={setFreq} />
+        </div>
+      ) : loading ? (
+        <div className="flex items-center justify-center py-24">
+          <Spin tip="加载K线数据…" />
         </div>
       ) : null}
     </SelfDrawer>

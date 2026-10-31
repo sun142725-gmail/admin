@@ -22,7 +22,7 @@ export const WatchStarButton: React.FC<WatchStarButtonProps> = ({ symbol, name, 
     listWatchlist()
       .then((res) => {
         if (!stopped) {
-          setIsFavorite(((res as WatchlistItem[]) ?? []).some((item) => item.symbol === symbol));
+          setIsFavorite((Array.isArray(res?.items) ? res.items : []).some((item) => item.symbol === symbol));
           setReady(true);
         }
       })
