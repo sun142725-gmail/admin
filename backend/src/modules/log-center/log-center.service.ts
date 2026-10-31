@@ -1,12 +1,13 @@
 // 日志中心服务负责写入与查询多类型日志。
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Brackets, DataSource, FindOptionsWhere, LessThan, Repository } from 'typeorm';
+import { Between, Brackets, DataSource, FindOptionsWhere, LessThan, MoreThan, Repository } from 'typeorm';
 import { TrackLog } from '../../common/entities/track-log.entity';
 import { FrontendLog } from '../../common/entities/frontend-log.entity';
 import { ErrorLog } from '../../common/entities/error-log.entity';
 import { BatchEventsDto } from './dto/batch-events.dto';
 import { QueryLogDto } from './dto/query-log.dto';
+import { QuerySessionDto } from './dto/query-session.dto';
 import { QueryStatsDto } from './dto/query-stats.dto';
 
 type LogType = 'track' | 'frontend' | 'error';
@@ -362,6 +363,25 @@ export class LogCenterService {
       topPages,
       errorBySource
     };
+  }
+
+  // 会话链路：一个 sessionId 在窗口内的全部事件（打点/前端/错误，含服务端 5xx），按时间正序返回，
+  // 供前端按天分组还原"用户整个流程的请求"；窗口默认与保留期一致，可选按来源过滤
+  async sessionTrace(sessionId: string, query: QuerySessionDto) {
+    const days = Math.min(Math.max(query.days ?? 7, 1), retentionDays());
+    const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const take = TRACE_TAKE;
+    const where = (extra: Record<string, unknown> = {}) => ({
+      sessionId,
+      createdAt: MoreThan(start),
+      ...extra
+    });
+    const [track, frontend, error] = await Promise.all([
+      this.trackRepo.find({ where: where(query.source ? { source: query.source } : {}), order: { createdAt: 'ASC' }, take }),
+      this.frontendRepo.find({ where: where(query.source ? { source: query.source } : {}), order: { createdAt: 'ASC' }, take }),
+      this.errorRepo.find({ where: where(query.source ? { source: query.source } : {}), order: { createdAt: 'ASC' }, take })
+    ]);
+    return { sessionId, days, track, frontend, error };
   }
 
   private normalizeRange(start?: string, end?: string) {

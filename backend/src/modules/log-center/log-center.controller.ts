@@ -18,6 +18,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { BatchEventsDto } from './dto/batch-events.dto';
 import { QueryLogDto } from './dto/query-log.dto';
+import { QuerySessionDto } from './dto/query-session.dto';
 import { QueryStatsDto } from './dto/query-stats.dto';
 import { LogCenterService } from './log-center.service';
 
@@ -52,6 +53,17 @@ export class LogCenterController {
   @Permissions('system:audit:center')
   async stats(@Query() query: QueryStatsDto) {
     return this.logCenterService.stats(query);
+  }
+
+  // 会话链路与 trace/stats 一样必须声明在 :type/:id 之前
+  @Get('session/:sessionId')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('system:audit:center')
+  async sessionTrace(@Param('sessionId') sessionId: string, @Query() query: QuerySessionDto) {
+    if (!sessionId || sessionId.length > 128) {
+      throw new BadRequestException('sessionId 不合法');
+    }
+    return this.logCenterService.sessionTrace(sessionId, query);
   }
 
   // 链路聚合必须声明在 :type/:id 之前，否则 "trace/xxx" 会被通配路由当成 type=trace 命中详情

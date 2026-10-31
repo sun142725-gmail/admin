@@ -180,7 +180,9 @@ export class SeedService implements OnModuleInit {
       { name: '审计日志', type: 'page', path: '/logs/audit', parentId: logs.id, permissionCode: 'system:audit:list' },
       { name: '打点日志', type: 'page', path: '/logs/track', parentId: logs.id, permissionCode: 'system:audit:center' },
       { name: '前端日志', type: 'page', path: '/logs/frontend', parentId: logs.id, permissionCode: 'system:audit:center' },
-      { name: '错误日志', type: 'page', path: '/logs/error', parentId: logs.id, permissionCode: 'system:audit:center' }
+      { name: '错误日志', type: 'page', path: '/logs/error', parentId: logs.id, permissionCode: 'system:audit:center' },
+      { name: '日志概览', type: 'page', path: '/logs/overview', parentId: logs.id, permissionCode: 'system:audit:center' },
+      { name: '会话链路', type: 'page', path: '/logs/session', parentId: logs.id, permissionCode: 'system:audit:center' }
     ];
     await this.resourceRepo.save(this.resourceRepo.create(children));
   }
@@ -402,7 +404,9 @@ export class SeedService implements OnModuleInit {
       { name: '审计日志', path: '/logs/audit', permissionCode: 'system:audit:list' },
       { name: '打点日志', path: '/logs/track', permissionCode: 'system:audit:center' },
       { name: '前端日志', path: '/logs/frontend', permissionCode: 'system:audit:center' },
-      { name: '错误日志', path: '/logs/error', permissionCode: 'system:audit:center' }
+      { name: '错误日志', path: '/logs/error', permissionCode: 'system:audit:center' },
+      { name: '日志概览', path: '/logs/overview', permissionCode: 'system:audit:center' },
+      { name: '会话链路', path: '/logs/session', permissionCode: 'system:audit:center' }
     ];
 
     for (const page of pages) {

@@ -350,4 +350,50 @@ describe('LogCenter (e2e)', () => {
       .expect(200);
     expect(normalRange.body.data.clamped).toBe(false);
   });
+
+  it('should aggregate session trace by sessionId with source filter', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ username: 'tester', password: 'password' })
+      .expect(201);
+    const accessToken = loginResponse.body.data.accessToken;
+
+    await request(app.getHttpServer())
+      .post('/api/log-center/events')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        source: 'web',
+        sessionId: 'session-flow',
+        events: [
+          { type: 'track', traceId: 'trace-flow-1', payload: { pageCode: 'system_user', path: '/users' } },
+          { type: 'frontend', traceId: 'trace-flow-1', payload: { level: 'info', category: 'api', message: 'GET /api/users 200' } },
+          { type: 'error', traceId: 'trace-flow-1', payload: { message: 'POST /api/users 500 服务器错误' } }
+        ]
+      })
+      .expect(201);
+    // 服务端 5xx 落库（source=server）同会话
+    await errorRepo.save(
+      errorRepo.create({ source: 'server', sessionId: 'session-flow', traceId: 'trace-flow-1', message: 'GET /api/x -> 500 服务器错误' })
+    );
+
+    const trace = await request(app.getHttpServer())
+      .get('/api/log-center/session/session-flow')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(trace.body.data.sessionId).toBe('session-flow');
+    expect(trace.body.data.track).toHaveLength(1);
+    expect(trace.body.data.frontend).toHaveLength(1);
+    // 错误含 web 上报 1 条 + server 落库 1 条
+    expect(trace.body.data.error).toHaveLength(2);
+
+    // 按来源过滤：只看服务端
+    const serverOnly = await request(app.getHttpServer())
+      .get('/api/log-center/session/session-flow')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .query({ source: 'server' })
+      .expect(200);
+    expect(serverOnly.body.data.track).toHaveLength(0);
+    expect(serverOnly.body.data.frontend).toHaveLength(0);
+    expect(serverOnly.body.data.error).toHaveLength(1);
+  });
 });
