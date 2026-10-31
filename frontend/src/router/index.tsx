@@ -47,6 +47,8 @@ const PromptLibraryPage = lazyPage(() => import('../pages/prompt/PromptLibraryPa
 const TemplatePage = lazyPage(() => import('../pages/notification/TemplatePage'), 'TemplatePage');
 const PublishPage = lazyPage(() => import('../pages/notification/PublishPage'), 'PublishPage');
 const InboxPage = lazyPage(() => import('../pages/notification/InboxPage'), 'InboxPage');
+// 组件库演示页（dev-only）：不进侧边菜单，仅开发核对基座组件用法。
+const ComponentPlayground = lazyPage(() => import('../pages/dev/ComponentPlayground'), 'ComponentPlayground');
 
 // 画布编辑器较重（React Flow），按需加载不进首屏包。
 const FlowEditorPage = React.lazy(async () => {
@@ -109,6 +111,7 @@ export const router = createBrowserRouter([
       { path: '/notifications/publish', element: <PublishPage /> },
       { path: '/notifications/publishes', element: <Navigate to="/notifications/publish" replace /> },
       { path: '/notifications/inbox', element: <InboxPage /> },
+      { path: '/dev/components', element: <ComponentPlayground /> },
       { path: '/profile', element: <ProfilePage /> }
     ]
   }

@@ -1,26 +1,3 @@
-// 公共表格组件统一分页体验。
-import React from 'react';
-import { Table } from 'antd';
-import type { TableProps } from 'antd';
-
-export const AppTable = <T extends object>(props: TableProps<T>) => {
-  const pagination =
-    props.pagination === false
-      ? false
-      : {
-          showSizeChanger: true,
-          pageSizeOptions: ['10', '20', '30', '50'],
-          showTotal: (total: number) => `共 ${total} 条`,
-          locale: { items_per_page: '页' },
-          ...props.pagination
-        };
-
-  return (
-    <Table
-      size={props.size ?? 'middle'}
-      scroll={props.scroll ?? { x: 'max-content' }}
-      {...props}
-      pagination={pagination}
-    />
-  );
-};
+// 兼容垫片：AppTable 收编为 base 层 SelfTable，旧路径一行 re-export，14 页既有引用零改动。
+// 新代码一律 import components/base/SelfTable；stock 波全仓 grep AppTable 零引用后删除本文件。
+export { SelfTable as AppTable } from './base/SelfTable';

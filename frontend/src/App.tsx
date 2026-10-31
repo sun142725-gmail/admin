@@ -14,7 +14,22 @@ const theme: ThemeConfig = {
   token: {
     colorPrimary: '#1677ff',
     colorInfo: '#1677ff',
-    fontFamily: "-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif"
+    fontFamily: "-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif",
+    // —— 圆角档位锚点（以下均为 antd v5 默认值，渲染零变化；组件级覆写仍在下方 components 段）——
+    borderRadiusSM: 4, // 小元素 Tag/Popconfirm
+    borderRadius: 6, // 中控件默认
+    borderRadiusLG: 8, // 大容器基准
+    // —— 间距四档锚点（Space size 8 种散值归一到 4/8/12/16，types/ui.ts SPACE_SIZE 同源；均为 antd 默认值）——
+    marginXXS: 4, // xs：标签/按钮组内
+    marginXS: 8, // sm：Space 默认档
+    marginSM: 12, // md：表单项间
+    margin: 16, // lg：卡片内边距
+    marginLG: 24, // xl：区块间
+    // —— 字号阶梯与控件高度锚点（均为 antd 默认值；页面标题继续走 global.css text-lg 工具类不动）——
+    fontSizeSM: 12, // 辅助/标签
+    fontSize: 14, // 正文
+    fontSizeLG: 16, // 强调正文
+    controlHeight: 32 // 控件高度基准
   },
   components: {
     // 原 CSS：.ant-btn 圆角 12（曾被 antd 默认值压制）+ font-weight 600
