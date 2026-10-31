@@ -4,10 +4,19 @@
 // 图文流水线按 category 引用模板，模板正文中 {{content}} 会被场景文本替换。
 // 权限口径：查看 flow:prompt:view，写操作（新建/编辑/删除/批量同步）flow:prompt:manage，
 // 与后端统一控制器 /prompt-library、菜单(/prompts) 同码。
+// 2026-10-31：Card title+extra 骨架收编为 PageHeader（components/README.md 点名收编写法）。
 import { useState } from 'react';
-import { Button, Card, Empty, Input, Pagination, Select, Space, Typography, message } from 'antd';
+import Button from 'antd/es/button';
+import Empty from 'antd/es/empty';
+import Input from 'antd/es/input';
+import Pagination from 'antd/es/pagination';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Typography from 'antd/es/typography';
 import { PlusOutlined, ReloadOutlined, SyncOutlined } from '@ant-design/icons';
 import { Permission } from '../../components/permission/Permission';
+import { PageHeader } from '../../components/business/PageHeader';
+import { useApiMessage } from '../../hooks/useApiMessage';
 import { useAppSelector } from '../../store/hooks';
 import { PromptLibraryItem, deletePromptTemplate } from '../../api/promptLibrary';
 import { usePromptLibrary } from './usePromptLibrary';
@@ -25,6 +34,7 @@ export const PromptLibraryPage: React.FC = () => {
   const canManage = useAppSelector((state) =>
     (state.auth.profile?.permissions ?? []).includes('flow:prompt:manage')
   );
+  const msg = useApiMessage();
 
   const openCreate = () => {
     setEditing(null);
@@ -41,66 +51,68 @@ export const PromptLibraryPage: React.FC = () => {
       // 卡片 Popconfirm 对引用>0 已弹警示，确认即带 force=true 二段删除；
       // 若引用数在渲染后变化（竞态），后端 409 兜底在此转为错误提示。
       await deletePromptTemplate(tpl.id, tpl.referenceCount > 0 || undefined);
-      message.success('已删除');
+      msg.success('已删除');
       await lib.reloadAll();
     } catch (error) {
-      message.error(error instanceof Error && error.message ? error.message : '删除失败');
+      msg.errorFrom(error, '删除失败');
     }
   };
 
   const handleCopy = async (tpl: PromptLibraryItem) => {
     try {
       await navigator.clipboard.writeText(tpl.template);
-      message.success('Prompt 已复制');
+      msg.success('Prompt 已复制');
     } catch {
-      message.warning('复制失败，请手动选择文本');
+      msg.warning('复制失败，请手动选择文本');
     }
   };
 
   return (
-    <Card
-      title="图片提示词库"
-      extra={
-        <Space wrap>
-          <Select
-            allowClear
-            placeholder="全部类型"
-            style={{ width: 130 }}
-            options={lib.categoryOptions}
-            value={lib.query.category}
-            onChange={lib.changeCategory}
-          />
-          <Select
-            allowClear
-            showSearch
-            placeholder="来源工具"
-            style={{ width: 130 }}
-            options={lib.sourceToolOptions}
-            value={lib.query.sourceTool}
-            onChange={lib.changeSourceTool}
-          />
-          <Input.Search
-            placeholder="搜索名称/正文/标签"
-            style={{ width: 200 }}
-            onSearch={lib.searchKeyword}
-            allowClear
-          />
-          <Button icon={<ReloadOutlined />} onClick={() => void lib.reloadAll()} loading={lib.loading} />
-          <Permission code="flow:prompt:manage">
-            <Button icon={<SyncOutlined />} onClick={() => setSyncOpen(true)}>
-              批量同步
-            </Button>
-          </Permission>
-          <Permission code="flow:prompt:manage">
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-              新建模板
-            </Button>
-          </Permission>
-        </Space>
-      }
-    >
+    <div>
+      <PageHeader
+        title="图片提示词库"
+        actions={
+          <Space wrap>
+            <Select
+              allowClear
+              placeholder="全部类型"
+              className="w-[130px]"
+              options={lib.categoryOptions}
+              value={lib.query.category}
+              onChange={lib.changeCategory}
+            />
+            <Select
+              allowClear
+              showSearch
+              placeholder="来源工具"
+              className="w-[130px]"
+              options={lib.sourceToolOptions}
+              value={lib.query.sourceTool}
+              onChange={lib.changeSourceTool}
+            />
+            <Input.Search
+              placeholder="搜索名称/正文/标签"
+              style={{ width: 200 }}
+              onSearch={lib.searchKeyword}
+              allowClear
+            />
+            <Button icon={<ReloadOutlined />} onClick={() => void lib.reloadAll()} loading={lib.loading} />
+            <Permission code="flow:prompt:manage">
+              <Button icon={<SyncOutlined />} onClick={() => setSyncOpen(true)}>
+                批量同步
+              </Button>
+            </Permission>
+            <Permission code="flow:prompt:manage">
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                新建模板
+              </Button>
+            </Permission>
+          </Space>
+        }
+      />
+
       <div className="prompt-library-stats">
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Typography.Text type="secondary" className="text-xs">
           已收录 {lib.stats ? lib.stats.total : '—'} 条 / 当前展示 {lib.total} 条
         </Typography.Text>
       </div>
@@ -153,6 +165,6 @@ export const PromptLibraryPage: React.FC = () => {
           void lib.reloadFromFirstPage();
         }}
       />
-    </Card>
+    </div>
   );
 };

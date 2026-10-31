@@ -1,8 +1,13 @@
 // 模板编辑弹窗：新建/编辑共用表单（分类 options 由 props 传入，与页面筛选下拉同源）。
 // 保存逻辑内聚：按 editing 有无调 create/update，成功后 onSaved 上抛（页面统一 reloadAll）。
 import { useEffect, useState } from 'react';
-import { Form, Input, Modal, Select, message } from 'antd';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Select from 'antd/es/select';
 import { PromptLibraryItem, createPromptTemplate, updatePromptTemplate } from '../../../api/promptLibrary';
+import { SelfForm } from '../../../components/base/SelfForm';
+import { SelfModal } from '../../../components/base/SelfModal';
+import { useApiMessage } from '../../../hooks/useApiMessage';
 
 export interface TemplateFormValues {
   name: string;
@@ -31,6 +36,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
 }) => {
   const [form] = Form.useForm<TemplateFormValues>();
   const [saving, setSaving] = useState(false);
+  const msg = useApiMessage();
 
   // 打开时同步表单：编辑回填、新建复位并给默认分类（关闭即弃，不留旧值/旧校验态）。
   useEffect(() => {
@@ -59,10 +65,10 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
     try {
       if (editing) {
         await updatePromptTemplate(editing.id, values);
-        message.success('模板已更新');
+        msg.success('模板已更新');
       } else {
         await createPromptTemplate(values);
-        message.success('模板已创建');
+        msg.success('模板已创建');
       }
       onSaved();
     } catch {
@@ -73,16 +79,16 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
   };
 
   return (
-    <Modal
+    <SelfModal
       title={editing ? '编辑模板' : '新建模板'}
       open={open}
       onOk={() => void handleOk()}
       onCancel={onCancel}
       confirmLoading={saving}
       okText="保存"
-      width={640}
+      width="md"
     >
-      <Form form={form} layout="vertical">
+      <SelfForm form={form}>
         <Form.Item name="name" label="模板名称" rules={[{ required: true, message: '请输入名称' }]}>
           <Input placeholder="如：水彩绘本插画" maxLength={128} />
         </Form.Item>
@@ -111,7 +117,7 @@ export const TemplateEditModal: React.FC<TemplateEditModalProps> = ({
         <Form.Item name="source" label="来源（可选）">
           <Input placeholder="原创 / 复刻自 xxx" maxLength={64} />
         </Form.Item>
-      </Form>
-    </Modal>
+      </SelfForm>
+    </SelfModal>
   );
 };

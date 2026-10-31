@@ -4,8 +4,13 @@
 //     （后端 SyncPromptTemplateItemDto 字段全集，此前这些字段前端完全没有入口）。
 // 前端 parse+校验：prompt 必填 / 字段白名单（未知字段丢弃并警告）/ 200 条截断 / 错误报行号。
 import { useEffect, useState } from 'react';
-import { Form, Input, Modal, Tabs, message } from 'antd';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Tabs from 'antd/es/tabs';
 import { SyncPromptImageItem, syncPromptImages } from '../../../api/promptLibrary';
+import { SelfForm } from '../../../components/base/SelfForm';
+import { SelfModal } from '../../../components/base/SelfModal';
+import { useApiMessage } from '../../../hooks/useApiMessage';
 
 interface QuickSyncFormValues {
   category?: string;
@@ -118,6 +123,7 @@ export const TemplateSyncModal: React.FC<TemplateSyncModalProps> = ({ open, onCa
   const [syncing, setSyncing] = useState(false);
   const [quickForm] = Form.useForm<QuickSyncFormValues>();
   const [structuredForm] = Form.useForm<StructuredSyncFormValues>();
+  const msg = useApiMessage();
 
   // 关闭即复位两个表单与告警态，防缓存旧粘贴内容。
   useEffect(() => {
@@ -132,7 +138,7 @@ export const TemplateSyncModal: React.FC<TemplateSyncModalProps> = ({ open, onCa
     setSyncing(true);
     try {
       const result = await syncPromptImages(items);
-      message.success(`同步完成：新增 ${result.inserted}，跳过 ${result.skipped}（共提交 ${result.received} 条）`);
+      msg.success(`同步完成：新增 ${result.inserted}，跳过 ${result.skipped}（共提交 ${result.received} 条）`);
       onSynced();
     } catch {
       // http 层已统一提示
@@ -149,11 +155,11 @@ export const TemplateSyncModal: React.FC<TemplateSyncModalProps> = ({ open, onCa
         .map((line) => line.trim())
         .filter(Boolean);
       if (prompts.length === 0) {
-        message.warning('请粘贴至少一条 Prompt');
+        msg.warning('请粘贴至少一条 Prompt');
         return;
       }
       if (prompts.length > SYNC_MAX_ITEMS) {
-        message.warning(`单次最多 ${SYNC_MAX_ITEMS} 条，已截取前 ${SYNC_MAX_ITEMS} 条`);
+        msg.warning(`单次最多 ${SYNC_MAX_ITEMS} 条，已截取前 ${SYNC_MAX_ITEMS} 条`);
       }
       await submit(
         prompts.slice(0, SYNC_MAX_ITEMS).map((prompt) => ({
@@ -167,15 +173,15 @@ export const TemplateSyncModal: React.FC<TemplateSyncModalProps> = ({ open, onCa
     const { payload } = await structuredForm.validateFields();
     const parsed = parseStructuredItems(payload);
     if (!parsed.ok) {
-      message.error(parsed.error);
+      msg.error(parsed.error);
       return;
     }
-    parsed.warnings.forEach((warning) => message.warning(warning));
+    parsed.warnings.forEach((warning) => msg.warning(warning));
     await submit(parsed.items);
   };
 
   return (
-    <Modal
+    <SelfModal
       title="批量同步提示词"
       open={open}
       onOk={() => void handleOk()}
@@ -192,7 +198,7 @@ export const TemplateSyncModal: React.FC<TemplateSyncModalProps> = ({ open, onCa
             key: 'quick',
             label: '快速粘贴（每行一条）',
             children: (
-              <Form form={quickForm} layout="vertical">
+              <SelfForm form={quickForm}>
                 <Form.Item name="category" label="统一分类（可选，默认 general）">
                   <Input placeholder="如：anime / fantasy / starry / xianxia" maxLength={64} />
                 </Form.Item>
@@ -207,14 +213,14 @@ export const TemplateSyncModal: React.FC<TemplateSyncModalProps> = ({ open, onCa
                 >
                   <Input.TextArea rows={10} placeholder={'一条完整 Prompt 独占一行\n第二条 Prompt…'} maxLength={200000} />
                 </Form.Item>
-              </Form>
+              </SelfForm>
             )
           },
           {
             key: 'structured',
             label: '结构化 JSON（逐条标题/分类/示例图）',
             children: (
-              <Form form={structuredForm} layout="vertical">
+              <SelfForm form={structuredForm}>
                 <Form.Item
                   name="payload"
                   label={`JSON 数组（单次最多 ${SYNC_MAX_ITEMS} 条）`}
@@ -230,11 +236,11 @@ export const TemplateSyncModal: React.FC<TemplateSyncModalProps> = ({ open, onCa
                     maxLength={400000}
                   />
                 </Form.Item>
-              </Form>
+              </SelfForm>
             )
           }
         ]}
       />
-    </Modal>
+    </SelfModal>
   );
 };

@@ -1,5 +1,7 @@
 // 图文故事页：导入原文 → LLM 自动分幕 → 按提示词库风格并发生图。
 // 进度采用 3s 轮询（SSE 经网关透传可用，轮询作为简单可靠的兜底）。
+// 2026-10-31：移除无用跨组样式依赖（页面未使用 flow-pages.css 任何类）；Card title+extra 收编 PageHeader；
+// 状态表收编 StatusTag；空态迁 EmptyState；Popconfirm→ConfirmPopconfirm；Modal→SelfModal；Form→SelfForm。
 import { useCallback, useEffect, useState } from 'react';
 import {
   Button,
@@ -9,14 +11,11 @@ import {
   Form,
   Image,
   Input,
-  Modal,
-  Popconfirm,
   Select,
   Space,
   Switch,
   Tag,
-  Typography,
-  message
+  Typography
 } from 'antd';
 import {
   CaretRightOutlined,
@@ -35,9 +34,16 @@ import {
   listGraphicStories,
   runGraphicStory
 } from '../../api/graphic';
-import '../flow/flow-pages.css';
+import { SelfForm } from '../../components/base/SelfForm';
+import { SelfModal } from '../../components/base/SelfModal';
+import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { EmptyState } from '../../components/business/PagePanel';
+import { PageHeader } from '../../components/business/PageHeader';
+import { StatusTag } from '../../components/business/StatusTag';
+import { useApiMessage } from '../../hooks/useApiMessage';
+import type { StatusMeta } from '../../types/ui';
 
-const STATUS_META: Record<string, { label: string; color: string }> = {
+const STATUS_META: Record<string, StatusMeta> = {
   draft: { label: '待生成', color: 'default' },
   running: { label: '生成中', color: 'processing' },
   succeeded: { label: '已完成', color: 'success' },
@@ -45,13 +51,14 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   cancelled: { label: '已取消', color: 'warning' }
 };
 
-const SCENE_STATUS_COLOR: Record<string, string> = {
-  pending: 'default',
-  running: 'processing',
-  succeeded: 'success',
-  failed: 'error',
-  skipped: 'warning',
-  cancelled: 'warning'
+// 幕状态标签：label 用原值（现状口径），色板走 antd 预设词
+const SCENE_STATUS_META: Record<string, StatusMeta> = {
+  pending: { label: 'pending', color: 'default' },
+  running: { label: 'running', color: 'processing' },
+  succeeded: { label: 'succeeded', color: 'success' },
+  failed: { label: 'failed', color: 'error' },
+  skipped: { label: 'skipped', color: 'warning' },
+  cancelled: { label: 'cancelled', color: 'warning' }
 };
 
 const STYLE_OPTIONS = [
@@ -71,6 +78,7 @@ export const GraphicPage: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [form] = Form.useForm();
   const [detail, setDetail] = useState<{ story: GraphicStory; scenes: GraphicScene[] } | null>(null);
+  const msg = useApiMessage();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -116,7 +124,7 @@ export const GraphicPage: React.FC = () => {
         continuity: values.mode === 'anime' ? values.continuity !== false : undefined,
         promptTemplateId: values.promptTemplateId ? Number(values.promptTemplateId) : undefined
       });
-      message.success('故事已创建');
+      msg.success('故事已创建');
       setCreateOpen(false);
       form.resetFields();
       refresh();
@@ -130,7 +138,7 @@ export const GraphicPage: React.FC = () => {
   const handleRun = async (story: GraphicStory) => {
     try {
       await runGraphicStory(story.id);
-      message.success('已开始生成，进度请关注状态');
+      msg.success('已开始生成，进度请关注状态');
       refresh();
     } catch {
       // ignore
@@ -140,7 +148,7 @@ export const GraphicPage: React.FC = () => {
   const handleCancel = async (story: GraphicStory) => {
     try {
       await cancelGraphicStory(story.id);
-      message.info('已请求取消');
+      msg.info('已请求取消');
       refresh();
     } catch {
       // ignore
@@ -149,38 +157,39 @@ export const GraphicPage: React.FC = () => {
 
   const handleDelete = async (story: GraphicStory) => {
     // MVP：删除走状态过滤（Go 侧暂未暴露 DELETE，后续补充）
-    message.info('删除接口将在下一迭代提供');
+    msg.info('删除接口将在下一迭代提供');
     void story;
   };
 
   return (
-    <Card
-      title="图文故事"
-      extra={
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>
-            刷新
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-            新建故事
-          </Button>
-        </Space>
-      }
-    >
+    <div>
+      <PageHeader
+        title="图文故事"
+        actions={
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>
+              刷新
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+              新建故事
+            </Button>
+          </Space>
+        }
+      />
+
       {stories.length === 0 && !loading ? (
-        <Empty description="还没有图文故事，点击右上角新建" />
+        <EmptyState description="还没有图文故事，点击右上角新建" />
       ) : (
-        <Space direction="vertical" style={{ width: '100%' }} size={12}>
+        <Space direction="vertical" className="w-full" size={12}>
           {stories.map((story) => {
-            const meta = STATUS_META[story.status] ?? STATUS_META.draft;
             return (
               <Card key={story.id} size="small" hoverable onClick={() => openDetail(story.id)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="flex justify-between items-center">
                   <Space>
                     <Typography.Text strong>{story.title}</Typography.Text>
                     {story.mode === 'anime' ? <Tag color="geekblue">动漫</Tag> : null}
                     <Tag>{STYLE_OPTIONS.find((o) => o.value === story.styleCategory)?.label ?? story.styleCategory}</Tag>
-                    <Tag color={meta.color}>{meta.label}</Tag>
+                    <StatusTag value={story.status} map={STATUS_META} fallback={STATUS_META.draft} />
                     {story.durationMs ? <Tag>{(story.durationMs / 1000).toFixed(1)}s</Tag> : null}
                   </Space>
                   <Space onClick={(e) => e.stopPropagation()}>
@@ -188,11 +197,11 @@ export const GraphicPage: React.FC = () => {
                       详情
                     </Button>
                     {story.status === 'running' ? (
-                      <Popconfirm title="确定取消该故事？" onConfirm={() => handleCancel(story)}>
+                      <ConfirmPopconfirm title="确定取消该故事？" onConfirm={() => handleCancel(story)}>
                         <Button size="small" danger icon={<StopOutlined />}>
                           取消
                         </Button>
-                      </Popconfirm>
+                      </ConfirmPopconfirm>
                     ) : (
                       <Button
                         size="small"
@@ -204,13 +213,13 @@ export const GraphicPage: React.FC = () => {
                         {story.status === 'failed' ? '重跑' : '生成'}
                       </Button>
                     )}
-                    <Popconfirm title="确定删除该故事？" onConfirm={() => handleDelete(story)}>
+                    <ConfirmPopconfirm title="确定删除该故事？" onConfirm={() => handleDelete(story)}>
                       <Button size="small" danger icon={<DeleteOutlined />} />
-                    </Popconfirm>
+                    </ConfirmPopconfirm>
                   </Space>
                 </div>
                 {story.error ? (
-                  <Typography.Text type="danger" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
+                  <Typography.Text type="danger" className="text-xs block mt-2">
                     {story.error}
                   </Typography.Text>
                 ) : null}
@@ -220,16 +229,16 @@ export const GraphicPage: React.FC = () => {
         </Space>
       )}
 
-      <Modal
+      <SelfModal
         title="新建图文故事"
         open={createOpen}
         onOk={handleCreate}
         onCancel={() => setCreateOpen(false)}
         confirmLoading={creating}
         okText="创建"
-        width={640}
+        width="md"
       >
-        <Form form={form} layout="vertical">
+        <SelfForm form={form}>
           <Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入标题' }]}>
             <Input placeholder="如：锦鲤物语" maxLength={64} />
           </Form.Item>
@@ -264,10 +273,11 @@ export const GraphicPage: React.FC = () => {
           >
             <Input.TextArea rows={6} maxLength={4000} showCount />
           </Form.Item>
-        </Form>
-      </Modal>
+        </SelfForm>
+      </SelfModal>
 
-      <Modal
+      {/* 860 为刻度外现状值（README 归档映射待专项截图比对），number 透传零视觉变化 */}
+      <SelfModal
         title={detail ? detail.story.title : '详情'}
         open={!!detail}
         onCancel={() => setDetail(null)}
@@ -276,56 +286,54 @@ export const GraphicPage: React.FC = () => {
       >
         {detail && (
           <>
-            <Descriptions size="small" column={3} style={{ marginBottom: 16 }}>
+            <Descriptions size="small" column={3} className="mb-4">
               <Descriptions.Item label="模式">
                 <Tag color={detail.story.mode === 'anime' ? 'geekblue' : 'default'}>
                   {detail.story.mode === 'anime' ? '动漫视频' : '图文'}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="状态">
-                <Tag color={(STATUS_META[detail.story.status] ?? STATUS_META.draft).color}>
-                  {(STATUS_META[detail.story.status] ?? STATUS_META.draft).label}
-                </Tag>
+                <StatusTag value={detail.story.status} map={STATUS_META} fallback={STATUS_META.draft} />
               </Descriptions.Item>
               <Descriptions.Item label="耗时">
                 {detail.story.durationMs ? `${(detail.story.durationMs / 1000).toFixed(1)}s` : '-'}
               </Descriptions.Item>
             </Descriptions>
             {detail.story.error ? (
-              <Typography.Text type="danger" style={{ display: 'block', marginBottom: 12 }}>
+              <Typography.Text type="danger" className="block mb-3">
                 {detail.story.error}
               </Typography.Text>
             ) : null}
             {detail.story.videoUrl ? (
-              <Card size="small" title="成片" style={{ marginBottom: 16 }}>
-                <video src={detail.story.videoUrl} controls style={{ width: '100%', maxHeight: 420 }} />
+              <Card size="small" title="成片" className="mb-4">
+                <video src={detail.story.videoUrl} controls className="w-full max-h-[420px]" />
               </Card>
             ) : null}
             {detail.scenes.length === 0 ? (
               <Empty description="尚未分幕，点击生成开始" />
             ) : (
-              <Space direction="vertical" style={{ width: '100%' }} size={12}>
+              <Space direction="vertical" className="w-full" size={12}>
                 {detail.scenes.map((scene) => (
                   <Card key={scene.id} size="small">
-                    <Space style={{ marginBottom: 8 }}>
+                    <Space className="mb-2">
                       <Tag>幕 {scene.idx}</Tag>
                       <Typography.Text strong>{scene.name}</Typography.Text>
-                      <Tag color={SCENE_STATUS_COLOR[scene.status] ?? 'default'}>{scene.status}</Tag>
+                      <StatusTag value={scene.status} map={SCENE_STATUS_META} fallback={{ label: scene.status, color: 'default' }} />
                       {scene.durationMs ? <Tag>{(scene.durationMs / 1000).toFixed(1)}s</Tag> : null}
                     </Space>
-                    <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
+                    <Typography.Paragraph type="secondary" className="text-xs !mb-2">
                       {scene.content}
                     </Typography.Paragraph>
                     {scene.imageUrl ? (
-                      <Image src={scene.imageUrl} alt={scene.name} width={280} style={{ borderRadius: 8 }} />
+                      <Image src={scene.imageUrl} alt={scene.name} width={280} className="rounded-lg" />
                     ) : null}
                     {scene.audioUrl ? (
-                      <div style={{ marginTop: 8 }}>
-                        <audio src={scene.audioUrl} controls style={{ width: 280, height: 32 }} />
+                      <div className="mt-2">
+                        <audio src={scene.audioUrl} controls className="w-[280px] h-8" />
                       </div>
                     ) : null}
                     {scene.error ? (
-                      <Typography.Text type="danger" style={{ fontSize: 12 }}>
+                      <Typography.Text type="danger" className="text-xs">
                         {scene.error}
                       </Typography.Text>
                     ) : null}
@@ -335,7 +343,7 @@ export const GraphicPage: React.FC = () => {
             )}
           </>
         )}
-      </Modal>
-    </Card>
+      </SelfModal>
+    </div>
   );
 }
