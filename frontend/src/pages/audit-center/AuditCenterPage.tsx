@@ -18,15 +18,23 @@ import {
   Typography,
   message
 } from 'antd';
-import { CopyOutlined } from '@ant-design/icons';
+import { CopyOutlined, DownloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import { listAuditLogs, getAuditLogDetail } from '../../api/auditCenter';
-import { listLogCenter, getLogCenterDetail, getLogTrace, LogEventType, TraceResult } from '../../api/logCenter';
+import {
+  listLogCenter,
+  getLogCenterDetail,
+  getLogTrace,
+  LogEventType,
+  TraceResult
+} from '../../api/logCenter';
 import { batchDicts } from '../../api/dict';
 import { AppTable } from '../../components/AppTable';
 import { JsonView } from '../../components/JsonView';
+import { OverviewPanel } from './OverviewPanel';
+import { downloadCsv } from '../../utils/csv';
 
 interface AuditItem {
   id: number;
@@ -50,9 +58,10 @@ interface AuditItem {
   referrer?: string;
 }
 
-type TabKey = 'audit' | LogEventType;
+type TabKey = 'overview' | 'audit' | LogEventType;
 
 const TAB_ITEMS: Array<{ key: TabKey; label: string }> = [
+  { key: 'overview', label: '概览' },
   { key: 'audit', label: '审计日志' },
   { key: 'track', label: '打点日志' },
   { key: 'frontend', label: '前端日志' },
@@ -114,9 +123,16 @@ export const AuditCenterPage: React.FC = () => {
   }>({ open: false, traceId: '', loading: false });
   // 同一查询条件只提示一次"范围被收敛"，翻页不重复弹
   const lastClampWarnRef = useRef('');
+  // 概览下钻：先记下目标筛选再切路由，路由 effect 应用它而不是清空
+  const pendingFiltersRef = useRef<Record<string, any> | null>(null);
+  const [autoRefreshSec, setAutoRefreshSec] = useState(0);
+  const [exporting, setExporting] = useState(false);
   const [form] = Form.useForm();
 
   const fetchData = async () => {
+    if (activeTab === 'overview') {
+      return;
+    }
     setLoading(true);
     try {
       const queryParams = { page, pageSize, ...filters };
@@ -160,13 +176,32 @@ export const AuditCenterPage: React.FC = () => {
       });
   }, []);
 
-  // 路由变化时切换 Tab 并重置查询条件
+  // 路由变化时切换 Tab 并重置查询条件；概览下钻跳转则应用预设筛选
   useEffect(() => {
     setActiveTab(defaultTab);
     setPage(1);
-    setFilters({});
-    form.resetFields();
+    const pending = pendingFiltersRef.current;
+    if (pending) {
+      pendingFiltersRef.current = null;
+      setFilters(pending);
+      const formValues: Record<string, unknown> = {};
+      Object.entries(pending).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && key !== 'start' && key !== 'end') {
+          formValues[key] = value;
+        }
+      });
+      form.setFieldsValue(formValues);
+    } else {
+      setFilters({});
+      form.resetFields();
+    }
   }, [defaultTab, form]);
+
+  // 概览下钻：切到目标 Tab 并带上下钻筛选（如 Top 错误 → 错误日志按关键字过滤）
+  const jumpToTab = (tab: 'track' | 'frontend' | 'error', filters: Record<string, unknown>) => {
+    pendingFiltersRef.current = filters;
+    navigate(`/logs/${tab}`);
+  };
 
   const onSearch = async () => {
     const values = await form.validateFields();
@@ -193,7 +228,7 @@ export const AuditCenterPage: React.FC = () => {
     setFilters({});
   };
 
-  const showDetail = async (type: TabKey, item: AuditItem) => {
+  const showDetail = async (type: 'audit' | LogEventType, item: AuditItem) => {
     setDetailLoading(true);
     try {
       const res =
@@ -260,18 +295,128 @@ export const AuditCenterPage: React.FC = () => {
     ? Object.entries(sourceLabelMap).map(([value, label]) => ({ value, label }))
     : SOURCE_FALLBACK_OPTIONS;
 
+  // 消息列：同类事件短窗口合并上报时带 meta.repeat，×N 提示重复次数
+  const messageWithRepeat = (_: unknown, record: AuditItem) => {
+    const repeat = (record.meta as { repeat?: number } | undefined)?.repeat;
+    return (
+      <span>
+        {record.message}
+        {repeat && repeat > 1 && (
+          <Tag color="orange" style={{ marginLeft: 4 }}>{`×${repeat}`}</Tag>
+        )}
+      </span>
+    );
+  };
+
+  // 自动刷新走 ref 取最新 fetchData，避免闭包里捕获旧的 activeTab/filters
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
+  useEffect(() => {
+    if (!autoRefreshSec || activeTab === 'overview') {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void fetchDataRef.current();
+    }, autoRefreshSec * 1000);
+    return () => window.clearInterval(timer);
+  }, [autoRefreshSec, activeTab]);
+
+  // 各 Tab 的 CSV 导出列（meta/detail 复杂字段序列化为 JSON 字符串）
+  const exportFields: Record<'audit' | LogEventType, Array<{ title: string; pick: (item: AuditItem) => string | number | null | undefined }>> = {
+    audit: [
+      { title: 'ID', pick: (i) => i.id },
+      { title: '用户', pick: (i) => i.userId },
+      { title: '模块', pick: (i) => i.module },
+      { title: '动作', pick: (i) => i.action },
+      { title: 'IP', pick: (i) => i.ip },
+      { title: 'TraceId', pick: (i) => i.traceId },
+      { title: '详情', pick: (i) => i.detail },
+      { title: '时间', pick: (i) => formatTime(i.createdAt) }
+    ],
+    track: [
+      { title: 'ID', pick: (i) => i.id },
+      { title: '用户', pick: (i) => i.userId },
+      { title: '页面码', pick: (i) => i.pageCode },
+      { title: '路径', pick: (i) => i.path },
+      { title: 'TraceId', pick: (i) => i.traceId },
+      { title: 'Session', pick: (i) => i.sessionId },
+      { title: '来源', pick: (i) => formatSource(i.source) },
+      { title: 'UserAgent', pick: (i) => i.userAgent },
+      { title: '时间', pick: (i) => formatTime(i.createdAt) }
+    ],
+    frontend: [
+      { title: 'ID', pick: (i) => i.id },
+      { title: '用户', pick: (i) => i.userId },
+      { title: '级别', pick: (i) => i.level },
+      { title: '分类', pick: (i) => i.category },
+      { title: '消息', pick: (i) => i.message },
+      { title: '重复次数', pick: (i) => (i.meta as { repeat?: number } | undefined)?.repeat },
+      { title: 'TraceId', pick: (i) => i.traceId },
+      { title: 'Session', pick: (i) => i.sessionId },
+      { title: '来源', pick: (i) => formatSource(i.source) },
+      { title: '堆栈', pick: (i) => i.stack },
+      { title: '元数据', pick: (i) => (i.meta ? JSON.stringify(i.meta) : undefined) },
+      { title: '时间', pick: (i) => formatTime(i.createdAt) }
+    ],
+    error: [
+      { title: 'ID', pick: (i) => i.id },
+      { title: '用户', pick: (i) => i.userId },
+      { title: '消息', pick: (i) => i.message },
+      { title: '重复次数', pick: (i) => (i.meta as { repeat?: number } | undefined)?.repeat },
+      { title: 'TraceId', pick: (i) => i.traceId },
+      { title: 'Session', pick: (i) => i.sessionId },
+      { title: '来源', pick: (i) => formatSource(i.source) },
+      { title: '堆栈', pick: (i) => i.stack },
+      { title: '元数据', pick: (i) => (i.meta ? JSON.stringify(i.meta) : undefined) },
+      { title: '时间', pick: (i) => formatTime(i.createdAt) }
+    ]
+  };
+
+  const onExport = async () => {
+    const tab = activeTab;
+    if (tab === 'overview') {
+      return;
+    }
+    setExporting(true);
+    try {
+      const maxRows = 1000;
+      const page = 100;
+      const all: AuditItem[] = [];
+      for (let p = 1; all.length < Math.min(total || maxRows, maxRows); p++) {
+        const queryParams = { ...filters, page: p, pageSize: page };
+        const res = tab === 'audit' ? await listAuditLogs(queryParams) : await listLogCenter({ type: tab, ...queryParams });
+        const items = (res.items ?? []) as AuditItem[];
+        all.push(...items);
+        if (items.length < page) {
+          break;
+        }
+      }
+      const fields = exportFields[tab];
+      downloadCsv(
+        `日志-${tab}-${dayjs().format('YYYYMMDD-HHmmss')}.csv`,
+        fields.map((f) => f.title),
+        all.map((item) => fields.map((f) => f.pick(item)))
+      );
+      message.success(`已导出 ${all.length} 条`);
+    } catch {
+      message.error('导出失败，请稍后重试');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const actionColumn: ColumnsType<AuditItem> = [
     {
       title: '操作',
       width: 150,
       render: (_: unknown, record) => (
         <Space size={0}>
-          {activeTab !== 'audit' && record.traceId && (
+          {record.traceId && (
             <Button type="link" size="small" className="!px-1" onClick={() => openTrace(record.traceId!)}>
               链路
             </Button>
           )}
-          <Button type="link" size="small" className="!px-1" onClick={() => showDetail(activeTab, record)}>
+          <Button type="link" size="small" className="!px-1" onClick={() => activeTab !== 'overview' && showDetail(activeTab, record)}>
             详情
           </Button>
         </Space>
@@ -308,6 +453,7 @@ export const AuditCenterPage: React.FC = () => {
         { title: '模块', dataIndex: 'module', width: 140 },
         { title: '动作', dataIndex: 'action', width: 160 },
         { title: 'IP', dataIndex: 'ip', width: 140 },
+        { title: 'TraceId', dataIndex: 'traceId', width: 200, ellipsis: true, render: (value: unknown) => (value as string) ?? '-' },
         ...timeColumn,
         ...actionColumn
       ];
@@ -334,7 +480,7 @@ export const AuditCenterPage: React.FC = () => {
           render: (value) => <Tag color={LEVEL_COLOR[value as string] ?? 'default'}>{(value as string) ?? '-'}</Tag>
         },
         { title: '分类', dataIndex: 'category', width: 120, render: (value) => value ?? '-' },
-        { title: '消息', dataIndex: 'message', width: 260, ellipsis: true },
+        { title: '消息', dataIndex: 'message', width: 260, ellipsis: true, render: messageWithRepeat },
         { title: 'TraceId', dataIndex: 'traceId', width: 200, ellipsis: true },
         { title: 'Session', dataIndex: 'sessionId', width: 200, ellipsis: true },
         ...sourceColumn,
@@ -344,7 +490,7 @@ export const AuditCenterPage: React.FC = () => {
     }
     return [
       ...baseColumns,
-      { title: '消息', dataIndex: 'message', width: 260, ellipsis: true },
+      { title: '消息', dataIndex: 'message', width: 260, ellipsis: true, render: messageWithRepeat },
       { title: 'TraceId', dataIndex: 'traceId', width: 200, ellipsis: true },
       { title: 'Session', dataIndex: 'sessionId', width: 200, ellipsis: true },
       ...sourceColumn,
@@ -367,6 +513,11 @@ export const AuditCenterPage: React.FC = () => {
           <FieldRow label="IP" copyText={item.ip}>
             {item.ip ?? '-'}
           </FieldRow>
+          {item.traceId && (
+            <FieldRow label="TraceId" copyText={item.traceId}>
+              {item.traceId}
+            </FieldRow>
+          )}
           <FieldRow label="时间">{formatTime(item.createdAt)}</FieldRow>
           {detailJson !== undefined ? (
             <div>
@@ -482,65 +633,65 @@ export const AuditCenterPage: React.FC = () => {
 
   return (
     <div className="app-page-flat">
-      <div className="page-filter-card">
-        <Form layout="inline" form={form} className="flex flex-wrap gap-4">
-          <Form.Item label="用户ID" name="userId">
-            <InputNumber placeholder="用户ID" min={1} precision={0} style={{ width: 140 }} />
-          </Form.Item>
-          {activeTab === 'audit' && (
-            <>
-              <Form.Item label="模块" name="module">
-                <Input placeholder="模块" maxLength={64} />
-              </Form.Item>
-              <Form.Item label="动作" name="action">
-                <Input placeholder="动作" maxLength={64} />
-              </Form.Item>
-            </>
-          )}
-          {activeTab === 'track' && (
-            <Form.Item label="页面码" name="pageCode">
-              <Input placeholder="页面码" maxLength={128} />
+      {activeTab !== 'overview' && (
+        <div className="page-filter-card">
+          <Form layout="inline" form={form} className="flex flex-wrap gap-4">
+            <Form.Item label="用户ID" name="userId">
+              <InputNumber placeholder="用户ID" min={1} precision={0} style={{ width: 140 }} />
             </Form.Item>
-          )}
-          {activeTab === 'frontend' && (
-            <Form.Item label="级别" name="level">
-              <Select placeholder="级别" allowClear options={LEVEL_OPTIONS} style={{ width: 120 }} />
-            </Form.Item>
-          )}
-          {activeTab !== 'audit' && (
-            <>
-              <Form.Item label="TraceId" name="traceId">
-                <Input placeholder="TraceId" maxLength={128} />
+            {activeTab === 'audit' && (
+              <>
+                <Form.Item label="模块" name="module">
+                  <Input placeholder="模块" maxLength={64} />
+                </Form.Item>
+                <Form.Item label="动作" name="action">
+                  <Input placeholder="动作" maxLength={64} />
+                </Form.Item>
+              </>
+            )}
+            {activeTab === 'track' && (
+              <Form.Item label="页面码" name="pageCode">
+                <Input placeholder="页面码" maxLength={128} />
               </Form.Item>
+            )}
+            {activeTab === 'frontend' && (
+              <Form.Item label="级别" name="level">
+                <Select placeholder="级别" allowClear options={LEVEL_OPTIONS} style={{ width: 120 }} />
+              </Form.Item>
+            )}
+            <Form.Item label="TraceId" name="traceId">
+              <Input placeholder="TraceId" maxLength={128} />
+            </Form.Item>
+            {activeTab !== 'audit' && (
               <Form.Item label="SessionId" name="sessionId">
                 <Input placeholder="SessionId" maxLength={128} />
               </Form.Item>
-            </>
-          )}
-          {(activeTab === 'frontend' || activeTab === 'error') && (
-            <>
-              <Form.Item label="来源" name="source">
-                <Select placeholder="来源" allowClear options={sourceOptions} style={{ width: 120 }} />
-              </Form.Item>
-              <Form.Item label="关键字" name="keyword">
-                <Input placeholder="消息关键字" maxLength={200} />
-              </Form.Item>
-            </>
-          )}
-          <Form.Item label="时间范围" name="range">
-            <DatePicker.RangePicker showTime />
-          </Form.Item>
-          <Form.Item className="w-full !mb-0 text-center">
-            <Space>
-              <Button type="primary" onClick={onSearch}>
-                查询
-              </Button>
-              <Button onClick={onReset}>重置</Button>
-              <Button onClick={fetchData}>刷新</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </div>
+            )}
+            {(activeTab === 'frontend' || activeTab === 'error') && (
+              <>
+                <Form.Item label="来源" name="source">
+                  <Select placeholder="来源" allowClear options={sourceOptions} style={{ width: 120 }} />
+                </Form.Item>
+                <Form.Item label="关键字" name="keyword">
+                  <Input placeholder="消息/堆栈关键字" maxLength={200} />
+                </Form.Item>
+              </>
+            )}
+            <Form.Item label="时间范围" name="range">
+              <DatePicker.RangePicker showTime />
+            </Form.Item>
+            <Form.Item className="w-full !mb-0 text-center">
+              <Space>
+                <Button type="primary" onClick={onSearch}>
+                  查询
+                </Button>
+                <Button onClick={onReset}>重置</Button>
+                <Button onClick={fetchData}>刷新</Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </div>
+      )}
 
       <div className="page-table-card">
         <Tabs
@@ -549,29 +700,52 @@ export const AuditCenterPage: React.FC = () => {
           items={TAB_ITEMS}
           style={{ marginBottom: 8 }}
           tabBarExtraContent={
-            activeTab !== 'audit' ? (
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                日志仅保留最近 {retentionDays} 天
-              </Typography.Text>
-            ) : undefined
+            activeTab === 'overview' ? undefined : (
+              <Space size={8}>
+                {activeTab !== 'audit' && (
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    仅保留最近 {retentionDays} 天
+                  </Typography.Text>
+                )}
+                <Select
+                  size="small"
+                  style={{ width: 110 }}
+                  value={autoRefreshSec}
+                  onChange={setAutoRefreshSec}
+                  options={[
+                    { value: 0, label: '不自动刷新' },
+                    { value: 10, label: '10s 刷新' },
+                    { value: 30, label: '30s 刷新' },
+                    { value: 60, label: '60s 刷新' }
+                  ]}
+                />
+                <Button size="small" icon={<DownloadOutlined />} loading={exporting} onClick={onExport}>
+                  导出CSV
+                </Button>
+              </Space>
+            )
           }
         />
-        <AppTable
-          rowKey="id"
-          columns={columns}
-          dataSource={data}
-          loading={loading}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            onChange: (p, ps) => {
-              setPage(p);
-              setPageSize(ps);
-            }
-          }}
-        />
+        {activeTab !== 'overview' && (
+          <AppTable
+            rowKey="id"
+            columns={columns}
+            dataSource={data}
+            loading={loading}
+            pagination={{
+              current: page,
+              pageSize,
+              total,
+              onChange: (p, ps) => {
+                setPage(p);
+                setPageSize(ps);
+              }
+            }}
+          />
+        )}
       </div>
+
+      {activeTab === 'overview' && <OverviewPanel onJump={jumpToTab} />}
 
       <Modal
         className="app-form-modal"

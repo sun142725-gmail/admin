@@ -37,3 +37,20 @@ export interface TraceResult {
 export const getLogTrace = (traceId: string) => {
   return http.get<never, TraceResult>(`/log-center/trace/${traceId}`);
 };
+
+// 概览统计：三类日志趋势 + Top 聚合（服务端会把 days 收敛到保留期内）
+export interface LogStats {
+  days: number;
+  start: string;
+  errorTrend: Array<{ day: string; count: number }>;
+  pvTrend: Array<{ day: string; count: number }>;
+  frontendTrend: Array<{ day: string; count: number }>;
+  topErrors: Array<{ message: string; count: number; firstSeen: string; lastSeen: string }>;
+  topSlowRequests: Array<{ message: string; count: number; lastSeen: string }>;
+  topPages: Array<{ pageCode: string; count: number }>;
+  errorBySource: Array<{ source: string | null; count: number }>;
+}
+
+export const getLogStats = (days: number) => {
+  return http.get<never, LogStats>('/log-center/stats', { params: { days } });
+};
