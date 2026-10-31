@@ -4,14 +4,12 @@ import {
   App as AntApp,
   Button,
   Card,
-  Drawer,
   Dropdown,
   Empty,
   Form,
   Image,
   Input,
   InputNumber,
-  Modal,
   Popconfirm,
   Progress,
   Select,
@@ -19,8 +17,7 @@ import {
   Spin,
   Tag,
   Typography,
-  Upload,
-  message
+  Upload
 } from 'antd';
 import type { MenuProps } from 'antd';
 import type { UploadFile } from 'antd';
@@ -39,6 +36,13 @@ import {
   VideoCameraOutlined
 } from '@ant-design/icons';
 import { Permission } from '../../components/permission/Permission';
+import { SelfDrawer } from '../../components/base/SelfDrawer';
+import { SelfForm } from '../../components/base/SelfForm';
+import { SelfModal } from '../../components/base/SelfModal';
+import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { PageHeader } from '../../components/business/PageHeader';
+import { StatusTag } from '../../components/business/StatusTag';
+import type { StatusMeta } from '../../types/ui';
 import {
   NovelProjectDetail,
   NovelProjectSummary,
@@ -59,7 +63,7 @@ import { NovelShotEditModal } from './NovelShotEditModal';
 import { formatDuration } from './flowRunUI';
 import './flow-pages.css';
 
-const PROJECT_STATUS_META: Record<string, { label: string; color: string }> = {
+const PROJECT_STATUS_META: Record<string, StatusMeta> = {
   draft: { label: '待生成', color: 'default' },
   running: { label: '生成中', color: 'processing' },
   completed: { label: '已完成', color: 'success' },
@@ -67,7 +71,7 @@ const PROJECT_STATUS_META: Record<string, { label: string; color: string }> = {
   cancelled: { label: '已取消', color: 'warning' }
 };
 
-const SHOT_STATUS_META: Record<string, { label: string; color: string }> = {
+const SHOT_STATUS_META: Record<string, StatusMeta> = {
   pending: { label: '待生成', color: 'default' },
   image_done: { label: '已出图', color: 'blue' },
   audio_done: { label: '已配音', color: 'geekblue' },
@@ -345,48 +349,42 @@ export const NovelVideoPage: React.FC = () => {
 
   return (
     <div>
-      <div className="flow-page-header">
-        <Typography.Title level={4} className="flow-page-header-title">
-          小说转视频
-        </Typography.Title>
-        <Typography.Text className="flow-page-header-desc">
-          导入小说自动分片，逐章生成分镜、首帧图与视频片段，最后合成成片——一键完成
-        </Typography.Text>
-        <span className="flow-page-header-spacer" />
-        <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading} />
-        <Permission code="flow:define:manage">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-            导入小说
-          </Button>
-        </Permission>
-      </div>
+      {/* flow-page-header 自绘 flex 迁 PageHeader（README 收编写法） */}
+      <PageHeader
+        className="flex-wrap gap-y-1"
+        title="小说转视频"
+        subtitle="导入小说自动分片，逐章生成分镜、首帧图与视频片段，最后合成成片——一键完成"
+        actions={
+          <>
+            <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading} />
+            <Permission code="flow:define:manage">
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+                导入小说
+              </Button>
+            </Permission>
+          </>
+        }
+      />
 
       {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
+        <div className="flex justify-center py-20">
           <Spin />
         </div>
       ) : projects.length === 0 ? (
-        <Empty description="还没有项目，导入一段小说开始" style={{ padding: 60 }} />
+        <Empty description="还没有项目，导入一段小说开始" className="py-15" />
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))',
-            gap: 16
-          }}
-        >
+        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))]">
           {projects.map((project) => {
-            const meta = PROJECT_STATUS_META[project.status] ?? { label: project.status, color: 'default' };
             return (
               <Card key={project.id} hoverable styles={{ body: { padding: 16 } }} onClick={() => void openDetail(project.id)}>
                 <Space size={6} wrap>
-                  <BookOutlined style={{ fontSize: 18, color: 'var(--brand-primary)' }} />
-                  <Typography.Text strong style={{ fontSize: 15 }}>
+                  <BookOutlined className="text-lg text-primary" />
+                  <Typography.Text strong className="text-[15px]">
                     {project.name}
                   </Typography.Text>
-                  <Tag color={meta.color}>{meta.label}</Tag>
+                  <StatusTag value={project.status} map={PROJECT_STATUS_META} fallback={{ label: project.status, color: 'default' }} />
                 </Space>
-                <Typography.Paragraph type="secondary" ellipsis={{ rows: 1 }} style={{ margin: '8px 0 6px', fontSize: 12 }}>
+                <Typography.Paragraph type="secondary" ellipsis={{ rows: 1 }} className="mt-2 !mb-1.5 text-xs">
                   {project.stageMessage ?? project.error ?? '—'}
                 </Typography.Paragraph>
                 {project.totalShots > 0 && (
@@ -396,7 +394,7 @@ export const NovelVideoPage: React.FC = () => {
                     status={project.status === 'failed' ? 'exception' : 'normal'}
                   />
                 )}
-                <div style={{ fontSize: 12, color: 'var(--text-sub)', marginTop: 6 }}>
+                <div className="text-xs text-text-sub mt-1.5">
                   {project.totalShots > 0 ? `分镜 ${project.doneShots}/${project.totalShots}` : '尚未生成分镜'}
                   {project.durationMs ? ` · 总耗时 ${formatDuration(project.durationMs)}` : ''}
                 </div>
@@ -427,9 +425,9 @@ export const NovelVideoPage: React.FC = () => {
                     )}
                   </Space>
                   <Permission code="flow:define:manage">
-                    <Popconfirm title="删除项目及其全部产物？" onConfirm={() => void remove(project.id)} okText="删除" cancelText="取消">
+                    <ConfirmPopconfirm title="删除项目及其全部产物？" onConfirm={() => void remove(project.id)} okText="删除" cancelText="取消">
                       <Button size="small" danger icon={<DeleteOutlined />} />
-                    </Popconfirm>
+                    </ConfirmPopconfirm>
                   </Permission>
                 </div>
               </Card>
@@ -438,22 +436,22 @@ export const NovelVideoPage: React.FC = () => {
         </div>
       )}
 
-      <Modal
+      <SelfModal
         title="导入小说"
         open={createOpen}
         onCancel={() => setCreateOpen(false)}
         onOk={() => void submitCreate()}
         okText="创建并分片"
         confirmLoading={creating}
-        width={640}
+        width="md"
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" initialValues={{ shotsPerChapter: 3, videoSeconds: 5 }}>
+        <SelfForm form={form} initialValues={{ shotsPerChapter: 3, videoSeconds: 5 }}>
           <Form.Item name="name" label="项目名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="如：星际橘猫 第一集" maxLength={64} />
           </Form.Item>
           <Form.Item label="小说文本（粘贴或上传 txt）" required>
-            <Space direction="vertical" style={{ width: '100%' }} size={8}>
+            <Space direction="vertical" className="w-full" size={8}>
               <Upload
                 accept=".txt"
                 maxCount={1}
@@ -486,7 +484,7 @@ export const NovelVideoPage: React.FC = () => {
             </Form.Item>
             <Form.Item name="videoSeconds" label="单镜时长（秒）">
               <Select
-                style={{ width: 100 }}
+                className="w-[100px]"
                 options={[
                   { value: 5, label: '5 秒' },
                   { value: 10, label: '10 秒' }
@@ -494,12 +492,13 @@ export const NovelVideoPage: React.FC = () => {
               />
             </Form.Item>
           </Space>
-        </Form>
-      </Modal>
+        </SelfForm>
+      </SelfModal>
 
-      <Drawer
+      {/* width=720 即 SelfDrawer lg 档 */}
+      <SelfDrawer
         title={detail ? `项目：${detail.project.name}` : '项目详情'}
-        width={720}
+        width="lg"
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
         destroyOnHidden
@@ -520,14 +519,14 @@ export const NovelVideoPage: React.FC = () => {
                 </Permission>
               )}
               <Permission code="flow:define:manage">
-                <Popconfirm
+                <ConfirmPopconfirm
                   title="重新分片将清空已有分镜与产物，确认？"
                   onConfirm={() => void reSplit(detail.project.id)}
                   okText="重新分片"
                   cancelText="取消"
                 >
                   <Button size="small">重新分片</Button>
-                </Popconfirm>
+                </ConfirmPopconfirm>
               </Permission>
             </Space>
           )
@@ -535,16 +534,18 @@ export const NovelVideoPage: React.FC = () => {
       >
         {detail && (
           <>
-            <Space size={8} wrap style={{ marginBottom: 12 }}>
-              <Tag color={PROJECT_STATUS_META[detail.project.status]?.color}>
-                {PROJECT_STATUS_META[detail.project.status]?.label ?? detail.project.status}
-              </Tag>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            <Space size={8} wrap className="mb-3">
+              <StatusTag
+                value={detail.project.status}
+                map={PROJECT_STATUS_META}
+                fallback={{ label: detail.project.status, color: 'default' }}
+              />
+              <Typography.Text type="secondary" className="text-xs">
                 {detail.project.stageMessage ?? detail.project.error ?? `共 ${detail.chapters.length} 章 · ${detail.progress.total} 个分镜`}
               </Typography.Text>
               {/* 字幕路径后端已存 /uploads/... 完整静态路径，直接用，不做前缀拼接 */}
               {detail.project.finalSubtitlePath && (
-                <a href={detail.project.finalSubtitlePath} download style={{ fontSize: 12 }}>
+                <a href={detail.project.finalSubtitlePath} download className="text-xs">
                   下载字幕（SRT）
                 </a>
               )}
@@ -562,16 +563,16 @@ export const NovelVideoPage: React.FC = () => {
               status={detail.progress.failed > 0 ? 'exception' : 'normal'}
             />
             {detail.project.finalVideoPath && (
-              <div style={{ margin: '16px 0' }}>
-                <Typography.Title level={5} style={{ marginTop: 0 }}>
+              <div className="my-4">
+                <Typography.Title level={5} className="!mt-0">
                   成片
                 </Typography.Title>
                 {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video src={detail.project.finalVideoPath} controls style={{ width: '100%', borderRadius: 12 }} />
+                <video src={detail.project.finalVideoPath} controls className="w-full rounded-xl" />
               </div>
             )}
             {detail.chapters.map((chapter) => (
-              <Card key={chapter.id} size="small" title={`${chapter.idx}. ${chapter.title}`} style={{ marginTop: 12 }}
+              <Card key={chapter.id} size="small" title={`${chapter.idx}. ${chapter.title}`} className="mt-3"
                 extra={
                   <Tag color={chapter.status === 'storyboarded' ? 'success' : chapter.status === 'failed' ? 'error' : 'default'}>
                     {chapter.status === 'storyboarded' ? '已分镜' : chapter.status === 'failed' ? '分镜失败' : '待分镜'}
@@ -579,7 +580,7 @@ export const NovelVideoPage: React.FC = () => {
                 }
               >
                 {chapter.error && (
-                  <Typography.Paragraph type="danger" style={{ fontSize: 12, marginBottom: 8 }}>
+                  <Typography.Paragraph type="danger" className="text-xs !mb-2">
                     {chapter.error}
                   </Typography.Paragraph>
                 )}
@@ -588,65 +589,52 @@ export const NovelVideoPage: React.FC = () => {
                   return (
                     <div
                       key={shot.id}
-                      style={{
-                        display: 'flex',
-                        gap: 12,
-                        padding: '8px 0',
-                        borderTop: '1px solid var(--panel-border)',
-                        alignItems: 'flex-start'
-                      }}
+                      className="flex gap-3 py-2 border-t border-[var(--panel-border)] items-start"
                     >
-                      <div style={{ width: 96, height: 64, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: 'var(--app-bg)' }}>
+                      <div className="w-24 h-16 shrink-0 rounded-lg overflow-hidden bg-[var(--app-bg)]">
                         {shot.imageUrl ? (
                           <Image src={shot.imageUrl} width={96} height={64} style={{ objectFit: 'cover' }} />
                         ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#bbb', fontSize: 12 }}>
+                          <div className="flex items-center justify-center h-full text-[#bbb] text-xs">
                             无图
                           </div>
                         )}
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="flex-1 min-w-0">
                         <Space size={6} wrap>
-                          <Tag color={shotMeta.color} style={{ marginRight: 0 }}>
+                          {/* 状态 Tag 带 #idx 前缀，StatusTag 仅渲染 meta.label，保留原生写法 */}
+                          <Tag color={shotMeta.color} className="!mr-0">
                             #{shot.idx} {shotMeta.label}
                           </Tag>
                           {shot.firstFrameLocked && (
-                            <Tag style={{ marginRight: 0, fontSize: 11 }} color="volcano">
+                            <Tag className="!mr-0 !text-[11px]" color="volcano">
                               首帧锁定
                             </Tag>
                           )}
                           {shot.shotMode === 't2v' && (
-                            <Tag style={{ marginRight: 0, fontSize: 11 }}>文生视频</Tag>
+                            <Tag className="!mr-0 !text-[11px]">文生视频</Tag>
                           )}
                           {shot.durationMs ? (
-                            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                            <Typography.Text type="secondary" className="text-[11px]">
                               {formatDuration(shot.durationMs)}
                             </Typography.Text>
                           ) : null}
                           {shot.audioDurationMs ? (
-                            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                            <Typography.Text type="secondary" className="text-[11px]">
                               配音 {(shot.audioDurationMs / 1000).toFixed(1)}s
                             </Typography.Text>
                           ) : null}
                         </Space>
-                        <Typography.Paragraph style={{ margin: '4px 0', fontSize: 12 }} ellipsis={{ rows: 2 }}>
+                        <Typography.Paragraph className="mt-1 !mb-1 text-xs" ellipsis={{ rows: 2 }}>
                           {shot.narration || shot.motionPrompt}
                         </Typography.Paragraph>
                         {shot.error && (
-                          <Typography.Text type="danger" style={{ fontSize: 11 }}>
+                          <Typography.Text type="danger" className="text-[11px]">
                             {shot.error}
                           </Typography.Text>
                         )}
                       </div>
-                      <div
-                        style={{
-                          flexShrink: 0,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'flex-end',
-                          gap: 4
-                        }}
-                      >
+                      <div className="shrink-0 flex flex-col items-end gap-1">
                         <Space size={4}>
                           <Permission code="flow:define:manage">
                             <Button
@@ -674,7 +662,7 @@ export const NovelVideoPage: React.FC = () => {
                             </Dropdown>
                           </Permission>
                         </Space>
-                        <Space size={8} style={{ fontSize: 11 }}>
+                        <Space size={8} className="text-[11px]">
                           {shot.audioUrl && (
                             <a href={shot.audioUrl} target="_blank" rel="noreferrer">
                               听配音
@@ -694,7 +682,7 @@ export const NovelVideoPage: React.FC = () => {
             ))}
           </>
         )}
-      </Drawer>
+      </SelfDrawer>
 
       <NovelShotEditModal
         open={Boolean(editingShot)}

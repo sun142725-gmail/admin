@@ -1,8 +1,17 @@
 // 单镜编辑弹窗：片段级创作控制（锁定原文/视觉任务/推进方式/生成模式/首帧锁定/旁白）。
 // 画面与运动提示词不可在此直接改——由「AI 重新规划」生成，这里折叠只读展示供核对。
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Collapse, Form, Input, Modal, Select, Switch, Tag, Typography } from 'antd';
+import Alert from 'antd/es/alert';
+import Collapse from 'antd/es/collapse';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Select from 'antd/es/select';
+import Switch from 'antd/es/switch';
+import Tag from 'antd/es/tag';
+import Typography from 'antd/es/typography';
 import { updateNovelShot, NovelShotVo, UpdateNovelShotPayload } from '../../api/novelVideo';
+import { SelfForm } from '../../components/base/SelfForm';
+import { SelfModal } from '../../components/base/SelfModal';
 import './flow-pages.css';
 
 export interface NovelShotEditModalProps {
@@ -85,7 +94,7 @@ export const NovelShotEditModal: React.FC<NovelShotEditModalProps> = ({
   };
 
   return (
-    <Modal
+    <SelfModal
       title={shot ? `编辑分镜 #${shot.idx}` : '编辑分镜'}
       open={open}
       onCancel={onCancel}
@@ -95,7 +104,7 @@ export const NovelShotEditModal: React.FC<NovelShotEditModalProps> = ({
       width={560}
       destroyOnHidden
     >
-      <Form form={form} layout="vertical" requiredMark={false}>
+      <SelfForm form={form} requiredMark={false}>
         <Form.Item
           name="lockedSourceText"
           label="锁定原文"
@@ -123,7 +132,7 @@ export const NovelShotEditModal: React.FC<NovelShotEditModalProps> = ({
         <Form.Item name="narration" label="旁白/台词" extra="配音与字幕的依据，30 字内效果最佳">
           <Input.TextArea rows={2} maxLength={5000} placeholder="如：他推开门，看见漫天大雪。" />
         </Form.Item>
-      </Form>
+      </SelfForm>
       {shot && (
         <Collapse
           ghost
@@ -131,29 +140,29 @@ export const NovelShotEditModal: React.FC<NovelShotEditModalProps> = ({
           items={[
             {
               key: 'prompts',
-              label: <span style={{ fontSize: 12 }}>高级：画面 / 运动提示词（只读，走「AI 重新规划」修改）</span>,
+              label: <span className="text-xs">高级：画面 / 运动提示词（只读，走「AI 重新规划」修改）</span>,
               children: (
                 <div className="novel-shot-prompt-review">
                   <div>
-                    <Tag color="purple" style={{ marginRight: 4 }}>
+                    <Tag color="purple" className="!mr-1">
                       首帧
                     </Tag>
-                    <Typography.Paragraph copyable style={{ fontSize: 12, marginBottom: 4 }}>
+                    <Typography.Paragraph copyable className="text-xs !mb-1">
                       {shot.scenePrompt || '—'}
                     </Typography.Paragraph>
                   </div>
                   <div>
-                    <Tag color="orange" style={{ marginRight: 4 }}>
+                    <Tag color="orange" className="!mr-1">
                       运动
                     </Tag>
-                    <Typography.Paragraph copyable style={{ fontSize: 12, marginBottom: 0 }}>
+                    <Typography.Paragraph copyable className="text-xs !mb-0">
                       {shot.motionPrompt || '—'}
                     </Typography.Paragraph>
                   </div>
                   <Alert
                     type="info"
                     showIcon
-                    style={{ marginTop: 8, fontSize: 12 }}
+                    className="mt-2 text-xs"
                     message="提示词由 AI 重新规划生成；保存本弹窗不会改动它们。"
                   />
                 </div>
@@ -162,6 +171,6 @@ export const NovelShotEditModal: React.FC<NovelShotEditModalProps> = ({
           ]}
         />
       )}
-    </Modal>
+    </SelfModal>
   );
 };

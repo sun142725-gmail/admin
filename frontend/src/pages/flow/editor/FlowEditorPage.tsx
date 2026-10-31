@@ -27,10 +27,8 @@ import {
   Alert,
   App as AntApp,
   Button,
-  Drawer,
   Form,
   Input,
-  Modal,
   Space,
   Spin,
   Tag,
@@ -66,6 +64,9 @@ import {
 import { listModels } from '../../../api/ai';
 import type { AiModel } from '../../../api/ai';
 import { Permission } from '../../../components/permission/Permission';
+import { SelfDrawer } from '../../../components/base/SelfDrawer';
+import { SelfForm } from '../../../components/base/SelfForm';
+import { SelfModal } from '../../../components/base/SelfModal';
 import { NODE_META, nodeMetaByKey, nextNodeName } from './nodeMeta';
 import { FlowNodeCard, type FlowCanvasNode } from './FlowNodeCard';
 import { NodeConfigPanel } from './NodeConfigPanel';
@@ -487,7 +488,7 @@ const FlowEditorInner: React.FC = () => {
   const save = useCallback(async () => {
     const errors = validateCanvas(nodes, edges);
     if (errors.length > 0) {
-      modal.error({ title: '画布校验未通过', content: <ul style={{ paddingLeft: 18 }}>{errors.map((item) => <li key={item}>{item}</li>)}</ul> });
+      modal.error({ title: '画布校验未通过', content: <ul className="pl-[18px]">{errors.map((item) => <li key={item}>{item}</li>)}</ul> });
       return;
     }
     setSaving(true);
@@ -505,7 +506,7 @@ const FlowEditorInner: React.FC = () => {
   const checkCanvasBeforeRun = useCallback((): boolean => {
     const errors = validateCanvas(nodes, edges);
     if (errors.length > 0) {
-      modal.error({ title: '画布校验未通过，无法运行', content: <ul style={{ paddingLeft: 18 }}>{errors.map((item) => <li key={item}>{item}</li>)}</ul> });
+      modal.error({ title: '画布校验未通过，无法运行', content: <ul className="pl-[18px]">{errors.map((item) => <li key={item}>{item}</li>)}</ul> });
       return false;
     }
     if (dirty) {
@@ -781,7 +782,7 @@ const FlowEditorInner: React.FC = () => {
 
   if (!flow) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="h-screen flex items-center justify-center">
         <Spin tip="加载任务流…" />
       </div>
     );
@@ -791,13 +792,13 @@ const FlowEditorInner: React.FC = () => {
     <div className={isNarrow ? 'flow-editor narrow' : 'flow-editor'}>
       <div className="flow-editor-header">
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/flow')} />
-        <span style={{ fontSize: 22 }}>{flow.icon}</span>
+        <span className="text-[22px]">{flow.icon}</span>
         <Typography.Title level={5} className="flow-editor-title">
           {flow.name}
         </Typography.Title>
         <Tag>V{flow.version}</Tag>
         {dirty && <Tag color="orange">未保存</Tag>}
-        <span style={{ flex: 1 }} />
+        <span className="flex-1" />
         <Space wrap>
           {isNarrow && (
             <Button
@@ -826,7 +827,7 @@ const FlowEditorInner: React.FC = () => {
           </Permission>
         </Space>
       </div>
-      <div className="flow-editor-body" style={{ flex: 1, minHeight: 0 }}>
+      <div className="flow-editor-body flex-1 min-h-0">
         {(!isNarrow || paletteOpen) && paletteElement}
         <div className="flow-canvas-wrap">
           <ReactFlow
@@ -864,9 +865,10 @@ const FlowEditorInner: React.FC = () => {
         </div>
         {!isNarrow && configPanelElement}
         {isNarrow && (
-          <Drawer
+          <SelfDrawer
             title="节点配置"
             placement="right"
+            // width="min(92vw, 360px)" 为 plan 文档认可的响应式实现，SelfDrawer 字符串透传保留
             width="min(92vw, 360px)"
             open={Boolean(selected)}
             onClose={onPaneClick}
@@ -874,7 +876,7 @@ const FlowEditorInner: React.FC = () => {
             destroyOnHidden
           >
             {configPanelElement}
-          </Drawer>
+          </SelfDrawer>
         )}
       </div>
       <RunPanel
@@ -886,7 +888,7 @@ const FlowEditorInner: React.FC = () => {
         onRetry={retryCurrentRun}
       />
 
-      <Modal
+      <SelfModal
         title={
           <Space>
             <CaretRightOutlined />
@@ -903,7 +905,7 @@ const FlowEditorInner: React.FC = () => {
         {startVariables.length === 0 ? (
           <Alert type="info" message="开始节点未定义变量，将直接执行。" />
         ) : (
-          <Form form={runForm} layout="vertical">
+          <SelfForm form={runForm}>
             {startVariables.map((variable) => (
               <Form.Item
                 key={variable.name}
@@ -914,11 +916,11 @@ const FlowEditorInner: React.FC = () => {
                 <Input.TextArea rows={2} placeholder="运行入参" autoComplete="off" />
               </Form.Item>
             ))}
-          </Form>
+          </SelfForm>
         )}
-      </Modal>
+      </SelfModal>
 
-      <Drawer
+      <SelfDrawer
         title={
           <Space>
             <ExperimentOutlined />
@@ -927,11 +929,12 @@ const FlowEditorInner: React.FC = () => {
         }
         open={Boolean(trialTarget)}
         onClose={() => setTrialTarget(null)}
+        // 460 为刻度外现状值（README flow checklist 待截图归档），number 透传零视觉变化 + 80vw 小屏兜底
         width={460}
         forceRender
         destroyOnHidden
         footer={
-          <Space style={{ float: 'right' }}>
+          <Space className="float-right">
             <Button onClick={() => setTrialTarget(null)}>取消</Button>
             <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => void submitTrial()}>
               执行试运行
@@ -944,17 +947,17 @@ const FlowEditorInner: React.FC = () => {
           showIcon
           message="只执行该节点"
           description="以下变量已按最近一次成功运行预填，可直接修改后单步执行，用于快速调试提示词与参数。"
-          style={{ marginBottom: 16 }}
+          className="mb-4"
         />
-        <Form form={mockForm} layout="vertical" onValuesChange={(_, values) => setMockValues(values)}>
-          {Object.keys(mockValues).length === 0 && <div style={{ color: '#999' }}>该节点没有上游变量依赖。</div>}
+        <SelfForm form={mockForm} onValuesChange={(_, values) => setMockValues(values)}>
+          {Object.keys(mockValues).length === 0 && <div className="text-text-sub">该节点没有上游变量依赖。</div>}
           {Object.keys(mockValues).map((ref) => (
             <Form.Item key={ref} name={ref} label={<code>{`{{${ref}}}`}</code>}>
               <Input.TextArea rows={2} placeholder="mock 值" autoComplete="off" />
             </Form.Item>
           ))}
-        </Form>
-      </Drawer>
+        </SelfForm>
+      </SelfDrawer>
     </div>
   );
 };

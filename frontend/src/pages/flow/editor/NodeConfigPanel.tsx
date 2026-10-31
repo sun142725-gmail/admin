@@ -1,8 +1,19 @@
 // 右侧配置面板：按节点类型渲染表单（受控回写画布数据），模板字段支持一键插入上游变量。
 import { useCallback, useMemo } from 'react';
-import { Button, Form, Input, InputNumber, Popover, Radio, Select, Slider, Space, Tag, message } from 'antd';
+import Button from 'antd/es/button';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import InputNumber from 'antd/es/input-number';
+import Popover from 'antd/es/popover';
+import Radio from 'antd/es/radio';
+import Select from 'antd/es/select';
+import Slider from 'antd/es/slider';
+import Space from 'antd/es/space';
+import Tag from 'antd/es/tag';
 import { DeleteOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { AiModel } from '../../../api/ai';
+import { SelfForm } from '../../../components/base/SelfForm';
+import { useApiMessage } from '../../../hooks/useApiMessage';
 import type { FlowCanvasNode } from './FlowNodeCard';
 import { nodeMetaByKey, outputFieldsOf } from './nodeMeta';
 
@@ -57,6 +68,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
   onTrialRun
 }) => {
   const [form] = Form.useForm<FormValues>();
+  const msg = useApiMessage();
   const flowType = node.data.flowType ?? 'llm';
   const meta = nodeMetaByKey(flowType);
   const Icon = meta?.icon;
@@ -99,9 +111,9 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
       const current = (form.getFieldValue(fieldName) as string | undefined) ?? '';
       form.setFieldValue(fieldName, `${current}${current && !current.endsWith(' ') ? ' ' : ''}${ref}`);
       commit({}, form.getFieldsValue() as FormValues);
-      message.info(`已插入 ${ref}`);
+      msg.info(`已插入 ${ref}`);
     },
-    [form, commit]
+    [form, commit, msg]
   );
 
   // 变量插入弹层：挂在模板字段的 addonAfter。
@@ -188,10 +200,9 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
         )}
       </div>
       <div className="flow-config-panel-body">
-        <Form
+        <SelfForm
           key={node.id}
           form={form}
-          layout="vertical"
           size="small"
           initialValues={initialValues}
           onValuesChange={commit}
@@ -422,8 +433,8 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
               <Input.TextArea rows={4} />
             </Form.Item>
           )}
-        </Form>
-        <Button danger block icon={<DeleteOutlined />} onClick={onDelete} style={{ marginTop: 8 }}>
+        </SelfForm>
+        <Button danger block icon={<DeleteOutlined />} onClick={onDelete} className="mt-2">
           删除节点
         </Button>
       </div>

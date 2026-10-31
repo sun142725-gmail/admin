@@ -1,22 +1,17 @@
 // 任务流列表页：卡片网格展示，支持新建/编辑跳转/复制/删除/启停，最近运行状态一眼可见。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Card,
-  Empty,
-  Form,
-  Input,
-  Modal,
-  Popconfirm,
-  Select,
-  Space,
-  Spin,
-  Switch,
-  Tag,
-  Typography,
-  message
-} from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Empty from 'antd/es/empty';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Spin from 'antd/es/spin';
+import Switch from 'antd/es/switch';
+import Tag from 'antd/es/tag';
+import Typography from 'antd/es/typography';
 import {
   CopyOutlined,
   DeleteOutlined,
@@ -27,6 +22,12 @@ import {
   SearchOutlined
 } from '@ant-design/icons';
 import { Permission } from '../../components/permission/Permission';
+import { SelfForm } from '../../components/base/SelfForm';
+import { SelfModal } from '../../components/base/SelfModal';
+import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { PageHeader } from '../../components/business/PageHeader';
+import { StatusTag } from '../../components/business/StatusTag';
+import { useApiMessage } from '../../hooks/useApiMessage';
 import {
   FlowSummary,
   createFlow,
@@ -57,6 +58,7 @@ export const FlowsPage: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form] = Form.useForm<FlowFormValues>();
+  const msg = useApiMessage();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,14 +89,14 @@ export const FlowsPage: React.FC = () => {
     setCreating(true);
     try {
       const created = await createFlow(values);
-      message.success('已创建，默认带一套 AI 视频生产模板');
+      msg.success('已创建，默认带一套 AI 视频生产模板');
       setCreateOpen(false);
       form.resetFields();
       navigate(`/flow/editor/${created.id}`);
     } finally {
       setCreating(false);
     }
-  }, [form, navigate]);
+  }, [form, navigate, msg]);
 
   const toggleStatus = useCallback(
     async (flow: FlowSummary) => {
@@ -102,71 +104,72 @@ export const FlowsPage: React.FC = () => {
         await updateFlow(flow.id, { status: flow.status === 1 ? 0 : 1 });
         await load();
       } catch (error) {
-        message.error(error instanceof Error ? error.message : '操作失败');
+        msg.errorFrom(error, '操作失败');
       }
     },
-    [load]
+    [load, msg]
   );
 
   const duplicate = useCallback(
     async (flow: FlowSummary) => {
       try {
         await duplicateFlow(flow.id);
-        message.success('已复制');
+        msg.success('已复制');
         await load();
       } catch (error) {
-        message.error(error instanceof Error ? error.message : '复制失败');
+        msg.errorFrom(error, '复制失败');
       }
     },
-    [load]
+    [load, msg]
   );
 
   const remove = useCallback(
     async (flow: FlowSummary) => {
       try {
         await deleteFlow(flow.id);
-        message.success('已删除');
+        msg.success('已删除');
         await load();
       } catch (error) {
-        message.error(error instanceof Error ? error.message : '删除失败');
+        msg.errorFrom(error, '删除失败');
       }
     },
-    [load]
+    [load, msg]
   );
 
   return (
     <div>
-      <div className="flow-page-header">
-        <Typography.Title level={4} className="flow-page-header-title">
-          任务流
-        </Typography.Title>
-        <Typography.Text className="flow-page-header-desc">
-          AI 视频生成的画布编排：LLM 分镜 → 首帧生图 → 图生视频，支持单节点调试与断点重跑
-        </Typography.Text>
-        <span className="flow-page-header-spacer" />
-        <Input
-          allowClear
-          prefix={<SearchOutlined />}
-          placeholder="搜索名称/描述"
-          className="flow-page-header-search"
-          style={{ width: 200 }}
-          value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
-        />
-        <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading} />
-        <Permission code="flow:define:manage">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-            新建任务流
-          </Button>
-        </Permission>
-      </div>
+      {/* flow-page-header 自绘 flex 迁 PageHeader：标题左/操作右由 page-toolbar justify-between 承担（README 收编写法） */}
+      <PageHeader
+        className="flex-wrap gap-y-1"
+        title="任务流"
+        subtitle="AI 视频生成的画布编排：LLM 分镜 → 首帧生图 → 图生视频，支持单节点调试与断点重跑"
+        actions={
+          <>
+            <Input
+              allowClear
+              prefix={<SearchOutlined />}
+              placeholder="搜索名称/描述"
+              className="flow-page-header-search"
+              style={{ width: 200 }}
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading} />
+            <Permission code="flow:define:manage">
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+                新建任务流
+              </Button>
+            </Permission>
+          </>
+        }
+      />
 
       {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
+        <div className="flex justify-center py-20">
           <Spin />
         </div>
       ) : filtered.length === 0 ? (
-        <Empty description={keyword ? '没有匹配的任务流' : '还没有任务流，新建一个开始编排'} style={{ padding: 60 }}>
+        <Empty description={keyword ? '没有匹配的任务流' : '还没有任务流，新建一个开始编排'} className="py-15">
           {!keyword ? (
             <Permission code="flow:define:manage">
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
@@ -178,16 +181,9 @@ export const FlowsPage: React.FC = () => {
           )}
         </Empty>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(min(320px, 100%), 1fr))',
-            gap: 16
-          }}
-        >
+        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(320px,100%),1fr))]">
           {filtered.map((flow) => {
             const lastRun = flow.lastRun;
-            const lastRunMeta = lastRun ? RUN_STATUS_META[lastRun.status] : null;
             return (
               <Card
                 key={flow.id}
@@ -195,11 +191,11 @@ export const FlowsPage: React.FC = () => {
                 styles={{ body: { padding: 16 } }}
                 onClick={() => navigate(`/flow/editor/${flow.id}`)}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                  <div style={{ fontSize: 30, lineHeight: 1 }}>{flow.icon ?? '🎬'}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="flex items-start gap-3">
+                  <div className="text-[30px] leading-none">{flow.icon ?? '🎬'}</div>
+                  <div className="flex-1 min-w-0">
                     <Space size={6}>
-                      <Typography.Text strong style={{ fontSize: 15 }}>
+                      <Typography.Text strong className="text-[15px]">
                         {flow.name}
                       </Typography.Text>
                       <Tag>V{flow.version}</Tag>
@@ -208,24 +204,22 @@ export const FlowsPage: React.FC = () => {
                     <Typography.Paragraph
                       type="secondary"
                       ellipsis={{ rows: 2 }}
-                      style={{ marginBottom: 8, marginTop: 4, fontSize: 12 }}
+                      className="!mb-2 mt-1 text-xs"
                     >
                       {flow.description || `${flow.nodeCount} 个节点`}
                     </Typography.Paragraph>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                    <div className="flex items-center gap-1.5 text-xs">
                       {lastRun ? (
                         <>
-                          <Tag color={lastRunMeta?.color} style={{ marginRight: 0 }}>
-                            {lastRunMeta?.label ?? lastRun.status}
-                          </Tag>
-                          <span style={{ color: 'var(--text-sub)' }}>
+                          <StatusTag value={lastRun.status} map={RUN_STATUS_META} />
+                          <span className="text-text-sub">
                             {lastRun.finishedAt
                               ? `上次运行 ${new Date(lastRun.finishedAt).toLocaleString('zh-CN', { hour12: false })}`
                               : '上次运行未完成'}
                           </span>
                         </>
                       ) : (
-                        <span style={{ color: 'var(--text-sub)' }}>尚未运行</span>
+                        <span className="text-text-sub">尚未运行</span>
                       )}
                     </div>
                   </div>
@@ -253,9 +247,9 @@ export const FlowsPage: React.FC = () => {
                     <Permission code="flow:define:manage">
                       <Space size={4}>
                         <Button size="small" icon={<CopyOutlined />} onClick={() => duplicate(flow)} />
-                        <Popconfirm title="确认删除？" onConfirm={() => remove(flow)} okText="删除" cancelText="取消">
+                        <ConfirmPopconfirm title="确认删除？" onConfirm={() => remove(flow)} okText="删除" cancelText="取消">
                           <Button size="small" danger icon={<DeleteOutlined />} />
-                        </Popconfirm>
+                        </ConfirmPopconfirm>
                         <Switch
                           size="small"
                           checked={flow.status === 1}
@@ -271,7 +265,7 @@ export const FlowsPage: React.FC = () => {
         </div>
       )}
 
-      <Modal
+      <SelfModal
         title="新建任务流"
         open={createOpen}
         onOk={() => void submitCreate()}
@@ -280,18 +274,18 @@ export const FlowsPage: React.FC = () => {
         confirmLoading={creating}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" initialValues={{ icon: '🎬' }}>
+        <SelfForm form={form} initialValues={{ icon: '🎬' }}>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="如：短视频流水线" maxLength={64} />
           </Form.Item>
           <Form.Item name="icon" label="图标">
-            <Select options={ICON_OPTIONS} style={{ width: 80 }} />
+            <Select options={ICON_OPTIONS} className="w-20" />
           </Form.Item>
           <Form.Item name="description" label="描述">
             <Input.TextArea rows={2} placeholder="这个任务流做什么（可选）" maxLength={255} />
           </Form.Item>
-        </Form>
-      </Modal>
+        </SelfForm>
+      </SelfModal>
     </div>
   );
 };

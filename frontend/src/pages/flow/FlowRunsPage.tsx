@@ -1,22 +1,22 @@
 // 运行历史页：表格 + 详情抽屉（节点时间线/输入输出/错误/产物预览），运行中自动刷新，支持断点重跑。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Alert,
-  Button,
-  Descriptions,
-  Drawer,
-  Select,
-  Space,
-  Tag,
-  Timeline,
-  Typography,
-  message
-} from 'antd';
+import Alert from 'antd/es/alert';
+import Button from 'antd/es/button';
+import Descriptions from 'antd/es/descriptions';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Tag from 'antd/es/tag';
+import Timeline from 'antd/es/timeline';
+import Typography from 'antd/es/typography';
 import type { ColumnsType } from 'antd/es/table';
 import { EyeOutlined, ReloadOutlined, StopOutlined } from '@ant-design/icons';
-import { AppTable } from '../../components/AppTable';
 import { Permission } from '../../components/permission/Permission';
+import { SelfDrawer } from '../../components/base/SelfDrawer';
+import { SelfTable } from '../../components/base/SelfTable';
+import { PageHeader } from '../../components/business/PageHeader';
+import { StatusTag } from '../../components/business/StatusTag';
+import { useApiMessage } from '../../hooks/useApiMessage';
 import {
   FlowRunNodeVo,
   FlowRunVo,
@@ -42,21 +42,11 @@ const JsonBlock: React.FC<{ title: string; value?: Record<string, unknown> | nul
     return null;
   }
   return (
-    <div style={{ marginTop: 4 }}>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+    <div className="mt-1">
+      <Typography.Text type="secondary" className="text-xs">
         {title}
       </Typography.Text>
-      <pre
-        style={{
-          margin: '4px 0',
-          padding: 8,
-          background: 'var(--app-bg)',
-          borderRadius: 8,
-          fontSize: 12,
-          maxHeight: 220,
-          overflow: 'auto'
-        }}
-      >
+      <pre className="m-1 p-2 rounded-lg text-xs max-h-[220px] overflow-auto bg-[var(--app-bg)]">
         {JSON.stringify(value, null, 2)}
       </pre>
     </div>
@@ -75,6 +65,7 @@ export const FlowRunsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<{ run: FlowRunVo; nodes: FlowRunNodeVo[] } | null>(null);
+  const msg = useApiMessage();
 
   const load = useCallback(async () => {
     try {
@@ -116,9 +107,9 @@ export const FlowRunsPage: React.FC = () => {
     try {
       setDetail(await getRunDetail(runId));
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '加载详情失败');
+      msg.errorFrom(error, '加载详情失败');
     }
-  }, []);
+  }, [msg]);
 
   // 详情抽屉打开时轮询刷新（含运行中详情）
   useEffect(() => {
@@ -156,19 +147,13 @@ export const FlowRunsPage: React.FC = () => {
         title: '模式',
         dataIndex: 'mode',
         width: 100,
-        render: (mode: string) => {
-          const meta = RUN_MODE_META[mode];
-          return <Tag color={meta?.color}>{meta?.label ?? mode}</Tag>;
-        }
+        render: (mode: string) => <StatusTag value={mode} map={RUN_MODE_META} />
       },
       {
         title: '状态',
         dataIndex: 'status',
         width: 100,
-        render: (value: string) => {
-          const meta = RUN_STATUS_META[value];
-          return <Tag color={meta?.color}>{meta?.label ?? value}</Tag>;
-        }
+        render: (value: string) => <StatusTag value={value} map={RUN_STATUS_META} />
       },
       {
         title: '耗时',
@@ -186,6 +171,7 @@ export const FlowRunsPage: React.FC = () => {
         title: '操作',
         key: 'actions',
         width: 200,
+        // 取消/断点重跑按运行状态互斥切换且带 icon，Permission 为 hide 模式，ActionCell 无法承载，保留原生写法
         render: (_, record) => {
           const running = record.status === 'running' || record.status === 'pending';
           return (
@@ -203,11 +189,11 @@ export const FlowRunsPage: React.FC = () => {
                       onClick={() =>
                         cancelRun(record.id)
                           .then(() => {
-                            message.success('已请求取消');
+                            msg.success('已请求取消');
                             void load();
                           })
                           .catch((error: unknown) =>
-                            message.error(error instanceof Error ? error.message : '取消失败')
+                            msg.errorFrom(error, '取消失败')
                           )
                       }
                     >
@@ -220,11 +206,11 @@ export const FlowRunsPage: React.FC = () => {
                       onClick={() =>
                         retryRun(record.id)
                           .then(({ runId }) => {
-                            message.success(`已发起重跑 #${runId}`);
+                            msg.success(`已发起重跑 #${runId}`);
                             void openDetail(runId);
                           })
                           .catch((error: unknown) =>
-                            message.error(error instanceof Error ? error.message : '重跑失败')
+                            msg.errorFrom(error, '重跑失败')
                           )
                       }
                     >
@@ -238,45 +224,48 @@ export const FlowRunsPage: React.FC = () => {
         }
       }
     ],
-    [openDetail, load]
+    [openDetail, load, msg]
   );
 
   return (
     <div>
-      <div className="flow-page-header">
-        <Typography.Title level={4} className="flow-page-header-title">
-          运行历史
-        </Typography.Title>
-        <span className="flow-page-header-spacer" />
-        <Select
-          allowClear
-          showSearch
-          optionFilterProp="label"
-          placeholder="全部任务流"
-          style={{ width: 220 }}
-          options={flowOptions}
-          value={flowId}
-          onChange={(value) => {
-            setFlowId(value);
-            if (value) {
-              setSearchParams({ flowId: String(value) });
-            } else {
-              setSearchParams({});
-            }
-          }}
-        />
-        <Select
-          allowClear
-          placeholder="全部状态"
-          style={{ width: 130 }}
-          options={STATUS_OPTIONS}
-          value={status}
-          onChange={setStatus}
-        />
-        <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading} />
-      </div>
+      {/* flow-page-header 自绘 flex 迁 PageHeader（README 收编写法），标题左/筛选右布局等价 */}
+      <PageHeader
+        className="flex-wrap gap-y-1"
+        title="运行历史"
+        actions={
+          <>
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="全部任务流"
+              className="w-[220px]"
+              options={flowOptions}
+              value={flowId}
+              onChange={(value) => {
+                setFlowId(value);
+                if (value) {
+                  setSearchParams({ flowId: String(value) });
+                } else {
+                  setSearchParams({});
+                }
+              }}
+            />
+            <Select
+              allowClear
+              placeholder="全部状态"
+              className="w-[130px]"
+              options={STATUS_OPTIONS}
+              value={status}
+              onChange={setStatus}
+            />
+            <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading} />
+          </>
+        }
+      />
 
-      <AppTable<FlowRunVo>
+      <SelfTable<FlowRunVo>
         rowKey="id"
         columns={columns}
         dataSource={runs}
@@ -285,21 +274,19 @@ export const FlowRunsPage: React.FC = () => {
         onRow={(record) => ({ onClick: () => void openDetail(record.id), style: { cursor: 'pointer' } })}
       />
 
-      <Drawer
+      {/* width=560 即 SelfDrawer md 档默认，零变更 */}
+      <SelfDrawer
         title={
           detail ? (
             <Space>
               <span>运行 #{detail.run.id}</span>
-              <Tag color={RUN_MODE_META[detail.run.mode]?.color}>{RUN_MODE_META[detail.run.mode]?.label}</Tag>
-              <Tag color={RUN_STATUS_META[detail.run.status]?.color}>
-                {RUN_STATUS_META[detail.run.status]?.label ?? detail.run.status}
-              </Tag>
+              <StatusTag value={detail.run.mode} map={RUN_MODE_META} />
+              <StatusTag value={detail.run.status} map={RUN_STATUS_META} />
             </Space>
           ) : (
             '运行详情'
           )
         }
-        width={560}
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
       >
@@ -326,15 +313,15 @@ export const FlowRunsPage: React.FC = () => {
               ]}
             />
             {detail.run.error && (
-              <Alert type="error" showIcon message="运行失败" description={detail.run.error} style={{ marginTop: 12 }} />
+              <Alert type="error" showIcon message="运行失败" description={detail.run.error} className="mt-3" />
             )}
             {detail.run.outputs && (
-              <div style={{ marginTop: 12 }}>
+              <div className="mt-3">
                 <Typography.Text strong>产物</Typography.Text>
                 <RunOutputsView outputs={detail.run.outputs} />
               </div>
             )}
-            <Typography.Title level={5} style={{ marginTop: 20 }}>
+            <Typography.Title level={5} className="!mt-5">
               节点执行
             </Typography.Title>
             <Timeline
@@ -355,18 +342,18 @@ export const FlowRunsPage: React.FC = () => {
                     <div key={node.id}>
                       <Space size={6} wrap>
                         <Typography.Text strong>{node.name}</Typography.Text>
-                        <Tag style={{ marginRight: 0 }}>{node.nodeType}</Tag>
-                        <Tag color={meta.color} style={{ marginRight: 0 }}>
+                        <Tag className="!mr-0">{node.nodeType}</Tag>
+                        <Tag color={meta.color} className="!mr-0">
                           {meta.label}
                         </Tag>
                         {node.durationMs !== null && node.durationMs !== undefined && (
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          <Typography.Text type="secondary" className="text-xs">
                             {formatDuration(node.durationMs)}
                           </Typography.Text>
                         )}
                       </Space>
                       {node.error && (
-                        <Alert type="error" showIcon={false} message={node.error} style={{ marginTop: 6 }} />
+                        <Alert type="error" showIcon={false} message={node.error} className="mt-1.5" />
                       )}
                       <JsonBlock title="输入" value={node.input as Record<string, unknown> | null} />
                       <JsonBlock title="输出" value={node.output as Record<string, unknown> | null} />
@@ -380,18 +367,18 @@ export const FlowRunsPage: React.FC = () => {
             />
             {detail.run.mode === 'run' && (
               <Permission code="flow:run:execute">
-                <Space style={{ marginTop: 8 }}>
+                <Space className="mt-2">
                   <Button
                     icon={<ReloadOutlined />}
                     disabled={detail.run.status === 'running' || detail.run.status === 'pending'}
                     onClick={() =>
                       retryRun(detail.run.id)
                         .then(({ runId }) => {
-                          message.success(`已发起重跑 #${runId}`);
+                          msg.success(`已发起重跑 #${runId}`);
                           void openDetail(runId);
                         })
                         .catch((error: unknown) =>
-                          message.error(error instanceof Error ? error.message : '重跑失败')
+                          msg.errorFrom(error, '重跑失败')
                         )
                     }
                   >
@@ -403,7 +390,7 @@ export const FlowRunsPage: React.FC = () => {
             )}
           </>
         )}
-      </Drawer>
+      </SelfDrawer>
     </div>
   );
 };

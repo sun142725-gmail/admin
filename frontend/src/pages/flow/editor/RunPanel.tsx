@@ -1,7 +1,11 @@
 // 底部运行控制台：实时日志时间线 + 产物预览 + 取消/重跑/跳转历史。
 import { DownOutlined, ReloadOutlined, StopOutlined, UpOutlined } from '@ant-design/icons';
-import { Button, Space, Tag, Tooltip } from 'antd';
+import Button from 'antd/es/button';
+import Space from 'antd/es/space';
+import Tag from 'antd/es/tag';
+import Tooltip from 'antd/es/tooltip';
 import type { FlowRunVo } from '../../../api/flows';
+import { StatusTag } from '../../../components/business/StatusTag';
 import { RUN_MODE_META, RUN_STATUS_META, RunOutputsView } from '../flowRunUI';
 
 export interface RunLogLine {
@@ -33,7 +37,6 @@ const now = () =>
 export const formatLogTime = now;
 
 export const RunPanel: React.FC<RunPanelProps> = ({ open, onToggle, run, logs, onCancel, onRetry }) => {
-  const statusMeta = run ? RUN_STATUS_META[run.status] ?? { label: run.status, color: 'default' } : null;
   const modeMeta = run ? RUN_MODE_META[run.mode] ?? { label: run.mode, color: 'default' } : null;
   const running = run?.status === 'running' || run?.status === 'pending';
 
@@ -41,16 +44,17 @@ export const RunPanel: React.FC<RunPanelProps> = ({ open, onToggle, run, logs, o
     <div className="flow-run-panel">
       <div className="flow-run-panel-header" style={{ flexWrap: 'wrap', rowGap: 4 }} onClick={onToggle}>
         {open ? <DownOutlined /> : <UpOutlined />}
-        <span style={{ fontWeight: 600 }}>运行控制台</span>
+        <span className="font-semibold">运行控制台</span>
         {run && (
           <>
+            {/* 模式 Tag 带 #id 后缀，StatusTag 仅渲染 meta.label，保留原生写法 */}
             <Tag color={modeMeta?.color}>
               {modeMeta?.label} #{run.id}
             </Tag>
-            <Tag color={statusMeta?.color}>{statusMeta?.label}</Tag>
+            <StatusTag value={run.status} map={RUN_STATUS_META} fallback={{ label: run.status, color: 'default' }} />
           </>
         )}
-        <span style={{ flex: 1 }} />
+        <span className="flex-1" />
         {run && (
           <Space onClick={(event) => event.stopPropagation()}>
             {running && (

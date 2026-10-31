@@ -1,7 +1,11 @@
-// 运行态共享 UI：状态标签配色、耗时格式化、产物媒体预览（编辑器控制台与运行历史抽屉共用）。
+// 运行态共享 UI：状态标签配色、耗时格式化（编辑器控制台与运行历史抽屉共用）。
+// 产物预览 RunOutputsView 已升级为 business 层 OutputsMediaPreview（媒体直渲 + JSON Collapse 折叠，
+// 原裸 pre 直出为预期视觉变更），此处一行 re-export 保持组内消费方 import 零改动。
 import React from 'react';
+import type { StatusMeta } from '../../types/ui';
+import { OutputsMediaPreview as RunOutputsViewImpl } from '../../components/business/MediaPreview';
 
-export const RUN_STATUS_META: Record<string, { label: string; color: string }> = {
+export const RUN_STATUS_META: Record<string, StatusMeta> = {
   pending: { label: '排队中', color: 'default' },
   running: { label: '运行中', color: 'processing' },
   succeeded: { label: '成功', color: 'success' },
@@ -11,7 +15,7 @@ export const RUN_STATUS_META: Record<string, { label: string; color: string }> =
   reused: { label: '复用上次', color: 'purple' }
 };
 
-export const NODE_STATUS_META: Record<string, { label: string; color: string }> = {
+export const NODE_STATUS_META: Record<string, StatusMeta> = {
   pending: { label: '待执行', color: 'default' },
   running: { label: '执行中', color: 'processing' },
   succeeded: { label: '成功', color: 'success' },
@@ -21,7 +25,7 @@ export const NODE_STATUS_META: Record<string, { label: string; color: string }> 
   reused: { label: '复用', color: 'purple' }
 };
 
-export const RUN_MODE_META: Record<string, { label: string; color: string }> = {
+export const RUN_MODE_META: Record<string, StatusMeta> = {
   run: { label: '完整运行', color: 'blue' },
   single: { label: '试运行', color: 'purple' }
 };
@@ -41,62 +45,10 @@ export const formatDuration = (ms?: number | null): string => {
   return `${minutes}m${seconds}s`;
 };
 
-const VIDEO_EXT = /\.(mp4|mov|webm|m3u8)(\?|$)/i;
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp)(\?|$)/i;
-const AUDIO_EXT = /\.(mp3|wav|ogg|flac|m4a)(\?|$)/i;
-
-/** 产物渲染：视频/音频/图片直接预览，其余 JSON 折叠展示。 */
-export const RunOutputsView: React.FC<{ outputs?: Record<string, unknown> | null }> = ({ outputs }) => {
-  if (!outputs || Object.keys(outputs).length === 0) {
-    return null;
-  }
-  const medias: Array<{ key: string; kind: 'video' | 'image' | 'audio'; url: string }> = [];
-  const rest: Array<[string, unknown]> = [];
-  for (const [key, value] of Object.entries(outputs)) {
-    // tts 等落盘产物是 /uploads/... 站内相对路径，与上游 http(s) 外链同样可预览。
-    if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('/uploads/'))) {
-      if (VIDEO_EXT.test(value)) {
-        medias.push({ key, kind: 'video', url: value });
-        continue;
-      }
-      if (IMAGE_EXT.test(value)) {
-        medias.push({ key, kind: 'image', url: value });
-        continue;
-      }
-      if (AUDIO_EXT.test(value)) {
-        medias.push({ key, kind: 'audio', url: value });
-        continue;
-      }
-    }
-    rest.push([key, value]);
-  }
-  return (
-    <div className="flow-run-outputs">
-      {medias.map((media) =>
-        media.kind === 'video' ? (
-          <video key={media.key} src={media.url} controls preload="metadata" />
-        ) : media.kind === 'audio' ? (
-          // eslint-disable-next-line jsx-a11y/media-has-caption
-          <audio key={media.key} src={media.url} controls preload="metadata" style={{ width: '100%' }} />
-        ) : (
-          <img key={media.key} src={media.url} alt={media.key} />
-        )
-      )}
-      {rest.length > 0 && (
-        <pre
-          style={{
-            margin: 0,
-            padding: 8,
-            background: 'var(--app-bg)',
-            borderRadius: 8,
-            fontSize: 12,
-            maxWidth: '100%',
-            overflow: 'auto'
-          }}
-        >
-          {JSON.stringify(Object.fromEntries(rest), null, 2)}
-        </pre>
-      )}
-    </div>
-  );
-};
+/** 产物渲染（RunOutputsView 升级版）：媒体直渲 + 其余键收进 JSON 折叠。
+ *  升级自原裸 pre 直出（预期视觉变更，README 备案）；媒体元素尺寸统一为 MediaPreview 内联值
+ *  （video 100%/maxHeight 420、audio 280×32、img 280 宽），与原无约束形态不同，窄屏由 editor.css
+ *  .flow-run-outputs 约束兜底。 */
+export const RunOutputsView: React.FC<{ outputs?: Record<string, unknown> | null }> = ({ outputs }) => (
+  <RunOutputsViewImpl outputs={outputs} />
+);
