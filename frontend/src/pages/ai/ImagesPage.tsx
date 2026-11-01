@@ -73,8 +73,8 @@ export const ImagesPage: React.FC = () => {
   );
 
   return (
-    <Space direction="vertical" size={12} className="w-full">
-      <Card title="文生图" styles={{ body: { padding: 12 } }}>
+    <div className="page-fill flex flex-col gap-3">
+      <Card title="文生图" className="shrink-0" styles={{ body: { padding: 12 } }}>
         {imageModels.length === 0 ? (
           <EmptyState description="暂无 image 能力模型，请先在模型管理里注册并挂载生图渠道" imageStyle={{ height: 48 }} />
         ) : (
@@ -115,7 +115,7 @@ export const ImagesPage: React.FC = () => {
       </Card>
 
       {lastImages.length > 0 && (
-        <Card title="本次结果" styles={{ body: { padding: 12 } }}>
+        <Card title="本次结果" className="shrink-0" styles={{ body: { padding: 12 } }}>
           <div className="flex gap-3 flex-wrap">
             {lastImages.map((image) => (
               <a key={image.id} href={image.url} target="_blank" rel="noreferrer">
@@ -130,9 +130,12 @@ export const ImagesPage: React.FC = () => {
         </Card>
       )}
 
-      <Card title="历史记录" styles={{ body: { padding: 12 } }}>
-        <AppTable<AiImageRecord> rowKey="id" columns={historyColumns} dataSource={history} pagination={{ pageSize: 10 }} />
+      <Card
+        title="历史记录"
+        className="flex-1 min-h-0 flex flex-col"
+        styles={{ body: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+      >
+        <AppTable<AiImageRecord> fill rowKey="id" columns={historyColumns} dataSource={history} pagination={{ pageSize: 10 }} />
       </Card>
-    </Space>
-  );
-};
+    </div>
+  );};

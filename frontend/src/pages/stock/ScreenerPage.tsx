@@ -226,13 +226,14 @@ export const ScreenerPage: React.FC = () => {
   ];
 
   return (
-    <div>
+    <div className="page-fill flex flex-col">
       <PageHeader
         title="选股器"
         subtitle="规则扫描：对候选池逐股检测 KDJ / MACD 金叉与即将金叉，支持日线 / 周线 / 月线。"
       />
 
       <Tabs
+        className="flex-1 min-h-0"
         defaultActiveKey={searchParams.get('tab') === 'daily' ? 'daily' : 'manual'}
         items={[
           { key: 'manual', label: '手动扫描', children: <ManualScanPanel /> },
@@ -427,6 +428,7 @@ export const ScreenerPage: React.FC = () => {
       )}
 
       <SelfTable
+        fill
         rowKey={(record) => `${record.symbol}:${record.freq}`}
         columns={columns}
         dataSource={dataSource}

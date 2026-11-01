@@ -424,6 +424,30 @@ a {
   margin: 12px 0 0;
 }
 
+/* 页面内 Tabs 撑满：页签内容区 flex 纵向填充（配合页面根 page-fill）。
+   tabpane 激活态转 flex 纵向，页内各段 shrink-0 / 表格槽 flex-1 自行分配。 */
+.page-fill .ant-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-fill .ant-tabs-content-holder {
+  flex: 1;
+  min-height: 0;
+}
+
+.page-fill .ant-tabs-content {
+  height: 100%;
+}
+
+.page-fill .ant-tabs-tabpane-active {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 /* SelfTable fill 模式：纯 flex 撑满——包装层纵向 flex，表体 flex-1 占满剩余高度
    （行少留白、行多内滚），分页器作为末个 flex 项钉在底部右侧（用户预期的标准列表页形态）。
    逐层 min-h-0 允许收缩；body 的 max-height（scroll.y 内联）被覆盖为 none，高度交给 flex。 */
