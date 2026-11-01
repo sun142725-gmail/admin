@@ -51,8 +51,11 @@ export const SelfTable = <T extends object>(props: SelfTableProps<T>): React.Rea
   const { containerRef, fillScrollY } = useFillTableHeight<HTMLDivElement>();
 
   if (fill) {
+    // 纯 flex 撑满（global.css .fill-table）：包装层纵向 flex，表体 flex-1 自动占满剩余高度
+    // （行少留白、行多内滚），分页器作为末个 flex 项钉在底部右侧。scroll.y 仍经 mergeFillScroll
+    // 注入以触发 antd 表头/表体分离渲染（表头固定），其实际 max-height 被 fill 规则覆盖。
     return (
-      <div ref={containerRef} className="flex-1 min-h-0">
+      <div ref={containerRef} className="fill-table flex-1 min-h-0">
         <Table<T>
           size={size ?? 'middle'}
           scroll={mergeFillScroll<T>(scroll, fillScrollY)}

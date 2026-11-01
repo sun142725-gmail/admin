@@ -417,6 +417,61 @@ a {
   min-width: 0;
 }
 
+/* SelfTable fill 模式：纯 flex 撑满——包装层纵向 flex，表体 flex-1 占满剩余高度
+   （行少留白、行多内滚），分页器作为末个 flex 项钉在底部右侧（用户预期的标准列表页形态）。
+   逐层 min-h-0 允许收缩；body 的 max-height（scroll.y 内联）被覆盖为 none，高度交给 flex。 */
+.fill-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.fill-table .ant-table-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.fill-table .ant-spin-nested-loading {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.fill-table .ant-spin-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.fill-table .ant-table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fill-table .ant-table-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fill-table .ant-table-body {
+  flex: 1;
+  min-height: 0;
+  height: auto !important;
+  max-height: none !important;
+}
+
+.fill-table .ant-table-pagination {
+  flex: none;
+  margin-bottom: 0;
+}
+
 /* Tailwind 规范：纯布局/间距/字号用工具类（@apply）；复杂渐变/阴影视觉保留原生 CSS */
 /* Tag 去默认右间距（行内多标签并排场景） */
 .ant-tag.tag-flat {

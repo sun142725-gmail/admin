@@ -11,6 +11,15 @@ export const MIN_FILL_SCROLL_Y = 200;
  * 纯函数：撑满模式 scroll.y 计算。
  * containerHeight==null（未测量）返回 undefined；否则 Math.max(下限, 容器高−表头−分页器)。
  */
+/** 外框盒高度：getBoundingClientRect 不含 margin，antd 分页器自带 margin: 16px 0 必须一并扣减。 */
+export const outerHeight = (el: HTMLElement | null): number => {
+  if (!el) {
+    return 0;
+  }
+  const style = getComputedStyle(el);
+  return el.getBoundingClientRect().height + parseFloat(style.marginTop || '0') + parseFloat(style.marginBottom || '0');
+};
+
 export const computeFillScrollY = (
   containerHeight: number | null | undefined,
   headerHeight: number,
@@ -47,7 +56,7 @@ export const useFillTableHeight = <T extends HTMLElement>() => {
       const headerHeight =
         el.querySelector<HTMLElement>('.ant-table-thead')?.getBoundingClientRect().height ?? 0;
       const paginationHeight =
-        el.querySelector<HTMLElement>('.ant-table-pagination')?.getBoundingClientRect().height ?? 0;
+        outerHeight(el.querySelector<HTMLElement>('.ant-table-pagination'));
       setFillScrollY(computeFillScrollY(el.clientHeight, headerHeight, paginationHeight));
     });
   }, []);
