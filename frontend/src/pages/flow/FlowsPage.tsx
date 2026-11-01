@@ -1,4 +1,4 @@
-// 任务流列表页：卡片网格展示，支持新建/编辑跳转/复制/删除/启停，最近运行状态一眼可见。
+// 制片计划列表页：卡片网格展示，支持新建/编辑跳转/复制/删除/启停，最近运行状态一眼可见。
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from 'antd/es/button';
@@ -141,7 +141,7 @@ export const FlowsPage: React.FC = () => {
       {/* flow-page-header 自绘 flex 迁 PageHeader：标题左/操作右由 page-toolbar justify-between 承担（README 收编写法） */}
       <PageHeader
         className="flex-wrap gap-y-1"
-        title="任务流"
+        title="制片计划"
         subtitle="AI 视频生成的画布编排：LLM 分镜 → 首帧生图 → 图生视频，支持单节点调试与断点重跑"
         actions={
           <>
@@ -157,7 +157,7 @@ export const FlowsPage: React.FC = () => {
             <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading} />
             <Permission code="flow:define:manage">
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-                新建任务流
+                新建制片计划
               </Button>
             </Permission>
           </>
@@ -169,11 +169,11 @@ export const FlowsPage: React.FC = () => {
           <Spin />
         </div>
       ) : filtered.length === 0 ? (
-        <Empty description={keyword ? '没有匹配的任务流' : '还没有任务流，新建一个开始编排'} className="py-15">
+        <Empty description={keyword ? '没有匹配的制片计划' : '还没有制片计划，新建一个开始编排'} className="py-15">
           {!keyword ? (
             <Permission code="flow:define:manage">
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-                新建任务流
+                新建制片计划
               </Button>
             </Permission>
           ) : (
@@ -266,7 +266,7 @@ export const FlowsPage: React.FC = () => {
       )}
 
       <SelfModal
-        title="新建任务流"
+        title="新建制片计划"
         open={createOpen}
         onOk={() => void submitCreate()}
         onCancel={() => setCreateOpen(false)}
@@ -282,7 +282,7 @@ export const FlowsPage: React.FC = () => {
             <Select options={ICON_OPTIONS} className="w-20" />
           </Form.Item>
           <Form.Item name="description" label="描述">
-            <Input.TextArea rows={2} placeholder="这个任务流做什么（可选）" maxLength={255} />
+            <Input.TextArea rows={2} placeholder="这个制片计划做什么（可选）" maxLength={255} />
           </Form.Item>
         </SelfForm>
       </SelfModal>

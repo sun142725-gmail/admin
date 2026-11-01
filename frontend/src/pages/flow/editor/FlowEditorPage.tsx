@@ -1,4 +1,4 @@
-// 任务流编辑器（全屏）：左侧节点面板 + React Flow 画布 + 右侧配置面板 + 底部运行控制台。
+// 制片计划编辑器（全屏）：左侧节点面板 + React Flow 画布 + 右侧配置面板 + 底部运行控制台。
 // 调试三件套：完整运行（SSE 实时节点状态）、单节点试运行（mock 上下文预填）、断点重跑。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -158,7 +158,7 @@ const validateCanvas = (nodes: FlowCanvasNode[], edges: Edge[]): string[] => {
     }
   }
   if (visited.size < executable.length) {
-    errors.push('画布存在环路，任务流必须是有向无环图');
+    errors.push('画布存在环路，制片计划必须是有向无环图');
   }
   return errors;
 };
@@ -783,7 +783,7 @@ const FlowEditorInner: React.FC = () => {
   if (!flow) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <Spin tip="加载任务流…" />
+        <Spin tip="加载制片计划…" />
       </div>
     );
   }
@@ -892,7 +892,7 @@ const FlowEditorInner: React.FC = () => {
         title={
           <Space>
             <CaretRightOutlined />
-            运行任务流
+            运行制片计划
           </Space>
         }
         open={runModalOpen}

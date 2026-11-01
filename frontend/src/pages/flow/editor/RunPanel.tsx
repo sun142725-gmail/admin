@@ -78,7 +78,7 @@ export const RunPanel: React.FC<RunPanelProps> = ({ open, onToggle, run, logs, o
         <div className="flow-run-panel-body">
           {logs.length === 0 && (
             <div style={{ color: 'var(--text-sub)', fontSize: 12, padding: '8px 0' }}>
-              点击工具栏「运行」执行任务流，节点状态与产物会实时显示在这里。
+              点击工具栏「运行」执行制片计划，节点状态与产物会实时显示在这里。
             </div>
           )}
           {logs.map((line) => (

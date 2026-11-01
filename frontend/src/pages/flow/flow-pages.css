@@ -1,4 +1,4 @@
-/* 任务流页搜索框响应式（头部骨架已迁 components/business/PageHeader 的 page-toolbar，
+/* 制片计划页搜索框响应式（头部骨架已迁 components/business/PageHeader 的 page-toolbar，
    原 .flow-page-header 系列规则随迁移移除；仅保留仍被 FlowsPage 引用的搜索框弹性收缩档）。 */
 
 /* 窄屏：搜索框弹性收缩（page-actions 自带 flex-wrap，媒体查询收紧其内搜索框） */

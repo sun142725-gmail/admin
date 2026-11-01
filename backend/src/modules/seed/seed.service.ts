@@ -117,8 +117,8 @@ export class SeedService implements OnModuleInit {
       { name: 'AI 对话', code: 'ai:chat:use' },
       { name: 'AI 生图', code: 'ai:image:use' },
       { name: '股市圆桌', code: 'stock:roundtable:use' },
-      { name: '任务流管理', code: 'flow:define:manage' },
-      { name: '任务流执行', code: 'flow:run:execute' },
+      { name: '制片计划管理', code: 'flow:define:manage' },
+      { name: '制片执行', code: 'flow:run:execute' },
       { name: '运行历史查看', code: 'flow:run:view' },
       { name: '提示词库查看', code: 'flow:prompt:view' },
       { name: '提示词库管理', code: 'flow:prompt:manage' }
@@ -762,8 +762,8 @@ export class SeedService implements OnModuleInit {
   // 任务流一级菜单与权限（幂等）：AI 视频生成的画布编排 + 运行调试。
   private async ensureFlowSetup() {
     const codes: Array<{ code: string; name: string }> = [
-      { code: 'flow:define:manage', name: '任务流管理' },
-      { code: 'flow:run:execute', name: '任务流执行' },
+      { code: 'flow:define:manage', name: '制片计划管理' },
+      { code: 'flow:run:execute', name: '制片执行' },
       { code: 'flow:run:view', name: '运行历史查看' },
       { code: 'flow:prompt:view', name: '提示词库查看' },
       { code: 'flow:prompt:manage', name: '提示词库管理' }
@@ -775,10 +775,18 @@ export class SeedService implements OnModuleInit {
       }
     }
 
-    let flowMenu = await this.resourceRepo.findOne({ where: { name: '任务流', type: 'menu' } });
+    // 模块更名「AI 制片厂」（2026-10-31）：老版本叫「任务流」，启动时顺带重命名（幂等，沿用 AI 中心先例）。
+    let flowMenu = await this.resourceRepo.findOne({ where: { name: 'AI 制片厂', type: 'menu' } });
+    if (!flowMenu) {
+      const legacyFlow = await this.resourceRepo.findOne({ where: { name: '任务流', type: 'menu' } });
+      if (legacyFlow) {
+        legacyFlow.name = 'AI 制片厂';
+        flowMenu = await this.resourceRepo.save(legacyFlow);
+      }
+    }
     if (!flowMenu) {
       flowMenu = await this.resourceRepo.save(
-        this.resourceRepo.create({ name: '任务流', type: 'menu', sortOrder: 7 })
+        this.resourceRepo.create({ name: 'AI 制片厂', type: 'menu', sortOrder: 7 })
       );
     }
     const pages: Array<{ path: string; name: string; code: string }> = [

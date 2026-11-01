@@ -133,7 +133,7 @@ export const FlowRunsPage: React.FC = () => {
     () => [
       { title: 'ID', dataIndex: 'id', width: 70 },
       {
-        title: '任务流',
+        title: '制片计划',
         dataIndex: 'flowName',
         width: 200,
         render: (name: string, record) => (
@@ -239,7 +239,7 @@ export const FlowRunsPage: React.FC = () => {
               allowClear
               showSearch
               optionFilterProp="label"
-              placeholder="全部任务流"
+              placeholder="全部制片计划"
               className="w-[220px]"
               options={flowOptions}
               value={flowId}
@@ -296,7 +296,7 @@ export const FlowRunsPage: React.FC = () => {
               size="small"
               column={2}
               items={[
-                { key: 'flow', label: '任务流', children: detail.run.flowName ?? detail.run.flowId },
+                { key: 'flow', label: '制片计划', children: detail.run.flowName ?? detail.run.flowId },
                 {
                   key: 'created',
                   label: '创建时间',
