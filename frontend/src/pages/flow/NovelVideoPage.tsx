@@ -51,14 +51,19 @@ import {
   cancelNovelProject,
   createNovelProject,
   deleteNovelProject,
+  deleteCharacterCard,
   generateNovelSubtitle,
   getNovelProject,
+  listCharacterCards,
   listNovelProjects,
   reSplitNovelProject,
   regenerateNovelShot,
   replanNovelShot,
   runNovelProject
 } from '../../api/novelVideo';
+import type { CharacterCardVo } from '../../api/novelVideo';
+import { CharacterCardModal } from './CharacterCardModal';
+import { CoverComposerModal } from './CoverComposerModal';
 import { NovelShotEditModal } from './NovelShotEditModal';
 import { formatDuration } from './flowRunUI';
 import './flow-pages.css';
@@ -101,6 +106,14 @@ export const NovelVideoPage: React.FC = () => {
   // 单镜编辑弹窗（非 null 即打开）与字幕重生成 loading。
   const [editingShot, setEditingShot] = useState<NovelShotVo | null>(null);
   const [subtitleLoading, setSubtitleLoading] = useState(false);
+  // 封面合成弹窗：coverProject 非空即打开；shots 由打开时拉取的 detail 提供（底图候选）。
+  const [coverProject, setCoverProject] = useState<{ id: number; name: string } | null>(null);
+  const [coverShots, setCoverShots] = useState<NovelShotVo[]>([]);
+  // 角色库：详情抽屉内列表 + 新建/编辑弹窗（editingCharacter null = 新建）。
+  const [characters, setCharacters] = useState<CharacterCardVo[]>([]);
+  const [charactersLoading, setCharactersLoading] = useState(false);
+  const [characterModalOpen, setCharacterModalOpen] = useState(false);
+  const [editingCharacter, setEditingCharacter] = useState<CharacterCardVo | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -127,15 +140,93 @@ export const NovelVideoPage: React.FC = () => {
     return () => clearInterval(timer);
   }, [hasRunning, load]);
 
+  // 角色列表：打开详情与增删改后刷新。
+  const loadCharacters = useCallback(
+    async (projectId: number) => {
+      setCharactersLoading(true);
+      try {
+        setCharacters(await listCharacterCards(projectId));
+      } catch (error) {
+        antMessage.error(error instanceof Error ? error.message : '角色加载失败');
+      } finally {
+        setCharactersLoading(false);
+      }
+    },
+    [antMessage]
+  );
+
   const openDetail = useCallback(async (id: number) => {
     detailIdRef.current = id;
     setDetailOpen(true);
+    setCharacters([]);
+    void loadCharacters(id);
     try {
       setDetail(await getNovelProject(id));
     } catch (error) {
       antMessage.error(error instanceof Error ? error.message : '加载失败');
     }
-  }, [antMessage]);
+  }, [antMessage, loadCharacters]);
+
+  // 封面合成：拉项目 detail 取分镜（底图候选），coverProject 非空即打开弹窗。
+  const openCover = useCallback(
+    async (id: number) => {
+      try {
+        const fresh = await getNovelProject(id);
+        setCoverShots(fresh.shots);
+        setCoverProject({ id: fresh.project.id, name: fresh.project.name });
+      } catch (error) {
+        antMessage.error(error instanceof Error ? error.message : '加载失败');
+      }
+    },
+    [antMessage]
+  );
+
+  // 封面已保存：同步卡片墙与详情（列表 summary 与 detail.project 都有 coverUrl）。
+  const coverSaved = useCallback(
+    (coverUrl: string) => {
+      setCoverProject(null);
+      antMessage.success('封面已保存');
+      setProjects((prev) =>
+        prev.map((project) => (project.id === (coverProject?.id ?? -1) ? { ...project, coverUrl } : project))
+      );
+      setDetail((prev) =>
+        prev && prev.project.id === coverProject?.id ? { ...prev, project: { ...prev.project, coverUrl } } : prev
+      );
+    },
+    [antMessage, coverProject]
+  );
+
+  // 封面弹窗错误提示：useCallback 固化引用——本页 hasRunning 时每 5s 轮询重渲染，
+  // 内联箭头函数会让 CoverComposerModal 依赖 onError 的 effect 反复重跑。
+  const coverOnError = useCallback(
+    (error: unknown) => antMessage.error(error instanceof Error ? error.message : '封面生成失败'),
+    [antMessage]
+  );
+
+  // 角色删除（ConfirmPopconfirm 确认后）：刷新列表；不删除已上传文件（孤儿文件可接受，v1 从简）。
+  const removeCharacter = useCallback(
+    async (character: CharacterCardVo) => {
+      try {
+        await deleteCharacterCard(character.id);
+        antMessage.success('角色已删除');
+        if (detailIdRef.current) {
+          await loadCharacters(detailIdRef.current);
+        }
+      } catch (error) {
+        antMessage.error(error instanceof Error ? error.message : '删除失败');
+      }
+    },
+    [antMessage, loadCharacters]
+  );
+
+  // 角色保存成功（新建/编辑）：关弹窗刷新列表。
+  const characterSaved = useCallback(() => {
+    setCharacterModalOpen(false);
+    antMessage.success('角色已保存');
+    if (detailIdRef.current) {
+      void loadCharacters(detailIdRef.current);
+    }
+  }, [antMessage, loadCharacters]);
 
   // 详情抽屉打开且项目运行中：轮询进度。
   useEffect(() => {
@@ -377,6 +468,41 @@ export const NovelVideoPage: React.FC = () => {
           {projects.map((project) => {
             return (
               <Card key={project.id} hoverable styles={{ body: { padding: 16 } }} onClick={() => void openDetail(project.id)}>
+                {/* 封面：有图展示 + 重新生成；无图虚线占位入口（无权限不渲染，Permission hide 模式） */}
+                <div className="mb-2">
+                  {project.coverUrl ? (
+                    <div className="relative">
+                      <img src={project.coverUrl} alt={`${project.name} 封面`} className="h-36 w-full rounded-lg object-cover" />
+                      <Permission code="flow:define:manage">
+                        <Button
+                          size="small"
+                          className="absolute right-2 top-2"
+                          icon={<PictureOutlined />}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void openCover(project.id);
+                          }}
+                        >
+                          重新生成
+                        </Button>
+                      </Permission>
+                    </div>
+                  ) : (
+                    <Permission code="flow:define:manage">
+                      <button
+                        type="button"
+                        className="flex h-36 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--panel-border)] text-xs text-[#999] transition-colors hover:border-primary hover:text-primary"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void openCover(project.id);
+                        }}
+                      >
+                        <PictureOutlined className="text-lg" />
+                        生成封面
+                      </button>
+                    </Permission>
+                  )}
+                </div>
                 <Space size={6} wrap>
                   <BookOutlined className="text-lg text-primary" />
                   <Typography.Text strong className="text-[15px]">
@@ -562,6 +688,28 @@ export const NovelVideoPage: React.FC = () => {
               size="small"
               status={detail.progress.failed > 0 ? 'exception' : 'normal'}
             />
+            {detail.project.coverUrl && (
+              <div className="my-4">
+                <Space size={8} className="!mb-2">
+                  <Typography.Title level={5} className="!my-0">
+                    封面
+                  </Typography.Title>
+                  <Permission code="flow:define:manage">
+                    <Button
+                      size="small"
+                      type="link"
+                      icon={<PictureOutlined />}
+                      onClick={() => void openCover(detail.project.id)}
+                    >
+                      重新生成
+                    </Button>
+                  </Permission>
+                </Space>
+                <div>
+                  <img src={detail.project.coverUrl} alt={`${detail.project.name} 封面`} className="max-h-64 rounded-lg" />
+                </div>
+              </div>
+            )}
             {detail.project.finalVideoPath && (
               <div className="my-4">
                 <Typography.Title level={5} className="!mt-0">
@@ -571,6 +719,88 @@ export const NovelVideoPage: React.FC = () => {
                 <video src={detail.project.finalVideoPath} controls className="w-full rounded-lg" />
               </div>
             )}
+            {/* 角色库：分镜出图自动注入角色外观与参考图，保证多镜头同一角色形象 */}
+            <Card
+              size="small"
+              title="角色库"
+              loading={charactersLoading && characters.length === 0}
+              className="mt-3"
+              extra={
+                <Permission code="flow:define:manage">
+                  <Button
+                    size="small"
+                    type="link"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      setEditingCharacter(null);
+                      setCharacterModalOpen(true);
+                    }}
+                  >
+                    新建角色
+                  </Button>
+                </Permission>
+              }
+            >
+              {characters.length === 0 && !charactersLoading ? (
+                <Typography.Text type="secondary" className="text-xs">
+                  还没有角色。建角色卡（外观描述 + 参考图）后，出图自动注入保持角色一致。
+                </Typography.Text>
+              ) : (
+                characters.map((character) => (
+                  <div
+                    key={character.id}
+                    className="flex items-center gap-3 border-t border-[var(--panel-border)] py-2 first:border-t-0"
+                  >
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[var(--app-bg)]">
+                      {character.referenceImages[0] ? (
+                        <Image src={character.referenceImages[0]} width={48} height={48} style={{ objectFit: 'cover' }} />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xs text-[#bbb]">无图</div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <Space size={6} wrap>
+                        <Typography.Text strong>{character.name}</Typography.Text>
+                        {character.isPrimary && (
+                          <Tag color="gold" className="!mr-0">
+                            主角色
+                          </Tag>
+                        )}
+                        <Typography.Text type="secondary" className="text-[11px]">
+                          {character.referenceImages.length > 0 ? `${character.referenceImages.length} 张参考图` : '无参考图'}
+                        </Typography.Text>
+                      </Space>
+                      <Typography.Paragraph type="secondary" className="mt-0.5 !mb-0 text-xs" ellipsis={{ rows: 1 }}>
+                        {character.appearance || '—'}
+                      </Typography.Paragraph>
+                    </div>
+                    <Permission code="flow:define:manage">
+                      <Space size={4}>
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={<EditOutlined />}
+                          onClick={() => {
+                            setEditingCharacter(character);
+                            setCharacterModalOpen(true);
+                          }}
+                        >
+                          编辑
+                        </Button>
+                        <ConfirmPopconfirm
+                          title={`删除角色「${character.name}」？已生成的分镜图不受影响`}
+                          onConfirm={() => void removeCharacter(character)}
+                          okText="删除"
+                          cancelText="取消"
+                        >
+                          <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                        </ConfirmPopconfirm>
+                      </Space>
+                    </Permission>
+                  </div>
+                ))
+              )}
+            </Card>
             {detail.chapters.map((chapter) => (
               <Card key={chapter.id} size="small" title={`${chapter.idx}. ${chapter.title}`} className="mt-3"
                 extra={
@@ -690,6 +920,27 @@ export const NovelVideoPage: React.FC = () => {
         shot={editingShot}
         onCancel={() => setEditingShot(null)}
         onSaved={shotSaved}
+        onError={(error) => antMessage.error(error instanceof Error ? error.message : '保存失败')}
+      />
+
+      {/* 封面合成：底图三选（分镜首帧/重出首帧/上传）+ 标题文字 canvas 合成 */}
+      <CoverComposerModal
+        open={Boolean(coverProject)}
+        projectId={coverProject?.id ?? 0}
+        projectName={coverProject?.name ?? ''}
+        shots={coverShots}
+        onCancel={() => setCoverProject(null)}
+        onSaved={coverSaved}
+        onError={coverOnError}
+      />
+
+      {/* 角色卡：新建/编辑双模式 */}
+      <CharacterCardModal
+        open={characterModalOpen}
+        projectId={detailIdRef.current ?? detail?.project.id ?? 0}
+        card={editingCharacter}
+        onCancel={() => setCharacterModalOpen(false)}
+        onSaved={characterSaved}
         onError={(error) => antMessage.error(error instanceof Error ? error.message : '保存失败')}
       />
     </div>

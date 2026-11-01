@@ -26,6 +26,8 @@ export interface NovelProjectVo {
   finalVideoPath?: string | null;
   // 字幕文件静态访问路径（/uploads/...，SRT 与成片同目录）。
   finalSubtitlePath?: string | null;
+  // 作品封面静态访问路径（/uploads/...，前端 canvas 合成后上传落库）。
+  coverUrl?: string | null;
   error?: string | null;
   startedAt?: string | null;
   finishedAt?: string | null;
@@ -78,6 +80,8 @@ export interface NovelProjectSummary {
   stage: string;
   stageMessage?: string | null;
   finalVideoPath?: string | null;
+  // 作品封面静态访问路径（/uploads/...）。
+  coverUrl?: string | null;
   error?: string | null;
   totalShots: number;
   doneShots: number;
@@ -140,3 +144,37 @@ export const regenerateNovelShot = (projectId: number, shotId: number, step: Nov
 
 export const generateNovelSubtitle = (projectId: number) =>
   http.post<never, { subtitlePath: string }>(`/novel-video/${projectId}/subtitle`, undefined, { timeout: 0 });
+
+// ---------- 角色库：角色一致性（外观描述 + 参考图，分镜出图时注入） ----------
+
+export interface CharacterCardVo {
+  id: number;
+  projectId: number;
+  name: string;
+  appearance?: string | null;
+  // 参考图静态路径（files/upload 返回的 /uploads/... 原样存储），≤4 张。
+  referenceImages: string[];
+  isPrimary: boolean;
+  sortOrder: number;
+}
+
+export interface SaveCharacterCardPayload {
+  name: string;
+  appearance?: string;
+  referenceImages?: string[];
+  isPrimary?: boolean;
+}
+
+// 列表：projectId 传数值（后端 @Query ParseIntPipe 对齐）。
+export const listCharacterCards = (projectId: number) =>
+  http.get<never, CharacterCardVo[]>('/novel-video/characters', { params: { projectId } });
+
+// created_by 由后端 @CurrentUser 落库，前端不传。
+export const createCharacterCard = (projectId: number, payload: SaveCharacterCardPayload) =>
+  http.post<never, CharacterCardVo>('/novel-video/characters', { projectId, ...payload });
+
+export const updateCharacterCard = (id: number, payload: SaveCharacterCardPayload) =>
+  http.patch<never, CharacterCardVo>(`/novel-video/characters/${id}`, payload);
+
+export const deleteCharacterCard = (id: number) =>
+  http.delete<never, { success: boolean }>(`/novel-video/characters/${id}`);
