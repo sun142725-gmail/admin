@@ -1,7 +1,8 @@
-// SelfTable 分页合并纯函数直测（node 环境，无 antd 渲染依赖）。
-// 覆盖：false 关闭 / undefined 默认 / 受控覆盖 / 条件分页对象（stock 三页契约）。
+// SelfTable 分页合并与 fill scroll 合并纯函数直测（node 环境，无 antd 渲染依赖）。
+// 覆盖：false 关闭 / undefined 默认 / 受控覆盖 / 条件分页对象（stock 三页契约）/
+//       mergeFillScroll（fill 未测量首帧等价语义 + y 注入 / x 保留）。
 import { describe, expect, it } from 'vitest';
-import { buildMergedPagination } from './SelfTable';
+import { buildMergedPagination, mergeFillScroll } from './SelfTable';
 
 describe('buildMergedPagination', () => {
   it('pagination=false 保持关闭（条件分页关闭分支）', () => {
@@ -58,5 +59,29 @@ describe('buildMergedPagination', () => {
     });
     expect(typeof fromUndefined).toBe('object');
     expect(typeof (fromEmpty as { showTotal?: unknown }).showTotal).toBe('function');
+  });
+});
+
+describe('mergeFillScroll', () => {
+  it('fillY 未测量且 scroll 未传 → 注入默认 x（与非 fill 现状 scroll={x:...} 语义等价，不透传 undefined）', () => {
+    expect(mergeFillScroll(undefined, undefined)).toEqual({ x: 'max-content' });
+    expect(mergeFillScroll(undefined, null)).toEqual({ x: 'max-content' });
+  });
+
+  it('fillY 未测量且调用方自带 scroll → 原引用透传（首帧渲染与非 fill 逐字节一致）', () => {
+    const scroll = { x: 'max-content' };
+    expect(mergeFillScroll(scroll, undefined)).toBe(scroll);
+  });
+
+  it('fillY 已测量 → y 注入 fill 计算值、x 保留调用方自带值', () => {
+    expect(mergeFillScroll({ x: 'max-content' }, 688)).toEqual({ x: 'max-content', y: 688 });
+  });
+
+  it('fillY 已测量且 scroll 未传 → 默认 x + y（未传 scroll 的页面不丢默认横向语义）', () => {
+    expect(mergeFillScroll(undefined, 688)).toEqual({ x: 'max-content', y: 688 });
+  });
+
+  it('调用方自带 y 时以 fill 计算值覆盖（y 以 fill 为准）', () => {
+    expect(mergeFillScroll({ x: 1000, y: 400 }, 688)).toEqual({ x: 1000, y: 688 });
   });
 });

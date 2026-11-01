@@ -386,6 +386,37 @@ a {
   box-shadow: 0 20px 48px rgba(15, 23, 42, 0.06);
 }
 
+/* —— 列表页表格撑满（opt-in）：仅页面根挂 .page-fill 的页面生效，无该类走旧整页滚动布局（零影响）。
+   未分层原生 CSS 优先级高于 @layer utilities（见文件头层叠注释），故 :has 版可覆盖 .app-content-inner
+   自身 @apply 的 overflow-y-auto 与 .app-page-panel 原规则的 min-height。
+   :has() 需 Chrome/Edge 105+、Safari 15.4+、Firefox 121+；不支持的环境回退旧整页滚动布局，无功能损失。
+   依赖 .app-content-inner 滚动逻辑的页面勿接（先例 RolePermissionsPage.tsx 滚动定位）。
+   迁移指引见 frontend/src/components/README.md「列表页撑满（opt-in）」。 */
+.app-content-inner:has(.page-fill) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-content-inner:has(.page-fill) > .app-breadcrumb {
+  flex-shrink: 0;
+}
+
+.app-content-inner:has(.page-fill) > .app-page-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.page-fill {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
 /* Tailwind 规范：纯布局/间距/字号用工具类（@apply）；复杂渐变/阴影视觉保留原生 CSS */
 /* Tag 去默认右间距（行内多标签并排场景） */
 .ant-tag.tag-flat {

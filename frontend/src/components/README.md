@@ -31,6 +31,7 @@ React 18 + antd 5 + TS 严格模式下的可复用基座。分层职责：
 - 默认分页合并语义 `{defaults, ...props.pagination}`：外部字段覆盖默认（受控 `current/pageSize/total/onChange` 全量透传）；`pagination={false}` 保持关闭。
 - 默认：`showSizeChanger:true`、`pageSizeOptions:['10','20','30','50']`、`showTotal: 共 N 条`、分页 locale `items_per_page:'页'`、`size:'middle'`、`scroll={x:'max-content'}`。
 - `onRow`、`locale.emptyText` 等 TableProps 全量透传（表格空态一律走这里，不用 EmptyState，两者不得叠加）。
+- **`fill?: boolean`（opt-in，列表页撑满）**：true 时外层包一个 `flex-1 min-h-0` 测量容器（`useFillTableHeight`），按「容器高 − thead 实测 − 分页器实测（查不到按 0 扣，下限 200px）」注入 `scroll.y`——表体内部滚动、thead 固定、分页器常驻视口。scroll 合并走 `mergeFillScroll` 纯函数：`fillY==null`（未测量）返回 `scroll ?? { x: 'max-content' }`（与非 fill 现状逐字节等价，**未传 scroll 的调用方首帧仍获默认横向语义，无列宽重排跳变**）；`fillY!=null` 时 `{ ...(scroll ?? { x: 'max-content' }), y: fillY }`——**x 保留调用方自带值、y 以 fill 计算为准**。fill 缺省走原有渲染路径零改动；受控/条件分页（`buildMergedPagination`）在 fill 分支完整生效。
 
 ```tsx
 // 替换前
@@ -250,6 +251,32 @@ modal.openForm(item);    // 编辑
 const cols = useColumnSettings({ tab: activeTab, defaults: DEFAULT_VISIBLE[activeTab] });
 <ColumnSettings options={options} visible={cols.visible} onChange={cols.change} onReset={cols.reset} />
 ```
+
+### useFillTableHeight（`hooks/useFillTableHeight.ts`）
+
+列表页表格撑满（SelfTable `fill`）的测量基座，SelfTable 内部自用，页面一般不直接接触。`useFillTableHeight<T>()` → `{containerRef, fillScrollY}`：ResizeObserver 观察测量容器 + window resize 兜底重测（连续触发经 rAF 合并只保留最后一帧；observer 在 effect 清理 disconnect）。口径纯函数 `computeFillScrollY(containerHeight, headerHeight, paginationHeight)`：容器 `clientHeight` − `.ant-table-thead` 实测 − `.ant-table-pagination` 实测（querySelector 不到按 0 扣，对应 `pagination={false}`），下限 `MIN_FILL_SCROLL_Y=200`，未测量（`containerHeight==null`）返回 `undefined`（首帧正常渲染不滚动）。容器高度由页面 flex 链决定、不随 y 变化，setScrollY 同值 React 跳过重渲染，无测量循环。
+
+---
+
+## 列表页撑满（opt-in）
+
+标准列表页表格固定占满剩余区域：行多→表体内部滚动+thead 固定+分页器常驻视口；行少→表格自然高度、面板仍占满。**opt-in 语义**：只有页面根挂 `.page-fill` 类才启用（`global.css` 用 `:has()` 把 `.app-content-inner` 切为纵向 flex + overflow-hidden、`.app-page-panel` 切为 flex-1 min-h-0），无该类的页面完全走旧整页滚动布局、零影响。
+
+**:has() 浏览器要求**：Chrome/Edge 105+、Safari 15.4+、Firefox 121+；不支持的环境回退旧整页滚动布局，无功能损失。
+
+### 三步改法（每页统一）
+
+1. 页面根 div 加 `page-fill` 类；
+2. 中间段（PageHeader / FilterBar / 工具条 Space / 分组 Segmented）加 `shrink-0`；
+3. 表格卡（PagePanel 或手写 `page-table-card`）加 `flex-1 min-h-0 flex flex-col`，SelfTable/AppTable 传 `fill`（SelfTable 直出无表格卡时，fill 测量容器直接作为 `.page-fill` 纵向 flex 的 flex-1 子项）。
+
+两个开关（页面壳 `.page-fill` 与表格 `fill`）相互独立，可渐进接入。
+
+### 不接入形态
+
+表单为主页（PublishPage）、仪表盘混合布局（ScreenerPage）、嵌套子表（HistoryTable/ScreenerRunsPanel，容器非页面级）、卡片墙（ImagesPage）、演示页（ComponentPlayground）。
+
+⚠ **页内有依赖 `.app-content-inner` 滚动逻辑的页面勿接**（`.page-fill` 会把该容器 overflow-hidden）：先例 RolePermissionsPage.tsx:164 `querySelector('.app-content-inner')` 滚动定位。
 
 ---
 
