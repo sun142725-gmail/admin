@@ -539,7 +539,7 @@ export const CanvasPage: React.FC = () => {
 
   return (
     // 根节点显式高度：.app-page-panel 只是 min-height 的普通块容器（global.css:380-387），flex 子级
-    // 撑不出 React Flow 需要的确定高度，同仓先例 ChatPage.tsx:283 h-[calc(100vh-140px)] 口径。
+    // 撑不出 React Flow 需要的确定高度，同仓先例 ChatPage.tsx:283 h-[calc(100vh-116px)] 口径。
     // 预算：header 56 + content-inner 上下 padding 48 + page-panel 上下 padding 24 + PageHeader ≈46 → 176。
     <div className="flex flex-col h-[calc(100vh-176px)]">
       <PageHeader

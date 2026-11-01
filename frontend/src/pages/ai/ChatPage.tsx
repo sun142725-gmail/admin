@@ -280,7 +280,7 @@ export const ChatPage: React.FC = () => {
 
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-140px)]">
+    <div className="flex gap-4 h-[calc(100vh-116px)]">
       {/* 会话列表 */}
       <Card
         title="会话"

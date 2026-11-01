@@ -370,7 +370,7 @@ a {
 }
 
 .app-content-inner {
-  @apply h-[calc(100vh-var(--header-height))] overflow-y-auto pt-5 px-6 pb-7;
+  @apply h-[calc(100vh-var(--header-height))] overflow-y-auto p-3;
 }
 
 .app-breadcrumb {
@@ -378,7 +378,7 @@ a {
 }
 
 .app-page-panel {
-  min-height: calc(100vh - var(--header-height) - 64px);
+  min-height: calc(100vh - var(--header-height) - 24px);
   padding: 12px;
   border: 1px solid rgba(15, 23, 42, 0.04);
   border-radius: 24px;
@@ -909,7 +909,7 @@ a {
   }
 
   .app-content-inner {
-    padding: 16px;
+    padding: 12px;
   }
 
   .app-page-panel {
