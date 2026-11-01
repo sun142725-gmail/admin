@@ -1,6 +1,9 @@
 // 圆桌舞台：环形座次的专家卡片 + 中央主席/进度/投票 + 总结报告 + 讨论过程时间线双视图。
 import React, { useState } from 'react';
-import { Alert, Button, Segmented, Steps } from 'antd';
+import Alert from 'antd/es/alert';
+import Button from 'antd/es/button';
+import Segmented from 'antd/es/segmented';
+import Steps from 'antd/es/steps';
 import { StopOutlined } from '@ant-design/icons';
 import type { RoundtableSession } from '../useRoundtableFlow';
 import { conclusionColor } from '../useRoundtableFlow';

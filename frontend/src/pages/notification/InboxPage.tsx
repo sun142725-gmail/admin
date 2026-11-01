@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { sanitizeHtml } from '../../utils/sanitize';
-import { Button, Modal, Select, Space, Tag, Typography, message } from 'antd';
+import Button from 'antd/es/button';
+import Modal from 'antd/es/modal';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import Tag from 'antd/es/tag';
+import Typography from 'antd/es/typography';
+import message from 'antd/es/message';
 import { AppTable } from '../../components/AppTable';
 import { Permission } from '../../components/permission/Permission';
 import { listNotificationInbox, readAllNotificationInbox, readNotificationInbox } from '../../api/notification';

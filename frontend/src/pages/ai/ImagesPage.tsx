@@ -1,6 +1,14 @@
 // AI 生图页：文生图表单 + 结果墙 + 历史记录。
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Card, Empty, Form, Input, InputNumber, Select, Space, message } from 'antd';
+import Button from 'antd/es/button';
+import Card from 'antd/es/card';
+import Empty from 'antd/es/empty';
+import Form from 'antd/es/form';
+import Input from 'antd/es/input';
+import InputNumber from 'antd/es/input-number';
+import Select from 'antd/es/select';
+import Space from 'antd/es/space';
+import message from 'antd/es/message';
 import { PictureOutlined } from '@ant-design/icons';
 import { AppTable } from '../../components/AppTable';
 import { AiImageRecord, AiModel, generateImages, listImageHistory, listModels } from '../../api/ai';

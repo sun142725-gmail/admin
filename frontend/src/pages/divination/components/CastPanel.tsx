@@ -1,6 +1,6 @@
 // 第二幕：三枚铜钱 + 碗，逐爻掷币。点一下卜一下，掷币按钮触发单爻动画。
 // 铜钱只在点击掷币时播放一次动画，落定后保持本爻结果，等待下一次点击。
-import { Button } from 'antd';
+import Button from 'antd/es/button';
 import { useEffect, useRef, useState } from 'react';
 import { Coin } from './Coin';
 import type { DivinationRecord } from '../types';

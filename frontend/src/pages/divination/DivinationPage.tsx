@@ -1,6 +1,6 @@
 // 六爻占卜页：全屏沉浸式三幕场景，流程编排见 useDivinationFlow。
 // 路由位于 MainLayout 之外，独占整个视口。
-import { Button } from 'antd';
+import Button from 'antd/es/button';
 import { Link } from 'react-router-dom';
 import { InkBackground } from './components/InkBackground';
 import { StartPanel } from './components/StartPanel';

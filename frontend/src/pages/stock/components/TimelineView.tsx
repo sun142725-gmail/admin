@@ -1,6 +1,6 @@
 // 讨论过程时间线：按轮次分组完整呈现各轮观点流（实时流式 + 历史回放共用）。
 import React from 'react';
-import { Tag } from 'antd';
+import Tag from 'antd/es/tag';
 import type { TimelineItem } from '../useRoundtableFlow';
 import { STANCE_LABEL, expertOf } from '../experts';
 

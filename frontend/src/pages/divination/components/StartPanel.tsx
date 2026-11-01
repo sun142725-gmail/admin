@@ -1,5 +1,5 @@
 // 起卦前导屏：不提前填写所问之事，成卦后再补。
-import { Button } from 'antd';
+import Button from 'antd/es/button';
 
 interface StartPanelProps {
   loading: boolean;

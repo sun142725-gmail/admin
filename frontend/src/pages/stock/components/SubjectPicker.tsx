@@ -1,6 +1,10 @@
 // 分析对象选择器：类型切换 + 联想搜索（按当前类型过滤）+ 实时快照卡片。
 import React, { useEffect, useRef, useState } from 'react';
-import { AutoComplete, Card, Input, Segmented, Tag } from 'antd';
+import AutoComplete from 'antd/es/auto-complete';
+import Card from 'antd/es/card';
+import Input from 'antd/es/input';
+import Segmented from 'antd/es/segmented';
+import Tag from 'antd/es/tag';
 import {
   searchMarket,
   fetchQuotes,
@@ -154,7 +158,7 @@ export const SubjectPicker: React.FC<Props> = ({ value, onChange, disabled }) =>
         : '输入名称/代码/拼音首字母，如：贵州茅台、600519、gzmt';
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
       <Segmented
         value={value.subjectType}
         disabled={disabled}

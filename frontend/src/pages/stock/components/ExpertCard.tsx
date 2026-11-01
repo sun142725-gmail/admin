@@ -1,6 +1,8 @@
 // 专家卡片：头像/流派/立场徽章/置信度 + 当前轮次流式发言。
 import React, { useEffect, useRef } from 'react';
-import { Progress, Tag, Tooltip } from 'antd';
+import Progress from 'antd/es/progress';
+import Tag from 'antd/es/tag';
+import Tooltip from 'antd/es/tooltip';
 import type { ExpertRuntime } from '../useRoundtableFlow';
 import { STANCE_COLOR, STANCE_LABEL, expertOf } from '../experts';
 

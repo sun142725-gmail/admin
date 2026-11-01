@@ -1,5 +1,6 @@
 // 解卦面板：先补填所问之事（解卦时再写），提交后 SSE 实时逐字输出；失败可重试。
-import { Button, Input } from 'antd';
+import Button from 'antd/es/button';
+import Input from 'antd/es/input';
 import { useEffect, useState } from 'react';
 import type { DivinationRecord } from '../types';
 
