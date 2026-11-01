@@ -373,6 +373,8 @@ a {
   @apply h-[calc(100vh-var(--header-height))] overflow-y-auto p-3;
 }
 
+/* —— 间距刻度约定（2026-10-31）：普通/页面节奏间距统一 12px（小而精致），
+   紧凑内距 6px、区块级间隔 24px 为例外；组件内部密度 gap 保留原值。 —— */
 .app-breadcrumb {
   @apply mb-3 text-[13px] text-text-sub;
 }
@@ -415,6 +417,11 @@ a {
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
+}
+
+/* 分页器外距统一 12px 刻度（antd 默认 16px 0；.app-page-panel 提升特异性压过 cssinjs 注入） */
+.app-page-panel .ant-table-wrapper .ant-table-pagination.ant-pagination {
+  margin: 12px 0;
 }
 
 /* SelfTable fill 模式：纯 flex 撑满——包装层纵向 flex，表体 flex-1 占满剩余高度
@@ -467,9 +474,9 @@ a {
   max-height: none !important;
 }
 
-.fill-table .ant-table-pagination {
+.app-page-panel .fill-table .ant-table-pagination {
   flex: none;
-  margin-bottom: 0;
+  margin: 12px 0 0;
 }
 
 /* Tailwind 规范：纯布局/间距/字号用工具类（@apply）；复杂渐变/阴影视觉保留原生 CSS */
@@ -479,7 +486,7 @@ a {
 }
 
 .page-toolbar {
-  @apply flex flex-wrap items-center justify-between gap-3 mb-[18px];
+  @apply flex flex-wrap items-center justify-between gap-3 mb-3;
 }
 
 .page-toolbar-title {
@@ -495,7 +502,7 @@ a {
 }
 
 .page-filter-card {
-  margin-bottom: 18px;
+  margin-bottom: 12px;
   padding: 18px 18px 14px;
   border: 1px solid rgba(15, 23, 42, 0.05);
   border-radius: 18px;
@@ -522,7 +529,7 @@ a {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .role-permissions-stat-card {
@@ -566,7 +573,7 @@ a {
 }
 
 .role-permissions-alert {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   border-radius: 16px;
 }
 
@@ -670,7 +677,7 @@ a {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .role-permissions-group-title {
