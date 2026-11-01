@@ -484,7 +484,7 @@ a {
    thumb 用 content-box + 透明边框做出四周 2px 留白，视觉更轻。 —— */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: #91caff transparent;
 }
 
 ::-webkit-scrollbar {
@@ -497,14 +497,14 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
+  background-color: #91caff;
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8;
+  background-color: #4096ff;
 }
 
 ::-webkit-scrollbar-corner {
