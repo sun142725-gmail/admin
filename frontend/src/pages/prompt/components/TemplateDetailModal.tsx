@@ -19,6 +19,7 @@ import Upload from 'antd/es/upload';
 import type { RcFile, UploadChangeParam, UploadFile } from 'antd/es/upload';
 import { CopyOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons';
 import { SelfModal } from '../../../components/base/SelfModal';
+import { EmptyState } from '../../../components/business/PagePanel';
 import { useApiMessage } from '../../../hooks/useApiMessage';
 import { generateImages, AiImageRecord } from '../../../api/ai';
 import { CATEGORY_COLOR, PROMPT_CATEGORIES, PromptLibraryItem, updatePromptTemplate } from '../../../api/promptLibrary';
@@ -190,7 +191,7 @@ export const TemplateDetailModal: React.FC<TemplateDetailModalProps> = ({
             <Image src={exampleUrl} alt={tpl.name} className="max-h-[360px] w-auto rounded" />
           </div>
         ) : (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无示例图，生成后可一键设为示例图" />
+          <EmptyState image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无示例图，生成后可一键设为示例图" />
         )}
 
         <Divider className="!my-4" />

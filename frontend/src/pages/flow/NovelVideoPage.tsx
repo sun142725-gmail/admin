@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   Dropdown,
-  Empty,
   Form,
   Image,
   Input,
@@ -40,6 +39,7 @@ import { SelfDrawer } from '../../components/base/SelfDrawer';
 import { SelfForm } from '../../components/base/SelfForm';
 import { SelfModal } from '../../components/base/SelfModal';
 import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { EmptyState } from '../../components/business/PagePanel';
 import { PageHeader } from '../../components/business/PageHeader';
 import { StatusTag } from '../../components/business/StatusTag';
 import type { StatusMeta } from '../../types/ui';
@@ -371,7 +371,7 @@ export const NovelVideoPage: React.FC = () => {
           <Spin />
         </div>
       ) : projects.length === 0 ? (
-        <Empty description="还没有项目，导入一段小说开始" className="py-15" />
+        <EmptyState description="还没有项目，导入一段小说开始" className="py-15" />
       ) : (
         <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))]">
           {projects.map((project) => {

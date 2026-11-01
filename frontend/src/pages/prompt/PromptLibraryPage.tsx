@@ -10,7 +10,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from 'antd/es/button';
-import Empty from 'antd/es/empty';
 import Input from 'antd/es/input';
 import Pagination from 'antd/es/pagination';
 import Select from 'antd/es/select';
@@ -18,6 +17,7 @@ import Space from 'antd/es/space';
 import Typography from 'antd/es/typography';
 import { PlusOutlined, ReloadOutlined, SyncOutlined } from '@ant-design/icons';
 import { Permission } from '../../components/permission/Permission';
+import { EmptyState } from '../../components/business/PagePanel';
 import { PageHeader } from '../../components/business/PageHeader';
 import { useApiMessage } from '../../hooks/useApiMessage';
 import { useAppSelector } from '../../store/hooks';
@@ -130,7 +130,7 @@ export const PromptLibraryPage: React.FC = () => {
       </div>
 
       {lib.items.length === 0 && !lib.loading ? (
-        <Empty description="还没有提示词，点击右上角新建或批量同步导入" />
+        <EmptyState description="还没有提示词，点击右上角新建或批量同步导入" />
       ) : (
         <>
           <div className="prompt-library-grid">

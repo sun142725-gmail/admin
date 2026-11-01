@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Button from 'antd/es/button';
 import Card from 'antd/es/card';
-import Empty from 'antd/es/empty';
 import Form from 'antd/es/form';
 import Input from 'antd/es/input';
 import InputNumber from 'antd/es/input-number';
@@ -11,6 +10,7 @@ import Space from 'antd/es/space';
 import message from 'antd/es/message';
 import { PictureOutlined } from '@ant-design/icons';
 import { AppTable } from '../../components/AppTable';
+import { EmptyState } from '../../components/business/PagePanel';
 import { AiImageRecord, AiModel, generateImages, listImageHistory, listModels } from '../../api/ai';
 
 interface ImageFormValues {
@@ -76,7 +76,7 @@ export const ImagesPage: React.FC = () => {
     <Space direction="vertical" size={12} className="w-full">
       <Card title="文生图" styles={{ body: { padding: 12 } }}>
         {imageModels.length === 0 ? (
-          <Empty description="暂无 image 能力模型，请先在模型管理里注册并挂载生图渠道" imageStyle={{ height: 48 }} />
+          <EmptyState description="暂无 image 能力模型，请先在模型管理里注册并挂载生图渠道" imageStyle={{ height: 48 }} />
         ) : (
           <Form form={form} layout="vertical" initialValues={{ size: '1024x1024', count: 1 }} className="max-w-[720px]">
             <Form.Item name="modelId" label="模型（留空用第一个可用生图模型）">

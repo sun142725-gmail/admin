@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from 'antd/es/button';
 import Card from 'antd/es/card';
-import Empty from 'antd/es/empty';
 import Form from 'antd/es/form';
 import Input from 'antd/es/input';
 import Select from 'antd/es/select';
@@ -25,6 +24,7 @@ import { Permission } from '../../components/permission/Permission';
 import { SelfForm } from '../../components/base/SelfForm';
 import { SelfModal } from '../../components/base/SelfModal';
 import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { EmptyState } from '../../components/business/PagePanel';
 import { PageHeader } from '../../components/business/PageHeader';
 import { StatusTag } from '../../components/business/StatusTag';
 import { useApiMessage } from '../../hooks/useApiMessage';
@@ -169,7 +169,7 @@ export const FlowsPage: React.FC = () => {
           <Spin />
         </div>
       ) : filtered.length === 0 ? (
-        <Empty description={keyword ? '没有匹配的制片计划' : '还没有制片计划，新建一个开始编排'} className="py-15">
+        <EmptyState description={keyword ? '没有匹配的制片计划' : '还没有制片计划，新建一个开始编排'} className="py-15">
           {!keyword ? (
             <Permission code="flow:define:manage">
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
@@ -179,7 +179,7 @@ export const FlowsPage: React.FC = () => {
           ) : (
             <span />
           )}
-        </Empty>
+        </EmptyState>
       ) : (
         <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(320px,100%),1fr))]">
           {filtered.map((flow) => {

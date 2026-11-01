@@ -7,7 +7,6 @@ import {
   Button,
   Card,
   Descriptions,
-  Empty,
   Form,
   Image,
   Input,
@@ -310,7 +309,7 @@ export const GraphicPage: React.FC = () => {
               </Card>
             ) : null}
             {detail.scenes.length === 0 ? (
-              <Empty description="尚未分幕，点击生成开始" />
+              <EmptyState description="尚未分幕，点击生成开始" />
             ) : (
               <Space direction="vertical" className="w-full" size={12}>
                 {detail.scenes.map((scene) => (

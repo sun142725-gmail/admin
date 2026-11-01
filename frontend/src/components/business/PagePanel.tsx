@@ -20,6 +20,10 @@ export interface EmptyStateProps {
   description?: React.ReactNode;
   /** antd Empty image 透传（Empty.PRESENTED_IMAGE_SIMPLE 等）。 */
   image?: EmptyProps['image'];
+  /** antd Empty imageStyle 透传（自定义 image 尺寸）。 */
+  imageStyle?: EmptyProps['imageStyle'];
+  /** Empty children 透传：空态操作区（如「新建」按钮，antd Empty 渲染在文案下方）。 */
+  children?: React.ReactNode;
   /** 追加类名。 */
   className?: string;
   /** 撑满父级剩余高度（父级需为 flex 容器，页面根加 page-fill 激活壳链）：
@@ -28,13 +32,24 @@ export interface EmptyStateProps {
 }
 
 /** 非表格空态统一形态：居中 Empty 容器。表格空态走 Table locale.emptyText，不与本组件叠加。 */
-export const EmptyState: React.FC<EmptyStateProps> = ({ description = '暂无数据', image, className, fill = false }) =>
+export const EmptyState: React.FC<EmptyStateProps> = ({
+  description = '暂无数据',
+  image,
+  imageStyle,
+  children,
+  className,
+  fill = false
+}) =>
   fill ? (
     <div className={`flex-1 min-h-0 flex flex-col items-center justify-center ${className ?? ''}`}>
-      <Empty image={image} description={description} />
+      <Empty image={image} imageStyle={imageStyle} description={description}>
+        {children}
+      </Empty>
     </div>
   ) : (
     <div className={className} style={{ padding: '48px 0', textAlign: 'center' }}>
-      <Empty image={image} description={description} />
+      <Empty image={image} imageStyle={imageStyle} description={description}>
+        {children}
+      </Empty>
     </div>
   );

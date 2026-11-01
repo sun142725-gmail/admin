@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Button from 'antd/es/button';
 import Card from 'antd/es/card';
-import Empty from 'antd/es/empty';
 import Input from 'antd/es/input';
 import List from 'antd/es/list';
 import Select from 'antd/es/select';
@@ -25,6 +24,7 @@ import {
   submitChat
 } from '../../api/ai';
 import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
+import { EmptyState } from '../../components/business/PagePanel';
 import { useApiMessage } from '../../hooks/useApiMessage';
 
 interface ChatBubble extends Pick<AiChatMessage, 'role' | 'content' | 'status'> {
@@ -296,7 +296,7 @@ export const ChatPage: React.FC = () => {
         }
       >
         {conversations.length === 0 ? (
-          <Empty description="暂无会话" imageStyle={{ height: 48 }} />
+          <EmptyState description="暂无会话" imageStyle={{ height: 48 }} />
         ) : (
           <List
             dataSource={conversations}
@@ -363,7 +363,7 @@ export const ChatPage: React.FC = () => {
 
         <div ref={listBodyRef} className="flex-1 overflow-auto px-2 py-1">
           {bubbles.length === 0 ? (
-            <Empty description={selectedAgent?.openingLine ?? WELCOME_HINT} imageStyle={{ height: 60 }} className="mt-20" />
+            <EmptyState description={selectedAgent?.openingLine ?? WELCOME_HINT} imageStyle={{ height: 60 }} className="mt-20" />
           ) : (
             bubbles.map((bubble) => (
               <div

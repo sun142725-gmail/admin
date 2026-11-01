@@ -3,7 +3,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Alert from 'antd/es/alert';
 import Button from 'antd/es/button';
 import Checkbox from 'antd/es/checkbox';
-import Empty from 'antd/es/empty';
 import Input from 'antd/es/input';
 import Space from 'antd/es/space';
 import Spin from 'antd/es/spin';
@@ -14,7 +13,7 @@ import { listRoles, assignPermissions } from '../../api/roles';
 import { listPermissions } from '../../api/permissions';
 import { Permission } from '../../components/permission/Permission';
 import { PageHeader } from '../../components/business/PageHeader';
-import { PagePanel } from '../../components/business/PagePanel';
+import { EmptyState, PagePanel } from '../../components/business/PagePanel';
 import { useApiMessage } from '../../hooks/useApiMessage';
 
 interface PermissionItem {
@@ -263,7 +262,7 @@ export const RolePermissionsPage: React.FC = () => {
   }
 
   if (!role) {
-    return <Empty description="角色不存在" />;
+    return <EmptyState description="角色不存在" />;
   }
 
   return (
@@ -390,7 +389,7 @@ export const RolePermissionsPage: React.FC = () => {
             })
           ) : (
             <PagePanel className="role-permissions-empty">
-              <Empty description="没有匹配到权限项" />
+              <EmptyState description="没有匹配到权限项" />
             </PagePanel>
           )}
         </div>
