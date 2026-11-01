@@ -4,7 +4,7 @@
 .divination-scene {
   position: relative;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 8px;
   min-height: 640px;
   background: #f7f2e7;
 }

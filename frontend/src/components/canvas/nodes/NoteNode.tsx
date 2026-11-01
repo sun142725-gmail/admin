@@ -35,7 +35,7 @@ export const NoteNode: React.FC<NodeProps<NoteCanvasNode>> = ({ data }) => {
 
   return (
     <div
-      className="relative rounded-xl px-3 py-2.5 shadow-[0_2px_8px_rgba(15,23,42,0.1)]"
+      className="relative rounded-lg px-3 py-2.5 shadow-[0_2px_8px_rgba(15,23,42,0.1)]"
       style={{ width: NOTE_WIDTH, backgroundColor: color }}
     >
       {editing ? (

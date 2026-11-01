@@ -568,7 +568,7 @@ export const NovelVideoPage: React.FC = () => {
                   成片
                 </Typography.Title>
                 {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video src={detail.project.finalVideoPath} controls className="w-full rounded-xl" />
+                <video src={detail.project.finalVideoPath} controls className="w-full rounded-lg" />
               </div>
             )}
             {detail.chapters.map((chapter) => (

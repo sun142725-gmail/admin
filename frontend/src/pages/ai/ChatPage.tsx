@@ -371,7 +371,7 @@ export const ChatPage: React.FC = () => {
                 className={`flex mb-3 ${bubble.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className="max-w-[78%] px-3.5 py-2.5 rounded-xl whitespace-pre-wrap break-words"
+                  className="max-w-[78%] px-3.5 py-2.5 rounded-lg whitespace-pre-wrap break-words"
                   style={{
                     background: bubble.role === 'user' ? '#e6f4ff' : '#f5f5f5',
                     border: bubble.status === 'failed' ? '1px solid #ffa39e' : undefined

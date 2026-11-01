@@ -122,7 +122,7 @@ export const ImagesPage: React.FC = () => {
                 <img
                   src={image.url}
                   alt={image.prompt}
-                  className="w-[220px] rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
+                  className="w-[220px] rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
                 />
               </a>
             ))}

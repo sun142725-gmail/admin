@@ -17,7 +17,7 @@ const theme: ThemeConfig = {
     fontFamily: "-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif",
     // —— 圆角档位锚点（以下均为 antd v5 默认值，渲染零变化；组件级覆写仍在下方 components 段）——
     borderRadiusSM: 4, // 小元素 Tag/Popconfirm
-    borderRadius: 6, // 中控件默认
+    borderRadius: 8, // 中控件默认（2026-10-31 全局圆角统一 8px）
     borderRadiusLG: 8, // 大容器基准
     // —— 间距四档锚点（Space size 8 种散值归一到 4/8/12/16，types/ui.ts SPACE_SIZE 同源；均为 antd 默认值）——
     marginXXS: 4, // xs：标签/按钮组内
@@ -33,17 +33,17 @@ const theme: ThemeConfig = {
   },
   components: {
     // 原 CSS：.ant-btn 圆角 12（曾被 antd 默认值压制）+ font-weight 600
-    Button: { borderRadius: 12, fontWeight: 600 },
+    Button: { borderRadius: 8, fontWeight: 600 },
     // 原 CSS：.ant-input/.ant-select/.ant-picker/.ant-input-number 圆角 12 !important
-    Input: { borderRadius: 12 },
-    Select: { borderRadius: 12 },
-    DatePicker: { borderRadius: 12 },
-    InputNumber: { borderRadius: 12 },
+    Input: { borderRadius: 8 },
+    Select: { borderRadius: 8 },
+    DatePicker: { borderRadius: 8 },
+    InputNumber: { borderRadius: 8 },
     // 原 CSS：.ant-card 圆角 20 / 边框 rgba(15,23,42,.06) !important
-    Card: { borderRadiusLG: 20, colorBorderSecondary: 'rgba(15, 23, 42, 0.06)' },
+    Card: { borderRadiusLG: 8, colorBorderSecondary: 'rgba(15, 23, 42, 0.06)' },
     // 原 CSS：.ant-table 圆角 18 / 头部 #f7faff / hover 行背景 !important
     Table: {
-      borderRadiusLG: 18,
+      borderRadiusLG: 8,
       headerBg: '#f7faff',
       headerColor: '#1a1a1a',
       rowHoverBg: 'rgba(22, 119, 255, 0.03)'

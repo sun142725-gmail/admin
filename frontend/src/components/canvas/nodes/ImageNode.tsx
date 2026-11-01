@@ -46,9 +46,9 @@ export const ImageNode: React.FC<NodeProps<ImageCanvasNode>> = ({ data }) => {
   }, [data.url]);
 
   return (
-    <div className="relative rounded-xl border border-slate-200 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.08)]">
+    <div className="relative rounded-lg border border-slate-200 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.08)]">
       {data.loading ? (
-        <div style={{ width, height }} className="flex items-center justify-center rounded-xl bg-slate-50 p-2">
+        <div style={{ width, height }} className="flex items-center justify-center rounded-lg bg-slate-50 p-2">
           <Skeleton.Node active style={{ width: width - 16, height: height - 16 }} />
         </div>
       ) : error ? (
@@ -78,7 +78,7 @@ export const ImageNode: React.FC<NodeProps<ImageCanvasNode>> = ({ data }) => {
           // 大图节点懒加载：视口外的节点不立即拉取图片（浏览器原生 lazy）。
           loading="lazy"
           onError={() => setError(true)}
-          className="rounded-xl object-cover"
+          className="rounded-lg object-cover"
           style={{ width, height, objectFit: 'cover', borderRadius: 12 }}
         />
       )}
