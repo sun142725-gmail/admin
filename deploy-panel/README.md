@@ -39,6 +39,18 @@ http://服务器IP:9090
 
 SQL 生成方式（开发机，提示词变更后）：`cd backend && npm run sync:stock:gen`，产物 `deploy/scripts/stock-agents.sql` 随仓库提交。线上模型名不同时，直接修改该 SQL 文末 UPDATE 中的两个字面量。
 
+## 如何新增发布目标脚本
+
+发布目标脚本统一放在 `deploy-panel/scripts/` 目录。新增一个可在面板下拉框选择的发布目标，需要同步改三处：
+
+1. **脚本本体**：在 `deploy-panel/scripts/` 新建 `deploy-<目标名>.sh`，参照 `deploy-core.sh` 的写法（git pull + `docker compose up -d --build --no-deps <服务名>`，避免连带启动 mysql 等基础容器）；
+2. **服务端注册**：在 `server.js` 顶部 `SCRIPT_MAP` 加入 `目标名: path.join(__dirname, 'scripts/deploy-<目标名>.sh')`，未注册的 target 会被服务端拒绝；
+3. **前端下拉框**：在 `publish.html` 的 `<select id="target">` 加一个 `<option value="目标名">仅 XX 目标名</option>`。
+
+最后在本文档「发布目标」表格补一行说明。脚本随 git 提交即可，线上面板容器内执行的是挂载仓库的最新文件，无需重建面板镜像。
+
+注意与「线上脚本」（数据库 SQL 变更，白名单目录 `deploy-panel/scripts/online/`，见下文「线上脚本」章节）区分：重建应用的发布脚本放 `scripts/`，SQL 变更脚本放 `scripts/online/`，两个目录不要混用。
+
 ## 容器运行机制
 
 `deploy-panel` 服务会把项目根目录挂载到容器内与宿主机一致的绝对路径，默认是 `/home/sun142725/admin`，同时挂载宿主机 `/var/run/docker.sock`。发布脚本在该路径中执行 `git pull` 与 Docker Compose，因此可以从容器内控制宿主机 Docker 重建服务并正确解析 bind mount。
