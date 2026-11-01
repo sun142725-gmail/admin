@@ -383,7 +383,7 @@ a {
   min-height: calc(100vh - var(--header-height) - 24px);
   padding: 12px;
   border: 1px solid rgba(15, 23, 42, 0.04);
-  border-radius: 24px;
+  border-radius: 12px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.74));
   box-shadow: 0 20px 48px rgba(15, 23, 42, 0.06);
 }
@@ -505,7 +505,7 @@ a {
   margin-bottom: 12px;
   padding: 18px 18px 14px;
   border: 1px solid rgba(15, 23, 42, 0.05);
-  border-radius: 18px;
+  border-radius: 12px;
   background: linear-gradient(180deg, rgba(247, 250, 255, 0.9), rgba(255, 255, 255, 0.86));
 }
 
@@ -574,7 +574,7 @@ a {
 
 .role-permissions-alert {
   margin-bottom: 12px;
-  border-radius: 16px;
+  border-radius: 12px;
 }
 
 .role-permissions-groups {
@@ -921,7 +921,7 @@ a {
 
   .app-page-panel {
     padding: 12px;
-    border-radius: 20px;
+    border-radius: 12px;
   }
 
   .role-permissions-summary,
