@@ -479,6 +479,38 @@ a {
   margin: 12px 0 0;
 }
 
+/* —— 全局滚动条统一：细条圆角、悬浮加深（覆盖表格体/页面/抽屉/弹窗等一切滚动区域）。
+   Firefox 走 scrollbar-width/color 标准属性；Chrome/Edge/Safari 走 webkit 伪元素。
+   thumb 用 content-box + 透明边框做出四周 2px 留白，视觉更轻。 —— */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.2) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(15, 23, 42, 0.18);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(15, 23, 42, 0.34);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Tailwind 规范：纯布局/间距/字号用工具类（@apply）；复杂渐变/阴影视觉保留原生 CSS */
 /* Tag 去默认右间距（行内多标签并排场景） */
 .ant-tag.tag-flat {
