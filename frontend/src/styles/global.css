@@ -374,7 +374,7 @@ a {
 }
 
 .app-breadcrumb {
-  @apply mt-2 mb-[14px] text-[13px] text-text-sub;
+  @apply mb-3 text-[13px] text-text-sub;
 }
 
 .app-page-panel {
