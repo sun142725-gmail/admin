@@ -326,8 +326,8 @@ export const PublishPage: React.FC = () => {
   ];
 
   return (
-    <div>
-      <FilterBar form={queryForm} onSearch={onSearch} onReset={onReset} formClassName="gap-y-3">
+    <div className="page-fill flex flex-col">
+      <FilterBar form={queryForm} onSearch={onSearch} onReset={onReset} formClassName="gap-y-3" className="shrink-0">
         <Form.Item name="templateId" label="模板">
           <Select
             allowClear
@@ -355,7 +355,7 @@ export const PublishPage: React.FC = () => {
         </Form.Item>
       </FilterBar>
 
-      <Space className="mb-4">
+      <Space className="mb-4 shrink-0">
         <Permission code="system:notification:publish:create" mode="disable">
           <Button type="primary" onClick={onCreate}>
             发布通知
@@ -369,6 +369,7 @@ export const PublishPage: React.FC = () => {
         loading={table.loading}
         dataSource={table.data}
         pagination={table.pagination}
+        fill
       />
 
       <SelfModal title="发布通知" open={open} onOk={onSubmit} onCancel={() => setOpen(false)} width="lg">
