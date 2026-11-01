@@ -1,5 +1,6 @@
 // 会话链路视图：按 SessionId + 来源还原一个用户会话的完整请求流（PV/API/错误/服务端 5xx），
 // 按天分组折叠，点击某一天展开当天全部事件，每条可下钻详情。
+import { EmptyState } from '../../components/business/PagePanel';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Button from 'antd/es/button';
 import Card from 'antd/es/card';
@@ -147,8 +148,8 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
   const errorCount = result?.error.length ?? 0;
 
   return (
-    <div>
-      <div className="page-filter-card">
+    <div className="page-fill flex flex-col">
+      <div className="page-filter-card shrink-0">
         <Space wrap size={8}>
           <Input
             placeholder="SessionId"
@@ -180,16 +181,18 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
       </div>
 
       {loading && !result ? (
-        <div className="py-12 text-center">
+        <div className="flex-1 min-h-0 flex items-center justify-center">
           <Spin />
         </div>
       ) : !searched ? (
-        <Card size="small">
-          <Empty description="输入 SessionId 查询该会话的完整请求流（支持在日志详情弹窗点击「会话链路」直达）" />
-        </Card>
+        // 未查询空态：撑满筛选卡以下的剩余界面（fill 链由页面根 page-fill 激活）
+        <EmptyState
+          fill
+          description="输入 SessionId 查询该会话的完整请求流（支持在日志详情弹窗点击「会话链路」直达）"
+        />
       ) : (
         <>
-          <Card size="small" className="mb-3">
+          <Card size="small" className="mb-3 shrink-0">
             <Row gutter={16}>
               <Col span={6}>
                 <Statistic title="事件总数" value={entries.length} />
@@ -215,6 +218,7 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
           </Card>
           {dayGroups.length ? (
             <Collapse
+            className="flex-1 min-h-0 overflow-y-auto"
               defaultActiveKey={dayGroups.slice(0, 1).map(([day]) => day)}
               items={dayGroups.map(([day, list]) => {
                 const dayErrors = list.filter((entry) => entry.type === 'error').length;
@@ -231,7 +235,7 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
                     </Space>
                   ),
                   children: (
-                    // Collapse 内非 flex 链：fill 容器 flex-1 无效 → y=自然行高、200 下限兜底，行为≈不变
+                    // 页面根 page-fill 已激活：Collapse 撑满剩余高度，表格 fill 链有效（行多内滚、分页常驻）
                     <SelfTable
                       size="small"
                       rowKey={(entry: SessionEntry) => `${entry.type}-${entry.item.id}`}
@@ -245,9 +249,10 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
               })}
             />
           ) : (
-            <Card size="small">
-              <Empty description="该 SessionId 在窗口内没有日志（注意保留期限制，超期数据已被清理）" />
-            </Card>
+            <EmptyState
+              fill
+              description="该 SessionId 在窗口内没有日志（注意保留期限制，超期数据已被清理）"
+            />
           )}
         </>
       )}

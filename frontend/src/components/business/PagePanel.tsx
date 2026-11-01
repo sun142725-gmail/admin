@@ -22,11 +22,19 @@ export interface EmptyStateProps {
   image?: EmptyProps['image'];
   /** 追加类名。 */
   className?: string;
+  /** 撑满父级剩余高度（父级需为 flex 容器，页面根加 page-fill 激活壳链）：
+   *  空态居中铺满剩余界面，用于「未查询/无结果」等整片留白场景；缺省保持自然高度形态。 */
+  fill?: boolean;
 }
 
 /** 非表格空态统一形态：居中 Empty 容器。表格空态走 Table locale.emptyText，不与本组件叠加。 */
-export const EmptyState: React.FC<EmptyStateProps> = ({ description = '暂无数据', image, className }) => (
-  <div className={className} style={{ padding: '48px 0', textAlign: 'center' }}>
-    <Empty image={image} description={description} />
-  </div>
-);
+export const EmptyState: React.FC<EmptyStateProps> = ({ description = '暂无数据', image, className, fill = false }) =>
+  fill ? (
+    <div className={`flex-1 min-h-0 flex flex-col items-center justify-center ${className ?? ''}`}>
+      <Empty image={image} description={description} />
+    </div>
+  ) : (
+    <div className={className} style={{ padding: '48px 0', textAlign: 'center' }}>
+      <Empty image={image} description={description} />
+    </div>
+  );
