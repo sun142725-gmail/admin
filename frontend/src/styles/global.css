@@ -421,7 +421,7 @@ a {
 
 /* 分页器外距统一 12px 刻度（antd 默认 16px 0；.app-page-panel 提升特异性压过 cssinjs 注入） */
 .app-page-panel .ant-table-wrapper .ant-table-pagination.ant-pagination {
-  margin: 12px 0;
+  margin: 12px 0 0;
 }
 
 /* SelfTable fill 模式：纯 flex 撑满——包装层纵向 flex，表体 flex-1 占满剩余高度
@@ -474,7 +474,7 @@ a {
   max-height: none !important;
 }
 
-.app-page-panel .fill-table .ant-table-pagination {
+.app-page-panel .fill-table .ant-table-wrapper .ant-table-pagination.ant-pagination {
   flex: none;
   margin: 12px 0 0;
 }
