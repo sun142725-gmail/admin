@@ -231,11 +231,13 @@ export const SessionTraceView: React.FC<Props> = ({ sourceOptions, onShowDetail 
                     </Space>
                   ),
                   children: (
+                    // Collapse 内非 flex 链：fill 容器 flex-1 无效 → y=自然行高、200 下限兜底，行为≈不变
                     <SelfTable
                       size="small"
                       rowKey={(entry: SessionEntry) => `${entry.type}-${entry.item.id}`}
                       columns={dayColumns}
                       dataSource={list}
+                      fill
                       pagination={{ pageSize: 50, hideOnSinglePage: true, showSizeChanger: false, showTotal: (total) => `共 ${total} 条` }}
                     />
                   )

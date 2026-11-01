@@ -190,8 +190,9 @@ export const UsersPage: React.FC = () => {
   );
 
   return (
-    <div>
+    <div className="page-fill">
       <PageHeader
+        className="shrink-0"
         title="用户管理"
         subtitle="维护后台用户资料、状态与角色绑定关系。"
         actions={
@@ -202,8 +203,8 @@ export const UsersPage: React.FC = () => {
           </Permission>
         }
       />
-      <PagePanel>
-        <SelfTable rowKey="id" columns={columns} dataSource={data} loading={loading} />
+      <PagePanel className="flex-1 min-h-0 flex flex-col">
+        <SelfTable rowKey="id" columns={columns} dataSource={data} loading={loading} fill />
       </PagePanel>
 
       <SelfModal title={modal.editing ? '编辑用户' : '新增用户'} open={modal.open} onOk={onSubmit} onCancel={modal.close}>

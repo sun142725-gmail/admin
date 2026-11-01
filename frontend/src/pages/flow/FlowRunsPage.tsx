@@ -228,10 +228,10 @@ export const FlowRunsPage: React.FC = () => {
   );
 
   return (
-    <div>
+    <div className="page-fill">
       {/* flow-page-header 自绘 flex 迁 PageHeader（README 收编写法），标题左/筛选右布局等价 */}
       <PageHeader
-        className="flex-wrap gap-y-1"
+        className="flex-wrap gap-y-1 shrink-0"
         title="运行历史"
         actions={
           <>
@@ -270,6 +270,7 @@ export const FlowRunsPage: React.FC = () => {
         columns={columns}
         dataSource={runs}
         loading={loading}
+        fill
         pagination={{ pageSize: 20 }}
         onRow={(record) => ({ onClick: () => void openDetail(record.id), style: { cursor: 'pointer' } })}
       />

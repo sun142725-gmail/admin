@@ -323,8 +323,8 @@ export const TemplatePage: React.FC = () => {
   ];
 
   return (
-    <div>
-      <Space className="mb-4">
+    <div className="page-fill">
+      <Space className="mb-4 shrink-0">
         <Permission code="system:notification:template:create" mode="disable">
           <Button type="primary" onClick={onCreate}>
             新增模板
@@ -332,7 +332,7 @@ export const TemplatePage: React.FC = () => {
         </Permission>
       </Space>
 
-      <SelfTable rowKey="id" columns={columns} dataSource={data} />
+      <SelfTable rowKey="id" columns={columns} dataSource={data} fill />
 
       {/* width="66vw" 为响应式合法特例（components/README.md），SelfDrawer 字符串透传保留 */}
       <SelfDrawer

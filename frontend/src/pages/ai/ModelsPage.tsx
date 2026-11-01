@@ -254,8 +254,9 @@ export const ModelsPage: React.FC = () => {
   );
 
   return (
-    <div>
+    <div className="page-fill">
       <PageHeader
+        className="shrink-0"
         title="模型管理"
         actions={
           <Permission code="ai:model:manage">
@@ -265,8 +266,8 @@ export const ModelsPage: React.FC = () => {
           </Permission>
         }
       />
-      <PagePanel>
-        <SelfTable<AiModel> rowKey="id" loading={loading} columns={columns} dataSource={models} pagination={false} />
+      <PagePanel className="flex-1 min-h-0 flex flex-col">
+        <SelfTable<AiModel> rowKey="id" loading={loading} columns={columns} dataSource={models} pagination={false} fill />
       </PagePanel>
 
       <SelfDrawer

@@ -252,8 +252,9 @@ export const DictPage: React.FC = () => {
   );
 
   return (
-    <div>
+    <div className="page-fill">
       <PageHeader
+        className="shrink-0"
         title="字典管理"
         subtitle="维护枚举字典、多语言标签与扩展属性，供前后端统一复用。"
         actions={
@@ -265,14 +266,21 @@ export const DictPage: React.FC = () => {
         }
       />
 
-      <FilterBar form={queryForm} onSearch={onSearch} onReset={onReset}>
+      <FilterBar className="shrink-0" form={queryForm} onSearch={onSearch} onReset={onReset}>
         <Form.Item label="关键词" name="keyword">
           <Input placeholder="编码/名称" />
         </Form.Item>
       </FilterBar>
 
-      <PagePanel>
-        <SelfTable rowKey="id" columns={columns} dataSource={table.data} loading={table.loading} pagination={table.pagination} />
+      <PagePanel className="flex-1 min-h-0 flex flex-col">
+        <SelfTable
+          rowKey="id"
+          columns={columns}
+          dataSource={table.data}
+          loading={table.loading}
+          pagination={table.pagination}
+          fill
+        />
       </PagePanel>
 
       <SelfModal title={editItem ? '编辑字典' : '新增字典'} open={open} onOk={onSubmit} onCancel={() => setOpen(false)}>

@@ -716,7 +716,8 @@ export const AuditCenterPage: React.FC = () => {
     : 0;
 
   return (
-    <div className="app-page-flat">
+    // 列表页签撑满（opt-in page-fill），overview/session 图表页签保持旧整页滚动布局
+    <div className={`app-page-flat ${isListTab(activeTab) ? 'page-fill' : ''}`}>
       {activeTab === 'overview' && <OverviewPanel onJump={jumpToTab} />}
 
       {activeTab === 'session' && <SessionTraceView sourceOptions={sourceOptions} onShowDetail={showDetail} />}
@@ -724,7 +725,7 @@ export const AuditCenterPage: React.FC = () => {
       {isListTab(activeTab) && (
         <>
           {/* audit 特例：hideDefaultActions + actions 承载全宽居中按钮组（查询/重置/刷新/自动刷新/导出/列设置同处一行），formClassName 透传原 Form 布局类 */}
-          <FilterBar form={form} hideDefaultActions formClassName="flex flex-wrap gap-4">
+          <FilterBar form={form} hideDefaultActions formClassName="flex flex-wrap gap-4" className="shrink-0">
             <Form.Item label="用户ID" name="userId">
               <InputNumber placeholder="用户ID" min={1} precision={0} className="w-full sm:!w-[140px]" />
             </Form.Item>
@@ -806,12 +807,13 @@ export const AuditCenterPage: React.FC = () => {
             </Form.Item>
           </FilterBar>
 
-          <PagePanel>
+          <PagePanel className="flex-1 min-h-0 flex flex-col">
             <SelfTable
               rowKey="id"
               columns={columns}
               dataSource={data}
               loading={loading}
+              fill
               pagination={{
                 current: page,
                 pageSize,

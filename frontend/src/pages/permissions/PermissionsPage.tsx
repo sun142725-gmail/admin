@@ -101,8 +101,9 @@ export const PermissionsPage: React.FC = () => {
   ];
 
   return (
-    <div>
+    <div className="page-fill">
       <PageHeader
+        className="shrink-0"
         title="权限管理"
         subtitle="统一维护权限名称、权限码与描述，供角色与菜单引用。"
         actions={
@@ -113,8 +114,8 @@ export const PermissionsPage: React.FC = () => {
           </Permission>
         }
       />
-      <PagePanel>
-        <SelfTable rowKey="id" columns={columns} dataSource={data} />
+      <PagePanel className="flex-1 min-h-0 flex flex-col">
+        <SelfTable rowKey="id" columns={columns} dataSource={data} fill />
       </PagePanel>
 
       <SelfModal title={modal.editing ? '编辑权限' : '新增权限'} open={modal.open} onOk={onSubmit} onCancel={modal.close}>

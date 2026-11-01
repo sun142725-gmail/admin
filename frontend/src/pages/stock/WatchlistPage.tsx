@@ -302,8 +302,9 @@ export const WatchlistPage: React.FC = () => {
   ];
 
   return (
-    <div>
+    <div className="page-fill">
       <PageHeader
+        className="shrink-0"
         title="自选股"
         subtitle="收藏关注的股票，点击股票行查看日K线图；可作为选股器候选池，一键发起圆桌分析。"
         actions={
@@ -327,7 +328,7 @@ export const WatchlistPage: React.FC = () => {
       />
 
       {groups.length > 2 && (
-        <div className="mb-3">
+        <div className="mb-3 shrink-0">
           <Segmented
             value={groupFilter}
             onChange={(value) => setGroupFilter(value as string)}
@@ -336,12 +337,13 @@ export const WatchlistPage: React.FC = () => {
         </div>
       )}
 
-      <div className="page-table-card">
+      <div className="page-table-card flex-1 min-h-0 flex flex-col">
         <SelfTable
           rowKey="id"
           columns={columns}
           dataSource={dataSource}
           loading={loading}
+          fill
           onRow={(record) => ({
             onClick: (event) => {
               if (!isStockRowClickIgnored(event)) {

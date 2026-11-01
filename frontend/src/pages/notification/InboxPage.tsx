@@ -119,8 +119,8 @@ export const InboxPage: React.FC = () => {
   ];
 
   return (
-    <div>
-      <Space className="mb-4">
+    <div className="page-fill">
+      <Space className="mb-4 shrink-0">
         <Select
           value={status}
           onChange={setStatus}
@@ -139,6 +139,7 @@ export const InboxPage: React.FC = () => {
         columns={columns}
         loading={loading}
         dataSource={data}
+        fill
         pagination={{
           current: page,
           pageSize,

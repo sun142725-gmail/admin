@@ -180,8 +180,9 @@ export const AgentsPage: React.FC = () => {
   );
 
   return (
-    <div>
+    <div className="page-fill">
       <PageHeader
+        className="shrink-0"
         title="智能体管理"
         actions={
           <Permission code="ai:agent:manage">
@@ -191,8 +192,8 @@ export const AgentsPage: React.FC = () => {
           </Permission>
         }
       />
-      <PagePanel>
-        <SelfTable<AiAgent> rowKey="id" loading={loading} columns={columns} dataSource={agents} pagination={false} />
+      <PagePanel className="flex-1 min-h-0 flex flex-col">
+        <SelfTable<AiAgent> rowKey="id" loading={loading} columns={columns} dataSource={agents} pagination={false} fill />
       </PagePanel>
 
       {/* width=560 即 SelfDrawer md 档默认，零变更（components/README.md AgentsPage 560=md） */}

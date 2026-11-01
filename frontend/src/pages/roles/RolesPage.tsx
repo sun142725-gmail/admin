@@ -124,8 +124,9 @@ export const RolesPage: React.FC = () => {
   ];
 
   return (
-    <div>
+    <div className="page-fill">
       <PageHeader
+        className="shrink-0"
         title="角色管理"
         subtitle="管理角色定义与职责边界，功能权限进入独立页面配置，避免列表信息过载。"
         actions={
@@ -136,8 +137,8 @@ export const RolesPage: React.FC = () => {
           </Permission>
         }
       />
-      <PagePanel>
-        <SelfTable rowKey="id" columns={columns} dataSource={data} />
+      <PagePanel className="flex-1 min-h-0 flex flex-col">
+        <SelfTable rowKey="id" columns={columns} dataSource={data} fill />
       </PagePanel>
 
       <SelfModal title={modal.editing ? '编辑角色' : '新增角色'} open={modal.open} onOk={onSubmit} onCancel={modal.close}>
