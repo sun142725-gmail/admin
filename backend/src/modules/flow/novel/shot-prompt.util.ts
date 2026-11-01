@@ -4,6 +4,8 @@
 export interface ShotImagePromptInput {
   // 分镜画面提示词（英文，LLM 分镜产出）。
   scenePrompt: string;
+  // 角色外观描述串（角色卡 `Name: appearance`，主角色在前），保证多镜头角色形象一致；缺省/空数组不输出。
+  characterDescriptions?: Array<string | null | undefined>;
   // 视觉任务（本镜要传达的关键信息，可空）。
   visualTask?: string | null;
   // 全片风格提示词（项目级，可空）。
@@ -30,11 +32,17 @@ const normalizeSegment = (raw: string | null | undefined): string | null => {
 };
 
 /**
- * 合成首帧图提示词：scenePrompt + visualTask + stylePrompt 依次拼接。
- * 规则：空段跳过；重复段（完全一致，忽略首尾空白）只保留一次；逗号连接。
+ * 合成首帧图提示词：scenePrompt + characterDescriptions（逐条展平）+ visualTask + stylePrompt 依次拼接。
+ * 规则：空段跳过；重复段（完全一致，忽略首尾空白）只保留一次；逗号连接；
+ * characterDescriptions 缺省/空数组时输出与未引入该参数前逐字节一致。
  */
 export const composeShotImagePrompt = (input: ShotImagePromptInput): string => {
-  const segments = [input.scenePrompt, input.visualTask, input.stylePrompt]
+  const segments = [
+    input.scenePrompt,
+    ...(input.characterDescriptions ?? []),
+    input.visualTask,
+    input.stylePrompt
+  ]
     .map(normalizeSegment)
     .filter((segment): segment is string => segment !== null);
   const unique = [...new Set(segments)];

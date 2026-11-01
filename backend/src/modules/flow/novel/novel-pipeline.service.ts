@@ -11,6 +11,7 @@ import { Repository, In } from 'typeorm';
 import { NovelProject, NovelPipelineConfig, DEFAULT_NOVEL_CONFIG } from '../../../common/entities/novel-project.entity';
 import { NovelChapter } from '../../../common/entities/novel-chapter.entity';
 import { NovelShot } from '../../../common/entities/novel-shot.entity';
+import { CharacterCard } from '../../../common/entities/character-card.entity';
 import { ModelRouterService } from '../../ai/core/model-router.service';
 import { UsageLogService } from '../../ai/core/usage-log.service';
 import { ChatMessagePayload } from '../../ai/core/llm-adapter.interface';
@@ -19,7 +20,9 @@ import { NodeHandlerDependencies, parseJsonBlock, runLlm } from '../engine/node-
 import { estimateSpeechMs, normalizeTtsText, parseFfprobeDuration } from '../engine/tts.util';
 import { buildSrt } from './subtitle.util';
 import { composeShotImagePrompt, composeShotMotionPrompt } from './shot-prompt.util';
+import { readImageAsDataUrl } from './character-ref.util';
 import { splitChapterText } from './chapter-split.util';
+import { CreateCharacterCardDto, UpdateCharacterCardDto } from './character-card.dto';
 import { UpdateShotDto } from './novel-video.dto';
 
 const execFileAsync = promisify(execFile);
@@ -86,6 +89,7 @@ export class NovelPipelineService implements OnModuleDestroy {
     @InjectRepository(NovelProject) private readonly projectRepo: Repository<NovelProject>,
     @InjectRepository(NovelChapter) private readonly chapterRepo: Repository<NovelChapter>,
     @InjectRepository(NovelShot) private readonly shotRepo: Repository<NovelShot>,
+    @InjectRepository(CharacterCard) private readonly characterRepo: Repository<CharacterCard>,
     router: ModelRouterService,
     usageLog: UsageLogService,
     private readonly video: VideoUpstreamService
@@ -243,6 +247,8 @@ export class NovelPipelineService implements OnModuleDestroy {
       const executable = shots.filter((shot) => shot.status !== 'video_done');
       const total = shots.length;
       let done = shots.filter((shot) => shot.status === 'video_done').length;
+      // 角色注入素材整跑只读一次（跑片期间角色卡与参考图不会变化），避免逐镜重复 find + 读盘 + base64。
+      const characterInputs = await this.collectCharacterInputs(projectId);
       await this.projectRepo.update(projectId, { stage: 'producing' });
       for (const shot of executable) {
         if (this.cancelled(projectId)) {
@@ -256,7 +262,9 @@ export class NovelPipelineService implements OnModuleDestroy {
         try {
           // 首帧锁定：已有图且锁定时不重绘（单镜重生成同理，见 regenerateShot）。
           const imageUrl =
-            shot.firstFrameLocked && shot.imageUrl ? shot.imageUrl : await this.produceImage(project, shot);
+            shot.firstFrameLocked && shot.imageUrl
+              ? shot.imageUrl
+              : await this.produceImage(project, shot, characterInputs);
           await this.shotRepo.update(shot.id, { imageUrl, status: 'image_done', error: null });
           const videoFile = await this.produceVideo(userId, project, shot);
           await this.shotRepo.update(shot.id, {
@@ -360,15 +368,66 @@ export class NovelPipelineService implements OnModuleDestroy {
       }));
   }
 
-  /** 生成分镜首帧图并落盘，返回静态 URL。 */
-  private async produceImage(project: NovelProject, shot: NovelShot): Promise<string> {
+  /**
+   * 角色一致性注入素材：主角色优先的外观描述串与参考图 data URL（合计 ≤4 张）。
+   * 读卡失败/无卡/读图失败均降级为空（warn 日志，不抛错）——不破坏断点续跑与旧行为。
+   */
+  private async collectCharacterInputs(projectId: number): Promise<{
+    characterDescriptions: string[];
+    referenceImages: string[];
+  }> {
+    let cards: CharacterCard[];
+    try {
+      cards = await this.characterRepo.find({
+        where: { projectId },
+        order: { isPrimary: 'DESC', sortOrder: 'ASC', id: 'ASC' }
+      });
+    } catch (error) {
+      this.logger.warn(
+        `项目 ${projectId} 角色卡读取失败，本次出图不注入角色: ${error instanceof Error ? error.message : error}`
+      );
+      return { characterDescriptions: [], referenceImages: [] };
+    }
+    if (cards.length === 0) {
+      return { characterDescriptions: [], referenceImages: [] };
+    }
+    const characterDescriptions = cards.map((card) => {
+      const appearance = (card.appearance ?? '').trim();
+      return appearance ? `${card.name}: ${appearance}` : card.name;
+    });
+    // 参考图依卡序展开，逐张读盘转 data URL；非法/缺失跳过，全局截断 4 张（上游 edits 通道上限）。
+    const referenceImages: string[] = [];
+    for (const raw of cards.flatMap((card) => card.referenceImages ?? [])) {
+      if (referenceImages.length >= 4) {
+        break;
+      }
+      const dataUrl = await readImageAsDataUrl(raw);
+      if (dataUrl) {
+        referenceImages.push(dataUrl);
+      } else {
+        this.logger.warn(`项目 ${projectId} 角色参考图不可用已跳过: ${raw.slice(0, 120)}`);
+      }
+    }
+    return { characterDescriptions, referenceImages };
+  }
+
+  /** 生成分镜首帧图并落盘，返回静态 URL。characterInputs 由整跑调用方预取传入（见 pipeline），缺省现查（单镜重生成路径）。 */
+  private async produceImage(
+    project: NovelProject,
+    shot: NovelShot,
+    characterInputs?: { characterDescriptions: string[]; referenceImages: string[] }
+  ): Promise<string> {
     const candidates = await this.deps.router.candidatesByCapability('image');
     const usable = candidates.filter((candidate) => candidate.adapter.images);
     if (usable.length === 0) {
       throw new Error('没有可用的生图模型');
     }
+    // 角色一致性：描述并入提示词，参考图注入图生图通道（读卡/读图失败降级为原行为）。
+    const { characterDescriptions, referenceImages } =
+      characterInputs ?? (await this.collectCharacterInputs(project.id));
     const prompt = composeShotImagePrompt({
       scenePrompt: shot.scenePrompt,
+      characterDescriptions,
       visualTask: shot.visualTask,
       stylePrompt: project.stylePrompt
     });
@@ -380,7 +439,13 @@ export class NovelPipelineService implements OnModuleDestroy {
       }
       try {
         const results = await generate(
-          { prompt, size: project.config.imageSize || undefined, count: 1 },
+          {
+            prompt,
+            size: project.config.imageSize || undefined,
+            count: 1,
+            // 空数组传 undefined：无参考图时保持走 images/generations 通道旧行为。
+            referenceImages: referenceImages.length > 0 ? referenceImages : undefined
+          },
           candidate.channel
         );
         if (results.length === 0 || !results[0]?.url) {
@@ -810,7 +875,7 @@ export class NovelPipelineService implements OnModuleDestroy {
     return this.detail(project.id);
   }
 
-  async update(id: number, dto: { name?: string; stylePrompt?: string; config?: Partial<NovelPipelineConfig> }) {
+  async update(id: number, dto: { name?: string; stylePrompt?: string; coverUrl?: string | null; config?: Partial<NovelPipelineConfig> }) {
     const project = await this.projectRepo.findOne({ where: { id } });
     if (!project) {
       throw new NotFoundException('项目不存在');
@@ -821,6 +886,7 @@ export class NovelPipelineService implements OnModuleDestroy {
     await this.projectRepo.update(id, {
       name: dto.name?.trim() ?? project.name,
       stylePrompt: dto.stylePrompt !== undefined ? dto.stylePrompt.trim() || null : project.stylePrompt,
+      coverUrl: dto.coverUrl !== undefined ? dto.coverUrl?.trim() || null : project.coverUrl,
       config: dto.config ? { ...project.config, ...dto.config } : project.config
     });
     return this.detail(id);
@@ -855,6 +921,7 @@ export class NovelPipelineService implements OnModuleDestroy {
         stage: true,
         stageMessage: true,
         finalVideoPath: true,
+        coverUrl: true,
         error: true,
         durationMs: true,
         createdAt: true
@@ -882,6 +949,7 @@ export class NovelPipelineService implements OnModuleDestroy {
         stage: project.stage,
         stageMessage: project.stageMessage,
         finalVideoPath: project.finalVideoPath,
+        coverUrl: project.coverUrl,
         error: project.error,
         totalShots: count ? Number(count.total) : 0,
         doneShots: count ? Number(count.done) : 0,
@@ -896,10 +964,17 @@ export class NovelPipelineService implements OnModuleDestroy {
       throw new BadRequestException('项目正在运行中，请先取消');
     }
     await this.clearArtifacts(projectId);
+    // 角色卡是项目级创作资产，仅随整项目删除；reSplit 不清（见 clearArtifacts 注释）。
+    await this.characterRepo.delete({ projectId });
     await this.projectRepo.delete(projectId);
     return { success: true };
   }
 
+  /**
+   * 清理章节/分镜产物与产物目录。不删角色卡：角色卡是手工录入的项目级资产
+   * （外观描述 + 参考图），与章节/分镜产物无依赖关系，重切分文本后重新出片
+   * 恰恰最需要角色一致性注入，因此只有整项目删除（remove）才连带清理。
+   */
   private async clearArtifacts(projectId: number) {
     await this.shotRepo.delete({ projectId });
     await this.chapterRepo.delete({ projectId });
@@ -907,5 +982,58 @@ export class NovelPipelineService implements OnModuleDestroy {
     if (existsSync(dir)) {
       await rm(dir, { recursive: true, force: true });
     }
+  }
+
+  // ---------- 角色库 CRUD（控制器 CharacterCardController；列表/注入排序：主角色优先） ----------
+
+  listCharacterCards(projectId: number) {
+    return this.characterRepo.find({
+      where: { projectId },
+      order: { isPrimary: 'DESC', sortOrder: 'ASC', id: 'ASC' }
+    });
+  }
+
+  async createCharacterCard(userId: number, dto: CreateCharacterCardDto) {
+    const project = await this.projectRepo.findOne({ where: { id: dto.projectId }, select: ['id'] });
+    if (!project) {
+      throw new NotFoundException('项目不存在');
+    }
+    return this.characterRepo.save(
+      this.characterRepo.create({
+        projectId: dto.projectId,
+        name: dto.name.trim(),
+        appearance: dto.appearance?.trim() || null,
+        referenceImages: dto.referenceImages ?? [],
+        isPrimary: dto.isPrimary ?? false,
+        createdBy: userId
+      })
+    );
+  }
+
+  async updateCharacterCard(id: number, dto: UpdateCharacterCardDto) {
+    const card = await this.characterRepo.findOne({ where: { id } });
+    if (!card) {
+      throw new NotFoundException('角色不存在');
+    }
+    await this.characterRepo.update(id, {
+      name: dto.name !== undefined ? dto.name.trim() : card.name,
+      appearance: dto.appearance !== undefined ? dto.appearance?.trim() || null : card.appearance,
+      referenceImages: dto.referenceImages !== undefined ? dto.referenceImages : card.referenceImages,
+      isPrimary: dto.isPrimary ?? card.isPrimary
+    });
+    // update 与回读之间存在并发删除窗口：回读为 null 时按不存在处理（与 removeCharacterCard 口径一致）。
+    const updated = await this.characterRepo.findOne({ where: { id } });
+    if (!updated) {
+      throw new NotFoundException('角色不存在');
+    }
+    return updated;
+  }
+
+  async removeCharacterCard(id: number) {
+    const result = await this.characterRepo.delete(id);
+    if (!result.affected) {
+      throw new NotFoundException('角色不存在');
+    }
+    return { success: true };
   }
 }

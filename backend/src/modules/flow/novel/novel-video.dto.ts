@@ -67,6 +67,12 @@ export class UpdateNovelProjectDto {
   @MaxLength(500)
   stylePrompt?: string;
 
+  // 作品封面静态路径（前端 canvas 合成后经 files/upload 上传得到）；不传保持原值，空串归 null 清除。
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  coverUrl?: string | null;
+
   @IsOptional()
   @IsObject()
   config?: Partial<NovelPipelineConfigDto>;

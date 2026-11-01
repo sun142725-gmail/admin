@@ -114,3 +114,60 @@ describe('composeShotMotionPrompt（真实中文数据）', () => {
     expect(result).toBe('俯瞰坑底');
   });
 });
+
+// ---------- 角色一致性注入：characterDescriptions 段（位置在 scenePrompt 与 visualTask 之间） ----------
+
+describe('composeShotImagePrompt（characterDescriptions）', () => {
+  it('拼接顺序 scenePrompt → 角色描述（逐条）→ visualTask → stylePrompt', () => {
+    const result = composeShotImagePrompt({
+      scenePrompt: 'a girl standing by the window',
+      characterDescriptions: ['林晚: 银白长发，红瞳，黑色风衣', '阿凛: 短发少年，蓝色卫衣'],
+      visualTask: '突出两人对视的瞬间',
+      stylePrompt: 'cinematic lighting'
+    });
+    expect(result).toBe(
+      'a girl standing by the window, 林晚: 银白长发，红瞳，黑色风衣, 阿凛: 短发少年，蓝色卫衣, 突出两人对视的瞬间, cinematic lighting'
+    );
+  });
+
+  it('characterDescriptions 缺省/空数组/含空段时输出与旧版逐字节一致（回归）', () => {
+    const base = { scenePrompt: 'night city', visualTask: '霓虹雨夜', stylePrompt: 'cold tone' };
+    expect(composeShotImagePrompt(base)).toBe('night city, 霓虹雨夜, cold tone');
+    expect(composeShotImagePrompt({ ...base, characterDescriptions: [] })).toBe('night city, 霓虹雨夜, cold tone');
+    expect(composeShotImagePrompt({ ...base, characterDescriptions: [null, undefined, '  '] })).toBe(
+      'night city, 霓虹雨夜, cold tone'
+    );
+  });
+
+  it('角色描述与 visualTask 完全一致时去重只保留一次', () => {
+    const result = composeShotImagePrompt({
+      scenePrompt: 'a lone cabin',
+      characterDescriptions: ['林晚: 红瞳'],
+      visualTask: '林晚: 红瞳',
+      stylePrompt: null
+    });
+    expect(result).toBe('a lone cabin, 林晚: 红瞳');
+  });
+
+  it('描述串首尾分隔标点剥离后再拼接（normalizeSegment 复用）', () => {
+    const result = composeShotImagePrompt({
+      scenePrompt: 'a lone cabin,',
+      characterDescriptions: ['，林晚。'],
+      visualTask: null,
+      stylePrompt: null
+    });
+    expect(result).toBe('a lone cabin, 林晚');
+  });
+
+  it('真实中文数据：主角色在前，描述与中文风格段拼接顺序不变', () => {
+    const result = composeShotImagePrompt({
+      scenePrompt: 'ancient bronze coffin hovering over desert, starry sky',
+      characterDescriptions: ['林晚: 银白长发，黑色风衣，冷漠气质'],
+      visualTask: '青铜古棺悬浮坑底，九点暗芒如眼',
+      stylePrompt: '国风玄幻，冷色调，电影感构图'
+    });
+    expect(result).toBe(
+      'ancient bronze coffin hovering over desert, starry sky, 林晚: 银白长发，黑色风衣，冷漠气质, 青铜古棺悬浮坑底，九点暗芒如眼, 国风玄幻，冷色调，电影感构图'
+    );
+  });
+});

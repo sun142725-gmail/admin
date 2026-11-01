@@ -69,6 +69,7 @@ import { FlowRunNode } from './common/entities/flow-run-node.entity';
 import { NovelProject } from './common/entities/novel-project.entity';
 import { NovelChapter } from './common/entities/novel-chapter.entity';
 import { NovelShot } from './common/entities/novel-shot.entity';
+import { CharacterCard } from './common/entities/character-card.entity';
 import { PromptTemplate } from './common/entities/prompt-template.entity';
 import { FlowModule } from './modules/flow/flow.module';
 import { PromptLibraryModule } from './modules/prompt-library/prompt-library.module';
@@ -121,6 +122,7 @@ const ENTITIES = [
   NovelProject,
   NovelChapter,
   NovelShot,
+  CharacterCard,
   PromptTemplate
 ];
 

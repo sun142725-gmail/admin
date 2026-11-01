@@ -59,6 +59,10 @@ export class NovelProject extends BaseEntity {
   @Column({ name: 'final_subtitle_path', type: 'varchar', length: 255, nullable: true })
   finalSubtitlePath?: string | null;
 
+  // 作品封面静态访问路径（/uploads/...，前端 canvas 合成后经 files/upload 上传落库）。
+  @Column({ name: 'cover_url', type: 'varchar', length: 500, nullable: true })
+  coverUrl?: string | null;
+
   @Column({ type: 'text', nullable: true })
   error?: string | null;
 
