@@ -72,9 +72,12 @@ import { NovelChapter } from './common/entities/novel-chapter.entity';
 import { NovelShot } from './common/entities/novel-shot.entity';
 import { CharacterCard } from './common/entities/character-card.entity';
 import { PromptTemplate } from './common/entities/prompt-template.entity';
+import { PublisherAccount } from './common/entities/publisher-account.entity';
+import { VideoPublishRecord } from './common/entities/video-publish-record.entity';
 import { FlowModule } from './modules/flow/flow.module';
 import { PromptLibraryModule } from './modules/prompt-library/prompt-library.module';
 import { InternalAiModule } from './modules/internal-ai/internal-ai.module';
+import { PublisherModule } from './modules/publisher/publisher.module';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -125,7 +128,9 @@ const ENTITIES = [
   NovelChapter,
   NovelShot,
   CharacterCard,
-  PromptTemplate
+  PromptTemplate,
+  PublisherAccount,
+  VideoPublishRecord
 ];
 
 @Module({
@@ -175,6 +180,7 @@ const ENTITIES = [
     HealthModule,
     DictModule,
     NotificationModule,
+    PublisherModule,
     DashboardModule,
     FamilyModule,
     StockModule,

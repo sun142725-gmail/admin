@@ -768,8 +768,13 @@ export class SeedService implements OnModuleInit {
       { code: 'flow:run:execute', name: '制片执行' },
       { code: 'flow:run:view', name: '运行历史查看' },
       { code: 'flow:prompt:view', name: '提示词库查看' },
-      { code: 'flow:prompt:manage', name: '提示词库管理' }
+      { code: 'flow:prompt:manage', name: '提示词库管理' },
+      { code: 'publisher:manage', name: '发布矩阵管理' },
+      { code: 'publisher:view', name: '发布矩阵查看' }
     ];
+    // 约定：给角色分配 publisher:manage 时必须同批分配 publisher:view——
+    // 否则成片页发布入口可用，但账号列表/记录列表 403（前端已静默降级，完整体验依赖双码；
+    // admin 角色经 ensureAdminRolePermission 自动获得双码）。
     for (const item of codes) {
       const permission = await this.ensurePermissionByCode(item.code, item.name);
       if (permission) {
@@ -796,7 +801,9 @@ export class SeedService implements OnModuleInit {
       { path: '/flow/runs', name: '运行历史', code: 'flow:run:view' },
       { path: '/flow/novel', name: '小说转视频', code: 'flow:run:view' },
       { path: '/graphic', name: '小说生图', code: 'flow:run:view' },
-      { path: '/prompts', name: '图片提示词库', code: 'flow:prompt:view' }
+      { path: '/prompts', name: '图片提示词库', code: 'flow:prompt:view' },
+      // 页面可见挂 publisher:view，写操作由页面内 Permission(publisher:manage) 控制（/prompts 先例同构）
+      { path: '/publisher', name: '发布矩阵', code: 'publisher:view' }
     ];
     for (const page of pages) {
       const exists = await this.resourceRepo.findOne({ where: { path: page.path } });
