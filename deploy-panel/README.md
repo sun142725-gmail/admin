@@ -24,6 +24,14 @@ docker-compose up -d --build deploy-panel
 http://服务器IP:9090
 ```
 
+注意端口绑定方式：面板容器在 compose 中仅绑定宿主机 `127.0.0.1:9090`（面板持有 docker.sock 与 SSH 私钥，不直接暴露公网网卡）。因此 :9090 只能在服务器本机或经 SSH 隧道访问：
+
+```bash
+ssh -p <SSH端口> -N -L 9090:127.0.0.1:9090 <用户名>@<服务器IP>   # 本机执行，保持窗口开启
+```
+
+对外常规入口是 **nginx 代理端口 :9091**（`nginx/nginx.conf` 的 `deploy-panel` server 块，compose 内按服务名 `deploy-panel:9090` 转发，需在 compose/安全组放行 9091）：浏览器访问 `http://服务器IP:9091`。如需限制来源 IP，取消该 server 块中 `allow/deny` 注释并填入自己的出口 IP。
+
 发布密钥采用 fail-closed 模式：必须先在项目根目录 `.env`（或 shell 环境变量）配置 `PUBLISH_SECRET`，Compose 以 `:?required` 语法强制注入（`docker-compose.yml`），未配置时容器直接拒绝启动；运行期若密钥为空，服务端对所有业务请求返回 `503`，不存在「首次访问初始化密钥」的行为。`deploy-panel/logs/publish-secret.txt` 仅作为兼容旧版本遗留密钥文件的回退来源，优先级低于环境变量。
 
 页面首次访问会提示输入发布密钥，并保存到浏览器 `localStorage`。如需更换密钥，清理浏览器本地存储后重新输入。
