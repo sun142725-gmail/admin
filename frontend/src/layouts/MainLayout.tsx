@@ -8,6 +8,7 @@ import {
   ExperimentOutlined,
   FileSearchOutlined,
   FileTextOutlined,
+  SendOutlined,
   FilterOutlined,
   StarOutlined,
   HomeOutlined,
@@ -68,7 +69,7 @@ const getMenuIcon = (item: MenuItem) => {
       '/notifications/templates': <BookOutlined />,
       '/notifications/publish': <FileTextOutlined />,
       '/notifications/inbox': <IdcardOutlined />,
-      '/prompts': <FileImageOutlined />,
+      '/publisher': <SendOutlined />,
       '/profile': <IdcardOutlined />
     };
     return pathIconMap[item.path];
@@ -134,6 +135,7 @@ const PAGE_CODE_MAP: Record<string, string> = {
   '/notifications/publish': 'notification_publish',
   '/notifications/inbox': 'notification_inbox',
   '/prompts': 'prompt_library',
+  '/publisher': 'publisher_view',
   '/profile': 'profile'
 };
 

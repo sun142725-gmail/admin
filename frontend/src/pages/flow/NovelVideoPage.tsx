@@ -29,6 +29,7 @@ import {
   PlayCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SendOutlined,
   SoundOutlined,
   StopOutlined,
   ThunderboltOutlined,
@@ -63,6 +64,11 @@ import {
   runNovelProject,
   updateNovelProject
 } from '../../api/novelVideo';
+import {
+  listPublisherRecords,
+  type VideoPublishRecordVo
+} from '../../api/publisher';
+import { PublishModal } from './PublishModal';
 import type { CharacterCardVo } from '../../api/novelVideo';
 import { CharacterCardModal } from './CharacterCardModal';
 import { CoverComposerModal } from './CoverComposerModal';
@@ -129,6 +135,8 @@ export const NovelVideoPage: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [detail, setDetail] = useState<NovelProjectDetail | null>(null);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishRecords, setPublishRecords] = useState<VideoPublishRecordVo[] | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [form] = Form.useForm<CreateFormValues>();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
@@ -197,12 +205,27 @@ export const NovelVideoPage: React.FC = () => {
     setDetailOpen(true);
     setCharacters([]);
     void loadCharacters(id);
+    // 发布记录：失败（含仅授 manage 无 view 的 403）整块隐藏，不阻塞抽屉其余内容
+    setPublishRecords(null);
+    listPublisherRecords({ projectId: id })
+      .then((page) => setPublishRecords(page.items))
+      .catch(() => setPublishRecords(null));
     try {
       setDetail(await getNovelProject(id));
     } catch (error) {
       antMessage.error(error instanceof Error ? error.message : '加载失败');
     }
   }, [antMessage, loadCharacters]);
+
+  // 发布登记成功：刷新该项目发布记录（发布弹窗 onRegistered）
+  const reloadPublishRecords = useCallback(
+    (id: number) => {
+      listPublisherRecords({ projectId: id })
+        .then((page) => setPublishRecords(page.items))
+        .catch(() => setPublishRecords(null));
+    },
+    []
+  );
 
   // 项目配置表单与 detail 同步（打开抽屉/保存回读/轮询刷新都重置为服务端值）。
   useEffect(() => {
@@ -814,11 +837,41 @@ export const NovelVideoPage: React.FC = () => {
             )}
             {detail.project.finalVideoPath && (
               <div className="my-4">
-                <Typography.Title level={5} className="!mt-0">
-                  成片
-                </Typography.Title>
+                <Space size={8} className="!mb-2">
+                  <Typography.Title level={5} className="!my-0">
+                    成片与发布
+                  </Typography.Title>
+                  <Permission code="publisher:manage">
+                    <Button
+                      size="small"
+                      type="primary"
+                      icon={<SendOutlined />}
+                      onClick={() => setPublishOpen(true)}
+                    >
+                      发布
+                    </Button>
+                  </Permission>
+                </Space>
                 {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                 <video src={detail.project.finalVideoPath} controls className="w-full rounded-lg" />
+                {publishRecords !== null && publishRecords.length > 0 && (
+                  <div className="mt-2 text-xs text-text-sub">
+                    已登记发布：
+                    {publishRecords.map((row) => (
+                      <Tag key={row.id} className="mr-1">
+                        {row.platform} · {row.publishedAt.slice(0, 16).replace('T', ' ')}
+                        {row.receiptUrl && (
+                          <>
+                            {' '}
+                            <a href={row.receiptUrl} target="_blank" rel="noreferrer">
+                              回执
+                            </a>
+                          </>
+                        )}
+                      </Tag>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {/* 项目配置：多规格画幅 / BGM（ducking 混音）/ 字幕烧录样式 / BGM 音量，保存后下次合成生效 */}

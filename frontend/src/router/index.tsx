@@ -36,6 +36,7 @@ const ModelsPage = lazyPage(() => import('../pages/ai/ModelsPage'), 'ModelsPage'
 const AgentsPage = lazyPage(() => import('../pages/ai/AgentsPage'), 'AgentsPage');
 const ChatPage = lazyPage(() => import('../pages/ai/ChatPage'), 'ChatPage');
 const ImagesPage = lazyPage(() => import('../pages/ai/ImagesPage'), 'ImagesPage');
+const PublisherPage = lazyPage(() => import('../pages/publisher/PublisherPage'), 'PublisherPage');
 const CanvasPage = lazyPage(() => import('../pages/ai/CanvasPage'), 'CanvasPage');
 const UsageReportPage = lazyPage(() => import('../pages/ai/UsageReportPage'), 'UsageReportPage');
 const StockPage = lazyPage(() => import('../pages/stock/StockPage'), 'StockPage');
@@ -111,6 +112,7 @@ export const router = createBrowserRouter([
       { path: '/flow/novel', element: <NovelVideoPage /> },
       { path: '/graphic', element: <GraphicPage /> },
       { path: '/prompts', element: <PromptLibraryPage /> },
+      { path: '/publisher', element: <PublisherPage /> },
       { path: '/notifications/templates', element: <TemplatePage /> },
       { path: '/notifications/publish', element: <PublishPage /> },
       { path: '/notifications/publishes', element: <Navigate to="/notifications/publish" replace /> },
