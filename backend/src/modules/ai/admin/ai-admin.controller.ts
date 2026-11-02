@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Query,
   UseGuards
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -16,7 +17,8 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { AiModelsService } from './models.service';
 import { AiAgentsService } from './agents.service';
-import { CreateAgentDto, CreateModelDto, UpdateAgentDto, UpdateModelDto } from './dto/ai-admin.dto';
+import { AiModelPricesService } from './model-prices.service';
+import { CreateAgentDto, CreateModelDto, CreateModelPriceDto, UpdateAgentDto, UpdateModelDto, UpdateModelPriceDto } from './dto/ai-admin.dto';
 
 @ApiTags('AI Admin')
 @ApiBearerAuth()
@@ -24,7 +26,8 @@ import { CreateAgentDto, CreateModelDto, UpdateAgentDto, UpdateModelDto } from '
 export class AiAdminController {
   constructor(
     private readonly modelsService: AiModelsService,
-    private readonly agentsService: AiAgentsService
+    private readonly agentsService: AiAgentsService,
+    private readonly modelPricesService: AiModelPricesService
   ) {}
 
   // ---------- 模型（一行 = 端点：协议/地址/密钥） ----------
@@ -68,6 +71,35 @@ export class AiAdminController {
   @Permissions('ai:model:manage')
   probeModelModels(@Param('id', ParseIntPipe) id: number) {
     return this.modelsService.probeModels(id);
+  }
+
+  // ---------- 模型单价（成本核算，报表计价来源） ----------
+  @Get('model-prices')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('ai:model:manage')
+  listModelPrices(@Query('modelId') modelId?: string, @Query('kind') kind?: string) {
+    return this.modelPricesService.list(modelId ? Number(modelId) : undefined, kind || undefined);
+  }
+
+  @Post('model-prices')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('ai:model:manage')
+  createModelPrice(@Body() dto: CreateModelPriceDto) {
+    return this.modelPricesService.create(dto);
+  }
+
+  @Put('model-prices/:id')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('ai:model:manage')
+  updateModelPrice(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateModelPriceDto) {
+    return this.modelPricesService.update(id, dto);
+  }
+
+  @Delete('model-prices/:id')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('ai:model:manage')
+  removeModelPrice(@Param('id', ParseIntPipe) id: number) {
+    return this.modelPricesService.remove(id);
   }
 
   // ---------- 智能体 ----------

@@ -56,6 +56,7 @@ import { AiAgent } from './common/entities/ai-agent.entity';
 import { AiConversation } from './common/entities/ai-conversation.entity';
 import { AiMessage } from './common/entities/ai-message.entity';
 import { AiUsageLog } from './common/entities/ai-usage-log.entity';
+import { AiModelPrice } from './common/entities/ai-model-price.entity';
 import { AiImage } from './common/entities/ai-image.entity';
 import { AiCanvas } from './common/entities/ai-canvas.entity';
 import { StockRoundtable } from './common/entities/stock-roundtable.entity';
@@ -109,6 +110,7 @@ const ENTITIES = [
   AiConversation,
   AiMessage,
   AiUsageLog,
+  AiModelPrice,
   AiImage,
   AiCanvas,
   StockRoundtable,

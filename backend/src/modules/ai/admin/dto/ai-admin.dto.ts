@@ -1,7 +1,9 @@
-// AI 管理端 DTO：模型（含端点与密钥）与智能体。
+// AI 管理端 DTO：模型（含端点与密钥）、智能体与模型单价。
 import {
+  IsDateString,
   IsIn,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -293,4 +295,87 @@ export class UpdateAgentDto {
   @IsInt()
   @IsIn([0, 1])
   status?: number;
+}
+
+// ---------- 模型单价（成本核算） ----------
+const PRICE_KINDS = ['chat', 'image', 'video', 'tts'];
+const PRICE_UNITS = ['tokens_1k', 'image', 'second', 'char'];
+
+export class CreateModelPriceDto {
+  // 关联模型行；不传 = 该 kind 全局价。
+  @IsOptional()
+  @IsInt()
+  modelId?: number;
+
+  @IsIn(PRICE_KINDS)
+  kind!: string;
+
+  // chat：每 1K 输入 token 单价；非 chat 恒 0（缺省 0）。
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  inputPrice?: number;
+
+  // chat：每 1K 输出 token 单价；image/video/tts：每单位数量单价（缺省 0）。
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  outputPrice?: number;
+
+  // 计价单位；缺省由 kind 决定（service 内按 usage-cost.util.DEFAULT_UNIT_BY_KIND 落库）。
+  @IsOptional()
+  @IsIn(PRICE_UNITS)
+  unit?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  currency?: string;
+
+  // 生效时间（ISO 字符串），必填：报表按用量时间取「≤ 生效时间的最新一行」。
+  @IsDateString()
+  effectiveFrom!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  remark?: string;
+}
+
+export class UpdateModelPriceDto {
+  @IsOptional()
+  @IsInt()
+  modelId?: number;
+
+  @IsOptional()
+  @IsIn(PRICE_KINDS)
+  kind?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  inputPrice?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  outputPrice?: number;
+
+  @IsOptional()
+  @IsIn(PRICE_UNITS)
+  unit?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  currency?: string;
+
+  @IsOptional()
+  @IsDateString()
+  effectiveFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  remark?: string;
 }
