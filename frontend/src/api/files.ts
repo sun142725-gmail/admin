@@ -16,3 +16,12 @@ export const uploadFile = (file: File, bizType = 'common') => {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
 };
+
+// BGM 音频独立端点（POST /api/files/upload-audio）：.mp3/.wav、≤10MB，落 uploads/novel-bgm/。
+export const uploadAudioFile = (file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return http.post<never, UploadedFileVo>('/files/upload-audio', form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+};

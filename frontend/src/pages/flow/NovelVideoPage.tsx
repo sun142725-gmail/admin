@@ -12,6 +12,7 @@ import {
   Popconfirm,
   Progress,
   Select,
+  Slider,
   Space,
   Spin,
   Tag,
@@ -59,12 +60,14 @@ import {
   reSplitNovelProject,
   regenerateNovelShot,
   replanNovelShot,
-  runNovelProject
+  runNovelProject,
+  updateNovelProject
 } from '../../api/novelVideo';
 import type { CharacterCardVo } from '../../api/novelVideo';
 import { CharacterCardModal } from './CharacterCardModal';
 import { CoverComposerModal } from './CoverComposerModal';
 import { NovelShotEditModal } from './NovelShotEditModal';
+import { uploadAudioFile } from '../../api/files';
 import { formatDuration } from './flowRunUI';
 import './flow-pages.css';
 
@@ -90,7 +93,34 @@ interface CreateFormValues {
   stylePrompt?: string;
   shotsPerChapter: number;
   videoSeconds: number;
+  aspect: '16:9' | '9:16' | '1:1';
 }
+
+// 多规格画幅选项：贯穿生图 size 与合成端 mux/视觉步目标分辨率（缺省 16:9）。
+const ASPECT_OPTIONS = [
+  { value: '16:9', label: '16:9 横屏（1280x720）' },
+  { value: '9:16', label: '9:16 竖屏（720x1280）' },
+  { value: '1:1', label: '1:1 方形（720x720）' }
+];
+
+// 字幕烧录样式预设档（后端 subtitleStylePreset 同名三档）。
+const SUBTITLE_STYLE_OPTIONS = [
+  { value: 'default', label: '标准字幕（白字黑边 20px）' },
+  { value: 'big', label: '大字字幕（白字黑边 34px）' },
+  { value: 'none', label: '不烧录字幕' }
+];
+
+// 项目配置表单值（保存时整体走 updateNovelProject 的 config 浅合并）。
+interface ConfigFormValues {
+  aspect: '16:9' | '9:16' | '1:1';
+  bgmUrl: string;
+  subtitleStyle: 'default' | 'big' | 'none';
+  bgmVolume: number;
+}
+
+// BGM 上传限制（与后端 upload-audio 端点一致：mp3/wav + 10MB）。
+const BGM_MAX_SIZE = 10 * 1024 * 1024;
+const BGM_ALLOWED_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave'];
 
 export const NovelVideoPage: React.FC = () => {
   const { message: antMessage, modal } = AntApp.useApp();
@@ -102,6 +132,13 @@ export const NovelVideoPage: React.FC = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [form] = Form.useForm<CreateFormValues>();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  // 项目配置表单（详情抽屉「项目配置」Card）：画幅 / BGM / 字幕样式 / BGM 音量。
+  const [configForm] = Form.useForm<ConfigFormValues>();
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [bgmUploading, setBgmUploading] = useState(false);
+  // BGM 展示与音量 label 的响应式值（useWatch 随字段更新重渲染）。
+  const bgmUrl = Form.useWatch('bgmUrl', configForm) ?? '';
+  const bgmVolumeDisplay = ((Form.useWatch('bgmVolume', configForm) ?? 0.2) as number).toFixed(2);
   const detailIdRef = useRef<number | null>(null);
   // 单镜编辑弹窗（非 null 即打开）与字幕重生成 loading。
   const [editingShot, setEditingShot] = useState<NovelShotVo | null>(null);
@@ -166,6 +203,67 @@ export const NovelVideoPage: React.FC = () => {
       antMessage.error(error instanceof Error ? error.message : '加载失败');
     }
   }, [antMessage, loadCharacters]);
+
+  // 项目配置表单与 detail 同步（打开抽屉/保存回读/轮询刷新都重置为服务端值）。
+  useEffect(() => {
+    if (!detail) {
+      return;
+    }
+    configForm.setFieldsValue({
+      aspect: detail.project.config.aspect ?? '16:9',
+      bgmUrl: detail.project.config.bgmUrl ?? '',
+      subtitleStyle: (detail.project.config.subtitleStyle as ConfigFormValues['subtitleStyle']) ?? 'default',
+      bgmVolume: detail.project.config.bgmVolume ?? 0.2
+    });
+  }, [detail, configForm]);
+
+  // 保存项目配置：只传配置表单字段，后端 {...project.config, ...dto.config} 浅合并。
+  const saveConfig = useCallback(
+    async (projectId: number) => {
+      const values = await configForm.validateFields();
+      setSavingConfig(true);
+      try {
+        const fresh = await updateNovelProject(projectId, { config: values });
+        setDetail(fresh);
+        setProjects((prev) =>
+          prev.map((project) => (project.id === projectId ? { ...project, stageMessage: fresh.project.stageMessage ?? project.stageMessage } : project))
+        );
+        antMessage.success('项目配置已保存，下次生成/合成生效');
+      } catch (error) {
+        antMessage.error(error instanceof Error ? error.message : '配置保存失败');
+      } finally {
+        setSavingConfig(false);
+      }
+    },
+    [configForm, antMessage]
+  );
+
+  // BGM 上传：beforeUpload 双重校验（类型 + ≤10MB，与后端 upload-audio 一致）后手动上传，
+  // 成功回填 bgmUrl（记得点保存）；返回 false 阻止 antd 自动上传。
+  const handleBgmUpload = useCallback(
+    async (file: File) => {
+      if (file.type && !BGM_ALLOWED_TYPES.includes(file.type)) {
+        antMessage.error('BGM 仅支持 mp3/wav');
+        return false;
+      }
+      if (file.size > BGM_MAX_SIZE) {
+        antMessage.error('BGM 不能超过 10MB');
+        return false;
+      }
+      setBgmUploading(true);
+      try {
+        const uploaded = await uploadAudioFile(file);
+        configForm.setFieldsValue({ bgmUrl: uploaded.url });
+        antMessage.success('BGM 已上传，请点「保存」生效');
+      } catch (error) {
+        antMessage.error(error instanceof Error ? error.message : '上传失败');
+      } finally {
+        setBgmUploading(false);
+      }
+      return false;
+    },
+    [configForm, antMessage]
+  );
 
   // 封面合成：拉项目 detail 取分镜（底图候选），coverProject 非空即打开弹窗。
   const openCover = useCallback(
@@ -268,7 +366,7 @@ export const NovelVideoPage: React.FC = () => {
         name: values.name,
         text: values.text,
         stylePrompt: values.stylePrompt,
-        config: { shotsPerChapter: values.shotsPerChapter, videoSeconds: values.videoSeconds }
+        config: { shotsPerChapter: values.shotsPerChapter, videoSeconds: values.videoSeconds, aspect: values.aspect }
       });
       antMessage.success(`已创建并切分为 ${created.chapters.length} 个章节`);
       setCreateOpen(false);
@@ -572,7 +670,7 @@ export const NovelVideoPage: React.FC = () => {
         width="md"
         destroyOnHidden
       >
-        <SelfForm form={form} initialValues={{ shotsPerChapter: 3, videoSeconds: 5 }}>
+        <SelfForm form={form} initialValues={{ shotsPerChapter: 3, videoSeconds: 5, aspect: '16:9' }}>
           <Form.Item name="name" label="项目名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="如：星际橘猫 第一集" maxLength={64} />
           </Form.Item>
@@ -618,6 +716,10 @@ export const NovelVideoPage: React.FC = () => {
               />
             </Form.Item>
           </Space>
+          {/* 成片画幅：贯穿生图 size 与合成端分辨率；详情「项目配置」可随时改。 */}
+          <Form.Item name="aspect" label="成片画幅">
+            <Select className="w-[220px]" options={ASPECT_OPTIONS} />
+          </Form.Item>
         </SelfForm>
       </SelfModal>
 
@@ -719,6 +821,82 @@ export const NovelVideoPage: React.FC = () => {
                 <video src={detail.project.finalVideoPath} controls className="w-full rounded-lg" />
               </div>
             )}
+            {/* 项目配置：多规格画幅 / BGM（ducking 混音）/ 字幕烧录样式 / BGM 音量，保存后下次合成生效 */}
+            <Card
+              size="small"
+              title="项目配置"
+              className="mt-3"
+              extra={
+                <Permission code="flow:define:manage">
+                  <Button size="small" type="primary" loading={savingConfig} onClick={() => void saveConfig(detail.project.id)}>
+                    保存
+                  </Button>
+                </Permission>
+              }
+            >
+              <SelfForm form={configForm} layout="vertical">
+                <Space size="large" wrap>
+                  <Form.Item name="aspect" label="成片画幅" className="!mb-2">
+                    <Select className="w-[220px]" options={ASPECT_OPTIONS} />
+                  </Form.Item>
+                  <Form.Item name="subtitleStyle" label="字幕样式" className="!mb-2">
+                    <Select className="w-[200px]" options={SUBTITLE_STYLE_OPTIONS} />
+                  </Form.Item>
+                  <Form.Item name="bgmVolume" label={`BGM 音量（${bgmVolumeDisplay}）`} className="!mb-2">
+                    <Slider className="w-[160px]" min={0} max={1} step={0.05} />
+                  </Form.Item>
+                </Space>
+                <Form.Item label="背景音乐 BGM（合成时自动 ducking 压低垫乐）" className="!mb-0">
+                  <Space size={8} wrap>
+                    {/* bgmUrl 实际值存这里（hidden 字段）；上传成功回填，清除按钮置空串（后端空串 = 不加 BGM） */}
+                    <Form.Item name="bgmUrl" hidden>
+                      <Input />
+                    </Form.Item>
+                    {!bgmUrl ? (
+                      <Permission code="flow:define:manage">
+                        <Upload
+                          accept=".mp3,.wav"
+                          showUploadList={false}
+                          beforeUpload={(file) => {
+                            void handleBgmUpload(file);
+                            return false;
+                          }}
+                        >
+                          <Button size="small" icon={<UploadOutlined />} loading={bgmUploading}>
+                            上传 BGM（mp3/wav，≤10MB）
+                          </Button>
+                        </Upload>
+                      </Permission>
+                    ) : (
+                      <>
+                        <a href={bgmUrl} target="_blank" rel="noreferrer" className="text-xs">
+                          听当前 BGM
+                        </a>
+                        <Permission code="flow:define:manage">
+                          <Space size={4}>
+                            <Upload
+                              accept=".mp3,.wav"
+                              showUploadList={false}
+                              beforeUpload={(file) => {
+                                void handleBgmUpload(file);
+                                return false;
+                              }}
+                            >
+                              <Button size="small" icon={<UploadOutlined />} loading={bgmUploading}>
+                                更换
+                              </Button>
+                            </Upload>
+                            <Button size="small" icon={<DeleteOutlined />} onClick={() => configForm.setFieldsValue({ bgmUrl: '' })}>
+                              清除
+                            </Button>
+                          </Space>
+                        </Permission>
+                      </>
+                    )}
+                  </Space>
+                </Form.Item>
+              </SelfForm>
+            </Card>
             {/* 角色库：分镜出图自动注入角色外观与参考图，保证多镜头同一角色形象 */}
             <Card
               size="small"

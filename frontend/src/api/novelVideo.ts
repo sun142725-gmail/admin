@@ -12,6 +12,14 @@ export interface NovelPipelineConfig {
   ttsVoice?: string;
   // 配音模型行 id（空则按 tts 能力路由）。
   ttsModelId?: number;
+  // 成片画幅（缺省回落 imageSize/videoSize 旧行为）。
+  aspect?: '16:9' | '9:16' | '1:1';
+  // BGM 音频静态路径（/uploads/novel-bgm/...，upload-audio 上传）；空缺省不加 BGM。
+  bgmUrl?: string;
+  // 字幕烧录样式预设档：default（标准）/ big（大字）/ none（不烧录）。
+  subtitleStyle?: string;
+  // BGM 音量 0-1（ducking 侧链输入音量），缺省 0.2。
+  bgmVolume?: number;
 }
 
 export interface NovelProjectVo {
