@@ -192,7 +192,7 @@ export const ScreenerRunsPanel: React.FC<RunsPanelProps> = ({ favoriteSymbols, o
   );
 
   return (
-    <div className="flex flex-col gap-4 flex-1 min-h-0">
+    <div className="flex flex-col gap-4">
       <Alert
         type="info"
         showIcon

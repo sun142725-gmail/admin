@@ -226,14 +226,15 @@ export const ScreenerPage: React.FC = () => {
   ];
 
   return (
-    <div className="page-fill flex flex-col">
+    // 混合内容页（表单卡 + 条件提示 + 结果表）保持自然整页滚动：不套 page-fill/fill，
+    // 否则外层壳 overflow:hidden 钉死一屏、内容超高时无滚动出口（同生图页 7dd8b30 的教训）
+    <div>
       <PageHeader
         title="选股器"
         subtitle="规则扫描：对候选池逐股检测 KDJ / MACD 金叉与即将金叉，支持日线 / 周线 / 月线。"
       />
 
       <Tabs
-        className="flex-1 min-h-0"
         defaultActiveKey={searchParams.get('tab') === 'daily' ? 'daily' : 'manual'}
         items={[
           { key: 'manual', label: '手动扫描', children: <ManualScanPanel /> },
@@ -428,7 +429,6 @@ export const ScreenerPage: React.FC = () => {
       )}
 
       <SelfTable
-        fill
         rowKey={(record) => `${record.symbol}:${record.freq}`}
         columns={columns}
         dataSource={dataSource}

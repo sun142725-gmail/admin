@@ -1,6 +1,6 @@
-// 铜钱：写实乾隆通宝风格 SVG。
-// 钱币学：乾隆通宝四字面为正面（字面），满文泉源面为背面。
-// 占卜传统：背为阳、字为阴 —— 泉源面（背）朝上为阳（3 分），乾隆通宝面（字）朝上为阴（2 分）。
+// 铜钱：清代制钱形制的 SVG（外郭 → 地章 → 内郭 → 方孔，钱文对读）。
+// 钱币学：乾隆通宝字面为正面，满文记局面为背面；钱文对读（上乾 下隆 右通 左宝）。
+// 占卜传统：背为阳、字为阴 —— 背面（记号面）朝上为阳（3 分），字面朝上为阴（2 分）。
 // 由父组件通过 playId 变化重新触发一次抛掷动画，落定角度由爻结果决定。
 import { useEffect, useState } from 'react';
 
@@ -13,73 +13,104 @@ interface CoinProps {
   playId: number;
 }
 
-const CoinObverse = () => (
-  <svg className="coin-svg" viewBox="0 0 100 100" aria-hidden>
+/** 钱体（郭、地章、方孔）共用结构：光从左上，孔内上亮下暗。 */
+const CoinBody: React.FC<{ idPrefix: string }> = ({ idPrefix }) => (
+  <>
     <defs>
-      <radialGradient id="coin-bronze" cx="38%" cy="30%" r="80%">
-        <stop offset="0%" stopColor="#eed398" />
-        <stop offset="45%" stopColor="#cda457" />
-        <stop offset="80%" stopColor="#a37c34" />
-        <stop offset="100%" stopColor="#7c5a22" />
+      {/* 地章：黄铜哑光，左上受光 */}
+      <radialGradient id={`${idPrefix}-body`} cx="40%" cy="30%" r="85%">
+        <stop offset="0%" stopColor="#e6c98c" />
+        <stop offset="38%" stopColor="#d0aa61" />
+        <stop offset="74%" stopColor="#ac8442" />
+        <stop offset="100%" stopColor="#836029" />
       </radialGradient>
-      <linearGradient id="coin-sheen" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="rgba(255,255,255,0.5)" />
-        <stop offset="30%" stopColor="rgba(255,255,255,0.08)" />
-        <stop offset="60%" stopColor="rgba(62,42,10,0.1)" />
-        <stop offset="100%" stopColor="rgba(40,26,4,0.4)" />
-      </linearGradient>
+      {/* 外郭：立缘（中段被地章覆盖，只露出外侧环带），外暗内亮 */}
+      <radialGradient id={`${idPrefix}-rim`} cx="50%" cy="38%" r="62%">
+        <stop offset="0%" stopColor="#c69d52" />
+        <stop offset="86%" stopColor="#8a652c" />
+        <stop offset="100%" stopColor="#66481d" />
+      </radialGradient>
+      <filter id={`${idPrefix}-blur`} x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="2.4" />
+      </filter>
     </defs>
-    <circle cx="50" cy="50" r="48" fill="url(#coin-bronze)" stroke="#5f451c" strokeWidth="2.5" />
-    <circle cx="50" cy="50" r="43" fill="none" stroke="#a37f3a" strokeWidth="1.4" opacity="0.9" />
-    {/* 方孔：深色内壁模拟穿孔纵深 */}
-    <rect x="39.5" y="39.5" width="21" height="21" fill="#3f2f10" stroke="#6d5122" strokeWidth="1.6" />
-    <rect x="41" y="41" width="18" height="18" fill="#553f16" />
-    {/* 四字对读：上乾 下通 右隆 左宝 */}
-    <g
-      fill="#5c431a"
-      fontFamily="'Kaiti SC','KaiTi','STKaiti','Noto Serif SC',serif"
-      fontWeight="700"
-      fontSize="20"
-      textAnchor="middle"
-      dominantBaseline="central"
-    >
-      <text x="50" y="28">乾</text>
-      <text x="50" y="72">通</text>
-      <text x="72" y="50">隆</text>
-      <text x="28" y="50">宝</text>
-    </g>
-    {/* 包浆斑点 */}
-    <circle cx="24" cy="36" r="3.2" fill="rgba(94,115,74,0.22)" />
-    <circle cx="76" cy="68" r="2.6" fill="rgba(94,115,74,0.18)" />
-    <circle cx="70" cy="26" r="1.8" fill="rgba(74,55,20,0.25)" />
-    <circle cx="30" cy="72" r="2.2" fill="rgba(120,90,40,0.2)" />
-    {/* 金属光泽 */}
-    <circle cx="50" cy="50" r="48" fill="url(#coin-sheen)" />
+    {/* 外郭与地章 */}
+    <circle cx="60" cy="60" r="58" fill={`url(#${idPrefix}-rim)`} stroke="#4f3814" strokeWidth="1.8" />
+    <circle cx="60" cy="60" r="56.6" fill="none" stroke="rgba(255,232,175,0.32)" strokeWidth="1.1" />
+    <circle cx="60" cy="60" r="52" fill={`url(#${idPrefix}-body)`} />
+    <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(56,39,13,0.5)" strokeWidth="1.2" />
+    {/* 地章顶部弧光与底部沉影，撑起钱面弧度 */}
+    <path
+      d="M 22 40 A 46 46 0 0 1 98 40"
+      fill="none"
+      stroke="rgba(255,243,208,0.34)"
+      strokeWidth="6"
+      strokeLinecap="round"
+      filter={`url(#${idPrefix}-blur)`}
+    />
+    <path
+      d="M 28 88 A 46 46 0 0 0 92 88"
+      fill="none"
+      stroke="rgba(52,35,10,0.28)"
+      strokeWidth="5"
+      strokeLinecap="round"
+      filter={`url(#${idPrefix}-blur)`}
+    />
+    {/* 内郭（方孔凸缘）：外暗内亮双线 */}
+    <rect x="40" y="40" width="40" height="40" fill="none" stroke="rgba(58,40,14,0.6)" strokeWidth="1.6" />
+    <rect x="42.4" y="42.4" width="35.2" height="35.2" fill="none" stroke="rgba(255,236,185,0.26)" strokeWidth="1" />
+    {/* 穿孔：暗腔 + 孔缘受光 + 底部微透光 */}
+    <rect x="46" y="46" width="28" height="28" fill="#2a1c08" stroke="rgba(20,13,3,0.6)" strokeWidth="1" />
+    <path d="M 46.8 46.8 H 73.2" stroke="rgba(255,238,190,0.4)" strokeWidth="1.2" />
+    <path d="M 46.8 46.8 V 73.2" stroke="rgba(255,238,190,0.2)" strokeWidth="1" />
+    <rect x="47.4" y="68.6" width="25.2" height="4.4" fill="rgba(212,170,100,0.2)" />
+    {/* 包浆：大而淡的色斑（模糊处理，避免脏点感） */}
+    <ellipse cx="89" cy="83" rx="10" ry="7" fill="rgba(104,118,82,0.13)" filter={`url(#${idPrefix}-blur)`} />
+    <ellipse cx="30" cy="88" rx="8" ry="5.5" fill="rgba(104,118,82,0.1)" filter={`url(#${idPrefix}-blur)`} />
+    <ellipse cx="86" cy="33" rx="7" ry="5" fill="rgba(70,52,20,0.14)" filter={`url(#${idPrefix}-blur)`} />
+  </>
+);
+
+/** 钱文双层：下层投影 + 上层字身，模拟阳文铸字的浮雕感。 */
+const Inscription: React.FC<{
+  glyph: string;
+  x: number;
+  y: number;
+  size: number;
+}> = ({ glyph, x, y, size }) => (
+  <g
+    fontFamily="'Kaiti SC','KaiTi','STKaiti','Noto Serif SC',serif"
+    fontWeight="700"
+    fontSize={size}
+    textAnchor="middle"
+    dominantBaseline="central"
+  >
+    <text x={x + 0.9} y={y + 1.1} fill="rgba(42,28,8,0.5)">
+      {glyph}
+    </text>
+    <text x={x} y={y} fill="#57401a" stroke="rgba(255,238,195,0.22)" strokeWidth="0.6">
+      {glyph}
+    </text>
+  </g>
+);
+
+const CoinObverse = () => (
+  <svg className="coin-svg" viewBox="0 0 120 120" aria-hidden>
+    <CoinBody idPrefix="coin-ob" />
+    {/* 乾隆通宝：对读（上乾 下隆 右通 左宝） */}
+    <Inscription glyph="乾" x={60} y={25.5} size={21} />
+    <Inscription glyph="隆" x={60} y={94.5} size={21} />
+    <Inscription glyph="通" x={94.5} y={60} size={21} />
+    <Inscription glyph="宝" x={25.5} y={60} size={21} />
   </svg>
 );
 
 const CoinReverse = () => (
-  <svg className="coin-svg" viewBox="0 0 100 100" aria-hidden>
-    <circle cx="50" cy="50" r="48" fill="url(#coin-bronze)" stroke="#5f451c" strokeWidth="2.5" />
-    <circle cx="50" cy="50" r="43" fill="none" stroke="#a37f3a" strokeWidth="1.4" opacity="0.9" />
-    <rect x="39.5" y="39.5" width="21" height="21" fill="#3f2f10" stroke="#6d5122" strokeWidth="1.6" />
-    {/* 背面满文记号：左右两列星月纹 + 竖排宝泉印 */}
-    <g
-      fill="#5c431a"
-      fontFamily="'Kaiti SC','KaiTi','STKaiti',serif"
-      fontWeight="700"
-      fontSize="14"
-      textAnchor="middle"
-      dominantBaseline="central"
-    >
-      <text x="26" y="50">泉</text>
-      <text x="74" y="50">源</text>
-    </g>
-    <circle cx="27" cy="32" r="2" fill="#6d5122" />
-    <circle cx="73" cy="32" r="2" fill="#6d5122" />
-    <circle cx="24" cy="66" r="3" fill="rgba(94,115,74,0.22)" />
-    <circle cx="78" cy="38" r="2.4" fill="rgba(94,115,74,0.18)" />
-    <circle cx="50" cy="50" r="48" fill="url(#coin-sheen)" />
+  <svg className="coin-svg" viewBox="0 0 120 120" aria-hidden>
+    <CoinBody idPrefix="coin-re" />
+    {/* 背面记局：满文宝泉/宝源以汉字「泉」「源」示意，分列穿孔左右 */}
+    <Inscription glyph="泉" x={27} y={60} size={19} />
+    <Inscription glyph="源" x={93} y={60} size={19} />
   </svg>
 );
 
@@ -116,7 +147,7 @@ export const Coin: React.FC<CoinProps> = ({ yang, delay, playId }) => {
         style={{ transform: `rotateX(${spins}deg)`, transition: spins === 0 ? 'none' : undefined }}
       >
         <div className="coin-face">
-          {/* 静止面：背面（泉源）＝阳，掷出“正”时朝上。 */}
+          {/* 静止面：背面（记号）＝阳，掷出“正”时朝上。 */}
           <CoinReverse />
         </div>
         <div className="coin-face coin-face-yin">
