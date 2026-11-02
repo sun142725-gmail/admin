@@ -1,6 +1,8 @@
 // 模型管理页：一行模型 = 一个可调用端点（协议 + 请求地址 + API Key），同名模型多行互为备份。
+// 价格入口（成本核算）：弹窗内维护该模型的价格行（kind/单价/币种/生效时间）。
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Button from 'antd/es/button';
+import DatePicker from 'antd/es/date-picker';
 import Form from 'antd/es/form';
 import Input from 'antd/es/input';
 import InputNumber from 'antd/es/input-number';
@@ -8,10 +10,13 @@ import Select from 'antd/es/select';
 import Space from 'antd/es/space';
 import Tag from 'antd/es/tag';
 import message from 'antd/es/message';
+import type { ColumnsType } from 'antd/es/table';
 import { ApiOutlined, PlusOutlined } from '@ant-design/icons';
+import dayjs, { Dayjs } from 'dayjs';
 import { Permission } from '../../components/permission/Permission';
 import { SelfDrawer } from '../../components/base/SelfDrawer';
 import { SelfForm } from '../../components/base/SelfForm';
+import { SelfModal } from '../../components/base/SelfModal';
 import { SelfTable } from '../../components/base/SelfTable';
 import { ConfirmPopconfirm } from '../../components/business/ConfirmAction';
 import { PageHeader } from '../../components/business/PageHeader';
@@ -21,12 +26,17 @@ import { useApiMessage } from '../../hooks/useApiMessage';
 import type { StatusMeta } from '../../types/ui';
 import {
   AiModel,
+  AiModelPrice,
   createModel,
+  createModelPrice,
+  listModelPrices,
   listModels,
   probeModelModels,
   removeModel,
+  removeModelPrice,
   testModel,
-  updateModel
+  updateModel,
+  updateModelPrice
 } from '../../api/ai';
 
 const TYPE_OPTIONS = [
@@ -40,6 +50,13 @@ const CAPABILITY_OPTIONS = [
   { value: 'video', label: '视频' },
   { value: 'vision', label: '视觉理解' },
   { value: 'embedding', label: '向量' }
+];
+
+const PRICE_KIND_OPTIONS = [
+  { value: 'chat', label: '对话（每 1K token）' },
+  { value: 'image', label: '生图（每张）' },
+  { value: 'video', label: '视频（每秒）' },
+  { value: 'tts', label: '语音合成（每字符）' }
 ];
 
 // 状态色刻度表（components/README.md）：启用=green、停用=default（无色，原红色收敛到刻度表）。
@@ -63,6 +80,15 @@ interface ModelFormValues {
   remark?: string;
 }
 
+interface PriceFormValues {
+  kind: string;
+  inputPrice?: number;
+  outputPrice?: number;
+  currency?: string;
+  effectiveFrom?: Dayjs;
+  remark?: string;
+}
+
 export const ModelsPage: React.FC = () => {
   const [models, setModels] = useState<AiModel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,6 +97,14 @@ export const ModelsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm<ModelFormValues>();
   const msg = useApiMessage();
+
+  // 价格弹窗状态（成本核算入口）。
+  const [priceModalOpen, setPriceModalOpen] = useState(false);
+  const [priceModel, setPriceModel] = useState<AiModel | null>(null);
+  const [prices, setPrices] = useState<AiModelPrice[]>([]);
+  const [editingPrice, setEditingPrice] = useState<AiModelPrice | null>(null);
+  const [priceSaving, setPriceSaving] = useState(false);
+  const [priceForm] = Form.useForm<PriceFormValues>();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -192,6 +226,119 @@ export const ModelsPage: React.FC = () => {
     [load, msg]
   );
 
+  // ---------- 价格弹窗（成本核算） ----------
+  const loadPrices = useCallback(async (modelId: number) => {
+    setPrices(await listModelPrices({ modelId }));
+  }, []);
+
+  const openPrices = useCallback(
+    (record: AiModel) => {
+      setPriceModel(record);
+      setEditingPrice(null);
+      priceForm.resetFields();
+      setPriceModalOpen(true);
+      void loadPrices(record.id);
+    },
+    [loadPrices, priceForm]
+  );
+
+  const closePriceModal = useCallback(() => {
+    setPriceModalOpen(false);
+    setPriceModel(null);
+    setEditingPrice(null);
+    setPrices([]);
+  }, []);
+
+  const openPriceEdit = useCallback(
+    (record: AiModelPrice) => {
+      setEditingPrice(record);
+      priceForm.setFieldsValue({
+        kind: record.kind,
+        inputPrice: record.inputPrice,
+        outputPrice: record.outputPrice,
+        currency: record.currency,
+        effectiveFrom: record.effectiveFrom ? dayjs(record.effectiveFrom) : undefined,
+        remark: record.remark
+      });
+    },
+    [priceForm]
+  );
+
+  const submitPrice = useCallback(async () => {
+    if (!priceModel) {
+      return;
+    }
+    const values = await priceForm.validateFields();
+    setPriceSaving(true);
+    try {
+      const payload = {
+        kind: values.kind,
+        inputPrice: values.inputPrice,
+        outputPrice: values.outputPrice,
+        currency: values.currency,
+        remark: values.remark,
+        effectiveFrom: values.effectiveFrom?.toISOString()
+      };
+      if (editingPrice) {
+        await updateModelPrice(editingPrice.id, payload);
+        msg.success('价格行已更新');
+      } else {
+        await createModelPrice({ ...payload, modelId: priceModel.id });
+        msg.success('价格行已创建');
+      }
+      priceForm.resetFields();
+      setEditingPrice(null);
+      await loadPrices(priceModel.id);
+    } finally {
+      setPriceSaving(false);
+    }
+  }, [editingPrice, loadPrices, msg, priceForm, priceModel]);
+
+  const handleRemovePrice = useCallback(
+    async (record: AiModelPrice) => {
+      await removeModelPrice(record.id);
+      msg.success('价格行已删除');
+      if (priceModel) {
+        await loadPrices(priceModel.id);
+      }
+    },
+    [loadPrices, msg, priceModel]
+  );
+
+  const priceColumns: ColumnsType<AiModelPrice> = useMemo(
+    () => [
+      { title: '类型', dataIndex: 'kind', key: 'kind', width: 90 },
+      { title: '输入单价', dataIndex: 'inputPrice', key: 'inputPrice', width: 90 },
+      { title: '输出单价', dataIndex: 'outputPrice', key: 'outputPrice', width: 90 },
+      { title: '单位', dataIndex: 'unit', key: 'unit', width: 90 },
+      { title: '币种', dataIndex: 'currency', key: 'currency', width: 70 },
+      {
+        title: '生效时间',
+        dataIndex: 'effectiveFrom',
+        key: 'effectiveFrom',
+        render: (value?: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '—')
+      },
+      {
+        title: '操作',
+        key: 'actions',
+        width: 120,
+        render: (_: unknown, record: AiModelPrice) => (
+          <Space>
+            <Button size="small" type="link" onClick={() => openPriceEdit(record)}>
+              编辑
+            </Button>
+            <ConfirmPopconfirm title="确认删除该价格行？" onConfirm={() => void handleRemovePrice(record)}>
+              <Button size="small" type="link" danger>
+                删除
+              </Button>
+            </ConfirmPopconfirm>
+          </Space>
+        )
+      }
+    ],
+    [handleRemovePrice, openPriceEdit]
+  );
+
   const columns = useMemo(
     () => [
       { title: '模型 Key', dataIndex: 'modelKey', key: 'modelKey' },
@@ -233,6 +380,9 @@ export const ModelsPage: React.FC = () => {
             </Button>
             <Permission code="ai:model:manage">
               <>
+                <Button size="small" type="link" onClick={() => openPrices(record)}>
+                  价格
+                </Button>
                 <Button size="small" type="link" onClick={() => openEdit(record)}>
                   编辑
                 </Button>
@@ -250,7 +400,7 @@ export const ModelsPage: React.FC = () => {
         )
       }
     ],
-    [handleProbe, handleRemove, handleTest, openEdit]
+    [handleProbe, handleRemove, handleTest, openEdit, openPrices]
   );
 
   return (
@@ -351,6 +501,61 @@ export const ModelsPage: React.FC = () => {
           </Form.Item>
         </SelfForm>
       </SelfDrawer>
+
+      <SelfModal
+        title={`模型价格：${priceModel?.displayName ?? ''}`}
+        open={priceModalOpen}
+        onCancel={closePriceModal}
+        confirmLoading={priceSaving}
+        onOk={() => void submitPrice()}
+        okText={editingPrice ? '保存价格行' : '新增价格行'}
+        width="md"
+      >
+        <div className="mb-4">
+          <SelfTable<AiModelPrice>
+            rowKey="id"
+            columns={priceColumns}
+            dataSource={prices}
+            pagination={false}
+            size="small"
+          />
+        </div>
+        <SelfForm form={priceForm} initialValues={{ currency: 'CNY' }}>
+          <Form.Item name="kind" label="调用类型" rules={[{ required: true, message: '请选择调用类型' }]}>
+            <Select options={PRICE_KIND_OPTIONS} />
+          </Form.Item>
+          <Space size="large" wrap>
+            <Form.Item
+              name="inputPrice"
+              label="输入单价"
+              extra="chat：每 1K 输入 token；其余类型填 0"
+            >
+              <InputNumber min={0} step={0.000001} className="w-full sm:w-[140px]" />
+            </Form.Item>
+            <Form.Item
+              name="outputPrice"
+              label="输出单价"
+              extra="chat：每 1K 输出 token；生图/视频/语音 = 每单位数量价"
+            >
+              <InputNumber min={0} step={0.000001} className="w-full sm:w-[140px]" />
+            </Form.Item>
+            <Form.Item name="currency" label="币种">
+              <Input maxLength={8} className="w-full sm:w-[90px]" />
+            </Form.Item>
+          </Space>
+          <Form.Item
+            name="effectiveFrom"
+            label="生效时间"
+            rules={[{ required: true, message: '请选择生效时间' }]}
+            extra="报表按用量时间取「≤ 生效时间的最新一行」"
+          >
+            <DatePicker showTime className="w-full sm:w-[220px]" />
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input maxLength={255} />
+          </Form.Item>
+        </SelfForm>
+      </SelfModal>
     </div>
   );
 };

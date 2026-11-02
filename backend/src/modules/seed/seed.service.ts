@@ -680,7 +680,9 @@ export class SeedService implements OnModuleInit {
       { path: '/ai/agents', name: '智能体管理', code: 'ai:agent:manage' },
       { path: '/ai/chat', name: 'AI 对话', code: 'ai:chat:use' },
       { path: '/ai/images', name: 'AI 生图', code: 'ai:image:use' },
-      { path: '/ai/canvas', name: 'AI 画布', code: 'ai:canvas:view' }
+      { path: '/ai/canvas', name: 'AI 画布', code: 'ai:canvas:view' },
+      // 用量报表（成本核算）：codes 已含 ai:usage:view（:627），只补页面资源。
+      { path: '/ai/usage', name: '用量报表', code: 'ai:usage:view' }
     ];
     for (const page of pages) {
       const pageExists = await this.resourceRepo.findOne({ where: { path: page.path } });

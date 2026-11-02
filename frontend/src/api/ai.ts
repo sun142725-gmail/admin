@@ -88,6 +88,56 @@ export interface ProbeResultVo {
   message?: string;
 }
 
+// ---------- 模型单价（成本核算） ----------
+export interface AiModelPrice {
+  id: number;
+  // 关联模型行 id；null = 该 kind 全局价。
+  modelId: number | null;
+  kind: string;
+  inputPrice: number;
+  outputPrice: number;
+  unit: string;
+  currency: string;
+  effectiveFrom?: string;
+  remark?: string;
+  createdAt?: string;
+}
+
+// ---------- 用量聚合报表（成本核算） ----------
+export interface UsageReportRow {
+  day?: string;
+  modelId?: number | null;
+  modelName?: string;
+  projectId?: number;
+  projectName?: string;
+  calls: number;
+  tokens: number;
+  unitCount: number;
+  cost: number | null;
+  currency: string | null;
+}
+
+export interface UsageReportVo {
+  summary: {
+    calls: number;
+    tokens: number;
+    unitCount: number;
+    costByCurrency: Record<string, number>;
+    uncoveredCalls: number;
+  };
+  byDay: UsageReportRow[];
+  byModel: UsageReportRow[];
+  byProject: UsageReportRow[];
+}
+
+export interface UsageReportQuery {
+  from?: string;
+  to?: string;
+  modelId?: number;
+  projectId?: number;
+  kind?: string;
+}
+
 // ---------- 模型（一行 = 端点：协议/地址/密钥） ----------
 export const listModels = () => http.get<never, AiModel[]>('/ai/admin/models');
 export const createModel = (payload: object) => http.post<never, AiModel>('/ai/admin/models', payload);
@@ -100,6 +150,20 @@ export const probeModelModels = (id: number) =>
   http.post<never, ProbeResultVo>(`/ai/admin/models/${id}/probe-models`, undefined, {
     timeout: LONG_TASK_TIMEOUT
   });
+
+// ---------- 模型单价（成本核算，命名照模型管理范式） ----------
+export const listModelPrices = (params?: { modelId?: number; kind?: string }) =>
+  http.get<never, AiModelPrice[]>('/ai/model-prices', { params });
+export const createModelPrice = (payload: object) =>
+  http.post<never, AiModelPrice>('/ai/model-prices', payload);
+export const updateModelPrice = (id: number, payload: object) =>
+  http.put<never, AiModelPrice>(`/ai/model-prices/${id}`, payload);
+export const removeModelPrice = (id: number) =>
+  http.delete<never, { success: boolean }>(`/ai/model-prices/${id}`);
+
+// ---------- 用量聚合报表 ----------
+export const fetchUsageReport = (params?: UsageReportQuery) =>
+  http.get<never, UsageReportVo>('/ai/usage/report', { params });
 
 // ---------- 智能体 ----------
 export const listAgents = () => http.get<never, AiAgent[]>('/ai/admin/agents');

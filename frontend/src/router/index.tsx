@@ -37,6 +37,7 @@ const AgentsPage = lazyPage(() => import('../pages/ai/AgentsPage'), 'AgentsPage'
 const ChatPage = lazyPage(() => import('../pages/ai/ChatPage'), 'ChatPage');
 const ImagesPage = lazyPage(() => import('../pages/ai/ImagesPage'), 'ImagesPage');
 const CanvasPage = lazyPage(() => import('../pages/ai/CanvasPage'), 'CanvasPage');
+const UsageReportPage = lazyPage(() => import('../pages/ai/UsageReportPage'), 'UsageReportPage');
 const StockPage = lazyPage(() => import('../pages/stock/StockPage'), 'StockPage');
 const ScreenerPage = lazyPage(() => import('../pages/stock/ScreenerPage'), 'ScreenerPage');
 const WatchlistPage = lazyPage(() => import('../pages/stock/WatchlistPage'), 'WatchlistPage');
@@ -101,6 +102,7 @@ export const router = createBrowserRouter([
       { path: '/ai/chat', element: <ChatPage /> },
       { path: '/ai/images', element: <ImagesPage /> },
       { path: '/ai/canvas', element: <CanvasPage /> },
+      { path: '/ai/usage', element: <UsageReportPage /> },
       { path: '/stock', element: <StockPage /> },
       { path: '/stock/screener', element: <ScreenerPage /> },
       { path: '/stock/watchlist', element: <WatchlistPage /> },
