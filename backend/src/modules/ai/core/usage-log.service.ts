@@ -10,6 +10,9 @@ export interface UsageLogPayload {
   kind: 'chat' | 'image' | 'roundtable' | 'video' | 'tts';
   promptTokens?: number;
   completionTokens?: number;
+  // 制片厂项目关联（仅管线调用传入）；数量基准：image=张 / video=秒 / tts=字符，失败调用记 0。
+  projectId?: number;
+  unitCount?: number;
   latencyMs?: number;
   status?: 'ok' | 'failed' | 'stopped';
   errorMessage?: string;

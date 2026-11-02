@@ -12,6 +12,9 @@ export interface VideoRequestOptions {
   size?: string;
   // 指定模型行（可选）：优先用该行，失败回落到全部 video 候选。
   modelId?: number;
+  // 用量项目关联（仅制片厂管线传入，流程引擎为空）；unit_count 数量基准 = 秒。
+  projectId?: number;
+  unitCount?: number;
 }
 
 export interface VideoResult {
@@ -88,6 +91,8 @@ export class VideoUpstreamService {
           userId,
           modelId: candidate.model.id,
           kind: 'video',
+          projectId: options.projectId,
+          unitCount: options.unitCount ?? 0,
           latencyMs: result.latencyMs,
           status: 'ok'
         });
@@ -98,6 +103,8 @@ export class VideoUpstreamService {
           userId,
           modelId: candidate.model.id,
           kind: 'video',
+          projectId: options.projectId,
+          unitCount: options.unitCount ?? 0,
           latencyMs: 0,
           status: 'failed',
           errorMessage: lastError.message

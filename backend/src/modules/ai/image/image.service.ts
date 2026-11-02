@@ -80,6 +80,8 @@ export class AiImageService {
           userId,
           modelId: candidate.model.id || undefined,
           kind: 'image',
+          // 数量基准 = 上游实际返回张数（支持 dto.count>1）。
+          unitCount: results.length,
           latencyMs: Date.now() - startedAt,
           status: 'ok'
         });
@@ -98,6 +100,8 @@ export class AiImageService {
     this.usageLog.record({
       userId,
       kind: 'image',
+      // 失败不计数量（不计金额），calls 仍计入报表。
+      unitCount: 0,
       latencyMs: Date.now() - startedAt,
       status: 'failed',
       errorMessage: lastError?.message?.slice(0, 255)

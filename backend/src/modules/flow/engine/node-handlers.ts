@@ -238,6 +238,8 @@ const imageHandler = async (input: NodeExecInput): Promise<NodeExecResult> => {
         userId: input.userId,
         modelId: candidate.model.id,
         kind: 'image',
+        // 数量基准 = 上游实际返回张数（count 配置可 >1）。
+        unitCount: results.length,
         latencyMs: Date.now() - startedAt,
         status: 'ok'
       });
@@ -251,6 +253,8 @@ const imageHandler = async (input: NodeExecInput): Promise<NodeExecResult> => {
         userId: input.userId,
         modelId: candidate.model.id,
         kind: 'image',
+        // 失败不计数量（不计金额），calls 仍计入报表。
+        unitCount: 0,
         latencyMs: Date.now() - startedAt,
         status: 'failed',
         errorMessage: lastError.message
@@ -268,7 +272,9 @@ const videoHandler = async (input: NodeExecInput): Promise<NodeExecResult> => {
   const result = await input.deps.video.generate(input.userId, {
     prompt,
     firstFrameUrl: firstFrameUrl || undefined,
+    // 数量基准 = 秒（经 video-upstream 透传落 usage log，projectId 流程引擎不传）。
     seconds: num(input.node.config.seconds, 5),
+    unitCount: num(input.node.config.seconds, 5),
     size: str(input.node.config.size) || undefined,
     modelId: input.node.config.modelId as number | undefined
   });
@@ -390,6 +396,8 @@ const ttsHandler = async (input: NodeExecInput): Promise<NodeExecResult> => {
         userId: input.userId,
         modelId: candidate.model.id,
         kind: 'tts',
+        // 数量基准 = 旁白字符数（与 output.chars 同源）。
+        unitCount: text.length,
         latencyMs: Date.now() - startedAt,
         status: 'ok'
       });
@@ -403,6 +411,8 @@ const ttsHandler = async (input: NodeExecInput): Promise<NodeExecResult> => {
         userId: input.userId,
         modelId: candidate.model.id,
         kind: 'tts',
+        // 失败不计数量（不计金额），calls 仍计入报表。
+        unitCount: 0,
         latencyMs: Date.now() - startedAt,
         status: 'failed',
         errorMessage: lastError.message

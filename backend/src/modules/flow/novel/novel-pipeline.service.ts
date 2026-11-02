@@ -472,6 +472,7 @@ export class NovelPipelineService implements OnModuleDestroy {
       stylePrompt: project.stylePrompt
     });
     let lastError: Error | null = null;
+    const startedAt = Date.now();
     for (const candidate of usable) {
       const generate = candidate.adapter.images?.bind(candidate.adapter);
       if (!generate) {
@@ -496,6 +497,17 @@ export class NovelPipelineService implements OnModuleDestroy {
         const buffer = await this.urlToBuffer(results[0].url);
         const relative = `novel-video/p${project.id}/shot-c${await this.chapterIdxOf(shot)}-s${shot.idx}.jpg`;
         await this.writeUploadFile(relative, buffer);
+        // 管线生图此前零用量记录；count 恒 1（见上方 generate 入参），userId 用项目创建者（两处调用点零改动）。
+        // 口径说明：video/tts 用量记录的是触发者 userId，生图此处记录项目创建者（byProject 汇总不受影响）。
+        this.deps.usageLog.record({
+          userId: project.createdBy,
+          modelId: candidate.model.id,
+          kind: 'image',
+          projectId: project.id,
+          unitCount: 1,
+          latencyMs: Date.now() - startedAt,
+          status: 'ok'
+        });
         return `/uploads/${relative}`;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -527,6 +539,9 @@ export class NovelPipelineService implements OnModuleDestroy {
       }),
       firstFrameUrl,
       seconds: project.config.videoSeconds,
+      // 用量项目关联与数量基准（秒）：经 VideoUpstreamService 透传落 usage log。
+      projectId: project.id,
+      unitCount: project.config.videoSeconds,
       // 多规格：aspect 存在时映射优先（16:9→1280x720 / 9:16→720x1280 / 1:1→720x720），
       // 缺省回落 videoSize 现行为（旧项目零变化）；上游不守 size 时由合成 mux 步 scale+pad 兜底统一。
       size: resolveVideoSize(project.config.aspect) || project.config.videoSize || undefined
@@ -634,6 +649,9 @@ export class NovelPipelineService implements OnModuleDestroy {
           userId,
           modelId: candidate.model.id,
           kind: 'tts',
+          projectId: project.id,
+          // 数量基准 = 旁白字符数（normalizeTtsText 后，与计费文本同源）。
+          unitCount: narration.length,
           latencyMs: Date.now() - startedAt,
           status: 'ok'
         });
@@ -644,6 +662,9 @@ export class NovelPipelineService implements OnModuleDestroy {
           userId,
           modelId: candidate.model.id,
           kind: 'tts',
+          projectId: project.id,
+          // 失败不计数量（不计金额），calls 仍计入报表。
+          unitCount: 0,
           latencyMs: Date.now() - startedAt,
           status: 'failed',
           errorMessage: lastError.message
