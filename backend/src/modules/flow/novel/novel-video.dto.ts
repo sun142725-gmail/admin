@@ -1,24 +1,32 @@
 // 小说转视频 DTO。
-import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+// config 嵌套校验说明：NovelPipelineConfigDto 全字段 @IsOptional——config 是「任意子集 + 默认合并」
+// 语义（创建缺省合并 DEFAULT_NOVEL_CONFIG，更新 {...project.config, ...dto.config} 浅合并），
+// 前端只传变更字段；字段级约束（范围/枚举）在子集校验时仍然生效。
+import { Type } from 'class-transformer';
+import { IsBoolean, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 
 export class NovelPipelineConfigDto {
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(6)
-  shotsPerChapter!: number;
+  shotsPerChapter?: number;
 
+  @IsOptional()
   @IsInt()
   @Min(3)
   @Max(10)
-  videoSeconds!: number;
+  videoSeconds?: number;
 
+  @IsOptional()
   @IsString()
   @MaxLength(32)
-  imageSize!: string;
+  imageSize?: string;
 
+  @IsOptional()
   @IsString()
   @MaxLength(32)
-  videoSize!: string;
+  videoSize?: string;
 
   @IsOptional()
   @IsInt()
@@ -32,6 +40,29 @@ export class NovelPipelineConfigDto {
   @IsOptional()
   @IsInt()
   ttsModelId?: number;
+
+  // 成片画幅（缺省回落 imageSize/videoSize 旧行为）。
+  @IsOptional()
+  @IsIn(['16:9', '9:16', '1:1'])
+  aspect?: '16:9' | '9:16' | '1:1';
+
+  // BGM 音频静态路径（/uploads/novel-bgm/...，files/upload-audio 上传）；空串 = 不加 BGM。
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  bgmUrl?: string;
+
+  // 字幕烧录样式预设档（none = 不烧录）。
+  @IsOptional()
+  @IsIn(['default', 'big', 'none'])
+  subtitleStyle?: string;
+
+  // BGM 音量 0-1（ducking 侧链输入音量）。
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  bgmVolume?: number;
 }
 
 export class CreateNovelProjectDto {
@@ -53,6 +84,8 @@ export class CreateNovelProjectDto {
 
   @IsOptional()
   @IsObject()
+  @ValidateNested()
+  @Type(() => NovelPipelineConfigDto)
   config?: Partial<NovelPipelineConfigDto>;
 }
 
@@ -75,6 +108,8 @@ export class UpdateNovelProjectDto {
 
   @IsOptional()
   @IsObject()
+  @ValidateNested()
+  @Type(() => NovelPipelineConfigDto)
   config?: Partial<NovelPipelineConfigDto>;
 }
 

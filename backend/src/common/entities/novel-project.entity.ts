@@ -17,6 +17,16 @@ export interface NovelPipelineConfig {
   ttsVoice?: string;
   // 配音模型行 id（空则按 tts 能力路由）。
   ttsModelId?: number;
+  // 成片画幅（16:9/9:16/1:1）：贯穿生图 size 与合成端 mux/视觉步目标分辨率。
+  // 缺省（undefined/非法值）回落 imageSize/videoSize 现行为，旧项目零变化。
+  // 字面量联合与 modules/flow/novel/ffmpeg-av.util.ts resolveSizeByAspect 的 NovelAspect 对齐。
+  aspect?: '16:9' | '9:16' | '1:1';
+  // BGM 音频静态路径（/uploads/novel-bgm/...，files upload-audio 上传）；空缺省不加 BGM。
+  bgmUrl?: string;
+  // 字幕烧录样式预设档：default（标准 20px）/ big（大字 34px）/ none（不烧录）。
+  subtitleStyle?: string;
+  // BGM 音量 0-1（ducking 侧链输入音量），缺省 0.2。
+  bgmVolume?: number;
 }
 
 export const DEFAULT_NOVEL_CONFIG: NovelPipelineConfig = {

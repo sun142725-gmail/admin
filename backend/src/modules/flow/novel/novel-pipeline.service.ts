@@ -18,9 +18,19 @@ import { ChatMessagePayload } from '../../ai/core/llm-adapter.interface';
 import { VideoUpstreamService } from '../engine/video-upstream.service';
 import { NodeHandlerDependencies, parseJsonBlock, runLlm } from '../engine/node-handlers';
 import { estimateSpeechMs, normalizeTtsText, parseFfprobeDuration } from '../engine/tts.util';
-import { buildSrt } from './subtitle.util';
+import { buildSrt, SubtitleSegment } from './subtitle.util';
+import {
+  buildBgmMixArgs,
+  buildConcatListContent,
+  buildLoudnormArgs,
+  buildScalePadArgs,
+  buildShotMuxArgs,
+  buildSubtitleBurnArgs,
+  resolveSizeByAspect,
+  resolveVideoSize
+} from './ffmpeg-av.util';
 import { composeShotImagePrompt, composeShotMotionPrompt } from './shot-prompt.util';
-import { readImageAsDataUrl } from './character-ref.util';
+import { readImageAsDataUrl, sanitizeImageRelative } from './character-ref.util';
 import { splitChapterText } from './chapter-split.util';
 import { CreateCharacterCardDto, UpdateCharacterCardDto } from './character-card.dto';
 import { UpdateShotDto } from './novel-video.dto';
@@ -42,11 +52,14 @@ export const assertProjectIdle = (active: Set<number>, projectId: number): void 
 // ffmpeg/ffprobe 存在性探测缓存（Promise 记忆化）：合成与时长实测前各探测一次，失败结果也缓存。
 let ffmpegProbe: Promise<boolean> | null = null;
 let ffprobeProbe: Promise<boolean> | null = null;
+// subtitles 滤镜可用性探测缓存（字幕烧录前置）：同 Promise 记忆化模式。
+let subtitleFilterProbe: Promise<boolean> | null = null;
 
 /** 清空二进制探测缓存（仅测试用：模拟「未安装 ffmpeg」前后需要重置）。 */
 export const resetBinaryProbeCache = (): void => {
   ffmpegProbe = null;
   ffprobeProbe = null;
+  subtitleFilterProbe = null;
 };
 
 const probeBinary = (bin: string, cached: Promise<boolean> | null): Promise<boolean> => {
@@ -68,6 +81,34 @@ export const probeFfmpeg = (): Promise<boolean> => {
 export const assertFfmpegAvailable = async (): Promise<void> => {
   if (!(await probeFfmpeg())) {
     throw new Error('主机未安装 ffmpeg，无法合成视频，请先安装后重试');
+  }
+};
+
+/**
+ * 主机 ffmpeg 是否带 subtitles 滤镜（libass）：`ffmpeg -filters` 输出探测，Promise 记忆化。
+ * 集成测试在 beforeAll 探测本机能力，决定字幕烧录用例真跑或跳过。
+ */
+export const probeSubtitleFilter = (): Promise<boolean> => {
+  if (!subtitleFilterProbe) {
+    subtitleFilterProbe = probeFfmpeg().then(async (available) => {
+      if (!available) {
+        return false;
+      }
+      try {
+        const { stdout } = await execFileAsync('ffmpeg', ['-hide_banner', '-filters'], { timeout: 15000 });
+        return /\bsubtitles\b/.test(stdout);
+      } catch {
+        return false;
+      }
+    });
+  }
+  return subtitleFilterProbe;
+};
+
+/** 字幕烧录前置断言：缺 libass 时抛明确错误（而不是让 filtergraph 解析报谜语）。 */
+export const assertSubtitleBurnable = async (): Promise<void> => {
+  if (!(await probeSubtitleFilter())) {
+    throw new Error('主机 ffmpeg 未编译 libass（缺 subtitles 滤镜），无法烧录字幕，请换用含 libass 的 ffmpeg 或将字幕样式设为 none');
   }
 };
 
@@ -286,7 +327,7 @@ export class NovelPipelineService implements OnModuleDestroy {
         }
       }
 
-      // 4) 合成。
+      // 4) 合成（音画混流 + SRT 实测时间轴 + BGM ducking + 字幕烧录 + 多规格，编排见 composeProjectFinal）。
       const finalShots = await this.shotRepo.find({
         where: { projectId, status: 'video_done' },
         order: { id: 'ASC' }
@@ -302,13 +343,12 @@ export class NovelPipelineService implements OnModuleDestroy {
         return;
       }
       await this.projectRepo.update(projectId, { stage: 'merging', stageMessage: `合成 ${finalShots.length} 段视频…` });
-      // 字幕：按 concat 顺序（id ASC）生成 SRT 落盘；时间轴 = 分段视频时长（videoSeconds），与成片逐段对齐。
-      const subtitlePath = await this.writeSubtitle(projectId, finalShots, project.config.videoSeconds);
-      const finalPath = await this.mergeVideos(projectId, finalShots);
+      const { finalPath, subtitlePath, bgmApplied } = await this.composeProjectFinal(projectId);
       const failedShots = (await this.shotRepo.count({ where: { projectId, status: 'failed' } })) ?? 0;
       const cancelledNow = this.cancelled(projectId);
-      // 口径提示：成片当前为分段视频直拼，配音音轨未混入（音画混流属阶段2）；字幕时间轴按分段视频时长对齐。
-      const synthNote = '成片为分段视频直拼（配音音轨混流属阶段2），字幕时间轴按分段视频时长对齐';
+      // 口径提示：成片 = 每镜混流（配音进轨）→ concat → BGM ducking → 字幕烧录 → loudnorm；
+      // 字幕时间轴按混流后 ffprobe 实测段时长累加，与成片逐段对齐。
+      const synthNote = `成片含配音音轨与字幕${bgmApplied ? '（BGM 已混音 ducking）' : ''}，字幕时间轴按实测段时长对齐`;
       await this.projectRepo.update(projectId, {
         status: cancelledNow ? 'cancelled' : 'completed',
         stage: 'done',
@@ -438,10 +478,12 @@ export class NovelPipelineService implements OnModuleDestroy {
         continue;
       }
       try {
+        // 多规格：aspect 存在时映射优先（16:9→1792x1024 等），缺省回落 imageSize 现行为（旧项目零变化）。
+        const aspectSize = resolveSizeByAspect(project.config.aspect);
         const results = await generate(
           {
             prompt,
-            size: project.config.imageSize || undefined,
+            size: aspectSize ? aspectSize.imageSize : project.config.imageSize || undefined,
             count: 1,
             // 空数组传 undefined：无参考图时保持走 images/generations 通道旧行为。
             referenceImages: referenceImages.length > 0 ? referenceImages : undefined
@@ -485,7 +527,9 @@ export class NovelPipelineService implements OnModuleDestroy {
       }),
       firstFrameUrl,
       seconds: project.config.videoSeconds,
-      size: project.config.videoSize || undefined
+      // 多规格：aspect 存在时映射优先（16:9→1280x720 / 9:16→720x1280 / 1:1→720x720），
+      // 缺省回落 videoSize 现行为（旧项目零变化）；上游不守 size 时由合成 mux 步 scale+pad 兜底统一。
+      size: resolveVideoSize(project.config.aspect) || project.config.videoSize || undefined
     });
     const buffer = await this.urlToBuffer(result.url);
     const relative = `novel-video/p${project.id}/seg-c${await this.chapterIdxOf(shot)}-s${shot.idx}.mp4`;
@@ -584,7 +628,7 @@ export class NovelPipelineService implements OnModuleDestroy {
         const relative = `novel-video/p${project.id}/audio-c${await this.chapterIdxOf(shot)}-s${shot.idx}.mp3`;
         await this.writeUploadFile(relative, buffer);
         const absolute = join(process.cwd(), 'uploads', relative);
-        const probed = await this.probeAudioDurationMs(absolute);
+        const probed = await this.probeMediaDurationMs(absolute);
         const audioDurationMs = probed ?? (estimateSpeechMs(narration) || project.config.videoSeconds * 1000);
         this.deps.usageLog.record({
           userId,
@@ -609,8 +653,8 @@ export class NovelPipelineService implements OnModuleDestroy {
     throw lastError ?? new Error('配音失败');
   }
 
-  /** ffprobe 实测音频时长毫秒；无 ffprobe / 解析失败返回 null（调用方回落估算）。 */
-  private async probeAudioDurationMs(absolutePath: string): Promise<number | null> {
+  /** ffprobe 实测媒体（音频/视频）时长毫秒；无 ffprobe / 解析失败返回 null（调用方回落）。 */
+  private async probeMediaDurationMs(absolutePath: string): Promise<number | null> {
     ffprobeProbe = probeBinary('ffprobe', ffprobeProbe);
     if (!(await ffprobeProbe)) {
       return null;
@@ -629,17 +673,11 @@ export class NovelPipelineService implements OnModuleDestroy {
 
   /**
    * 生成项目字幕并落盘，返回 /uploads/ 静态路径。
-   * 时间轴口径：按「分段视频时长」（videoSeconds）逐段累加，与 mergeVideos 的 concat 成片
-   * 逐段对齐——每段视频按 seconds: videoSeconds 生成（见 produceVideo），concat 后总长 =
-   * 分镜数 × videoSeconds。配音音轨尚未混入成片（音画混流/字幕烧录属阶段2，
-   * 见 plan/go-taskflow-evaluation-20261028.md「阶段 2」），故不按 audioDurationMs 累加
-   * （那会与成片错位）；audioDurationMs 仅落库供展示与阶段2混流使用。
+   * 时间轴口径：按「混流后 ffprobe 实测段时长」逐段累加（composeProjectFinal mux 步实测），
+   * 与 concat 成片逐段对齐——了结音轨未进成片导致的历史错位（旧口径按 videoSeconds 累加）。
+   * 回落链（regenerateSubtitle）：muxed_file 实测 → video_file 实测 → videoSeconds 兜底。
    */
-  private async writeSubtitle(projectId: number, shots: NovelShot[], videoSeconds: number): Promise<string> {
-    const segments = shots.map((shot) => ({
-      text: (shot.narration ?? '').trim(),
-      durationMs: videoSeconds * 1000
-    }));
+  private async writeSubtitleSegments(projectId: number, segments: SubtitleSegment[]): Promise<string> {
     const srt = buildSrt(segments);
     const relative = `novel-video/p${projectId}/subtitle.srt`;
     await this.writeUploadFile(relative, Buffer.from(srt, 'utf8'));
@@ -669,37 +707,182 @@ export class NovelPipelineService implements OnModuleDestroy {
     await writeFile(absolute, buffer);
   }
 
-  /** ffmpeg 合成：concat demuxer 直拷贝，失败回落重编码。 */
-  private async mergeVideos(projectId: number, shots: NovelShot[]): Promise<string> {
-    // 主机无 ffmpeg 时直接报明确错误，而不是让 execFile 抛 ENOENT。
+  // ---------- 成片合成（音画混流 / concat / BGM ducking / 字幕烧录 / loudnorm） ----------
+
+  /**
+   * 项目成片合成编排（管线第 4 步与集成测试共用）：
+   * ① mux：逐镜 buildShotMuxArgs 混流——统一编码（libx264 veryfast / aac 44100 stereo）、
+   *    统一分辨率（aspect 映射或默认 1280x720，scale+pad 在 mux 步即统一，根治 concat SPS 花屏）、
+   *    以配音时长为准截断（音频为准）；mux 后 ffprobe 实测段时长（SRT 时间轴基准）。
+   * ② SRT：按实测段时长累加落盘。
+   * ③ concat 直拷（-c copy；失败回落重编码保留兜底）。
+   * ④ BGM ducking（可选）：bgmUrl 限根校验 + 扩展名白名单，文件缺失/失败 warn 降级跳过。
+   * ⑤ 视觉步（唯一全片重编码）：scale+pad 幂等保护 + 可选字幕烧录合并同一条 vf 链
+   *    （两者都必须重编码，合并避免两次全片重编码；BGM 步与 loudnorm 步 -c:v copy 夹在两侧）。
+   * ⑥ loudnorm 响度统一（-c:v copy，显式 -ar 44100）→ final.mp4。
+   *
+   * muxed_file 失效语义：本方法每次对全部 video_done 镜头重新 mux，绝不读 muxed_file 作为
+   * 合成输入——该列仅作 regenerateSubtitle 的 SRT 回落探针与调试（见 novel-shot.entity）。
+   */
+  async composeProjectFinal(projectId: number): Promise<{ finalPath: string; subtitlePath: string; bgmApplied: boolean }> {
     await assertFfmpegAvailable();
+    const project = await this.projectRepo.findOne({ where: { id: projectId } });
+    if (!project) {
+      throw new NotFoundException('项目不存在');
+    }
+    const config = project.config;
+    // 多规格：aspect 映射优先，缺省 1280x720（对齐现默认 videoSize 口径）。
+    const aspectSize = resolveSizeByAspect(config.aspect);
+    const width = aspectSize?.videoWidth ?? 1280;
+    const height = aspectSize?.videoHeight ?? 720;
+
+    const shots = await this.shotRepo.find({
+      where: { projectId, status: 'video_done' },
+      order: { id: 'ASC' }
+    });
+    if (shots.length === 0) {
+      throw new BadRequestException('没有任何已出片的分镜，无法合成');
+    }
+
     const projectDir = join(UPLOAD_ROOT, `p${projectId}`);
     await mkdir(projectDir, { recursive: true });
-    const listFile = join(projectDir, 'concat.txt');
-    const listContent = shots
-      .map((shot) => `file '${join(process.cwd(), 'uploads', shot.videoFile ?? '').replace(/'/g, "'\\''")}'`)
-      .join('\n');
-    await writeFile(listFile, listContent, 'utf8');
+    const uploadsRoot = join(process.cwd(), 'uploads');
+
+    // ① 逐镜混流：失败镜头跳过记 failed（对齐出片失败跳过语义），SRT/concat 不含该镜。
+    const muxed: Array<{ shot: NovelShot; path: string; durationMs: number }> = [];
+    for (const [index, shot] of shots.entries()) {
+      await this.projectRepo.update(projectId, {
+        stageMessage: `混流：第 ${index + 1}/${shots.length} 个分镜`
+      });
+      const muxedRelative = `novel-video/p${projectId}/mux-${shot.id}.mp4`;
+      const muxedAbsolute = join(uploadsRoot, muxedRelative);
+      const audioAbsolute = shot.audioFile ? join(uploadsRoot, shot.audioFile) : null;
+      const hasAudio = Boolean(audioAbsolute && existsSync(audioAbsolute));
+      try {
+        await execFileAsync(
+          'ffmpeg',
+          buildShotMuxArgs(join(uploadsRoot, shot.videoFile ?? ''), hasAudio ? audioAbsolute : null, muxedAbsolute, {
+            audioDurationMs: hasAudio ? shot.audioDurationMs ?? null : null,
+            width,
+            height
+          }),
+          { timeout: 120000 }
+        );
+        const probed = await this.probeMediaDurationMs(muxedAbsolute);
+        // 实测回落：配音实测时长 → videoSeconds（与 SRT 兜底链同源口径）。
+        const fallbackMs = hasAudio && shot.audioDurationMs ? shot.audioDurationMs : config.videoSeconds * 1000;
+        muxed.push({ shot, path: muxedAbsolute, durationMs: probed ?? fallbackMs });
+        // 仅探针/调试用途：下游合成永不读该列（见方法注释的 muxed_file 失效语义）。
+        await this.shotRepo.update(shot.id, { muxedFile: muxedRelative });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await this.shotRepo.update(shot.id, { status: 'failed', error: `合成混流失败: ${message}` });
+        this.logger.warn(`分镜 ${shot.id} 合成混流失败，已跳过: ${message}`);
+      }
+    }
+    if (muxed.length === 0) {
+      throw new Error('全部分镜混流失败，无法合成成片');
+    }
+
+    // ② SRT：按 mux 后 ffprobe 实测段时长累加（空文本段占时不出字幕，见 buildSrt）。
+    const subtitlePath = await this.writeSubtitleSegments(
+      projectId,
+      muxed.map(({ shot, durationMs }) => ({ text: shot.narration ?? '', durationMs }))
+    );
+
+    // ③ concat 直拷：mux 步已统一编码/分辨率/音轨。
+    const concatAbsolute = join(projectDir, 'concat.mp4');
+    await this.runConcat(projectDir, muxed.map((item) => item.path), concatAbsolute, width, height);
+
+    // ④ BGM ducking（可选）：bgmUrl 复用 sanitizeImageRelative 限根模式（剥 /uploads/ 前缀 +
+    //    拒 '..' 段 + resolve 限根），扩展名白名单 mp3/wav/m4a；缺失/失败 warn 降级跳过不阻塞。
+    let currentVideo = concatAbsolute;
+    let bgmApplied = false;
+    const bgmRelative = sanitizeImageRelative(config.bgmUrl ?? '');
+    if (bgmRelative) {
+      const bgmAbsolute = join(uploadsRoot, bgmRelative);
+      if (/\.(mp3|wav|m4a)$/i.test(bgmRelative) && existsSync(bgmAbsolute)) {
+        const bgmOutAbsolute = join(projectDir, 'bgm.mp4');
+        try {
+          await execFileAsync(
+            'ffmpeg',
+            buildBgmMixArgs(currentVideo, bgmAbsolute, bgmOutAbsolute, config.bgmVolume ?? 0.2),
+            { timeout: 600000 }
+          );
+          currentVideo = bgmOutAbsolute;
+          bgmApplied = true;
+        } catch (error) {
+          this.logger.warn(
+            `项目 ${projectId} BGM 混音失败，降级跳过: ${error instanceof Error ? error.message : error}`
+          );
+        }
+      } else {
+        this.logger.warn(`项目 ${projectId} BGM 文件不可用（缺失或扩展名不在 mp3/wav/m4a），已跳过: ${config.bgmUrl}`);
+      }
+    }
+
+    // ⑤ 视觉步（唯一全片重编码）：字幕烧录与 scale+pad 合并同一条 vf 链一次重编码。
+    const visualAbsolute = join(projectDir, 'visual.mp4');
+    const subtitleStyle = config.subtitleStyle ?? 'default';
+    const hasSubtitleText = muxed.some(({ shot }) => (shot.narration ?? '').trim());
+    if (subtitleStyle !== 'none' && hasSubtitleText) {
+      await assertSubtitleBurnable();
+      await execFileAsync(
+        'ffmpeg',
+        buildSubtitleBurnArgs(
+          currentVideo,
+          join(uploadsRoot, subtitlePath.replace(/^\/uploads\//, '')),
+          visualAbsolute,
+          { width, height },
+          subtitleStyle,
+          process.env.NOVEL_SUBTITLE_FONT_FILE
+        ),
+        { timeout: 600000 }
+      );
+    } else {
+      await execFileAsync('ffmpeg', buildScalePadArgs(currentVideo, visualAbsolute, { width, height }), {
+        timeout: 600000
+      });
+    }
+
+    // ⑥ loudnorm 响度统一（-c:v copy 不重编码）。
     const finalAbsolute = join(projectDir, 'final.mp4');
+    await execFileAsync('ffmpeg', buildLoudnormArgs(visualAbsolute, finalAbsolute), { timeout: 600000 });
+
+    return {
+      finalPath: `/uploads/novel-video/p${projectId}/final.mp4`,
+      subtitlePath,
+      bgmApplied
+    };
+  }
+
+  /** concat demuxer 直拷贝；片段编码参数不一致时回落重编码（mux 步已统一，此路为兜底保留）。 */
+  private async runConcat(
+    projectDir: string,
+    segmentPaths: string[],
+    outAbsolute: string,
+    width: number,
+    height: number
+  ): Promise<void> {
+    const listFile = join(projectDir, 'concat.txt');
+    await writeFile(listFile, buildConcatListContent(segmentPaths), 'utf8');
     try {
-      await execFileAsync('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', finalAbsolute], {
+      await execFileAsync('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', outAbsolute], {
         timeout: 300000
       });
     } catch {
-      // 片段编码参数不一致时回落重编码。
       await execFileAsync(
         'ffmpeg',
         [
           '-y', '-f', 'concat', '-safe', '0', '-i', listFile,
-          '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
+          '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`,
           '-r', '24', '-c:v', 'libx264', '-preset', 'fast', '-pix_fmt', 'yuv420p',
-          '-c:a', 'aac', '-movflags', '+faststart',
-          finalAbsolute
+          '-c:a', 'aac', '-ar', '44100', '-ac', '2', '-movflags', '+faststart',
+          outAbsolute
         ],
         { timeout: 600000 }
       );
     }
-    return `/uploads/novel-video/p${projectId}/final.mp4`;
   }
 
   // ---------- 单镜创作控制（片段级配置 / AI 重新规划 / 单镜重生成 / 字幕重生成） ----------
@@ -837,7 +1020,11 @@ export class NovelPipelineService implements OnModuleDestroy {
     return (await this.shotRepo.findOne({ where: { id: shot.id } }))!;
   }
 
-  /** 手动重生成字幕：按当前成片镜头顺序重建 SRT 并落盘。 */
+  /**
+   * 手动重生成字幕：按当前成片镜头顺序重建 SRT 并落盘。
+   * 段时长回落链：muxed_file ffprobe 实测 → video_file ffprobe 实测 → videoSeconds 兜底
+   * （旧项目/无产物场景走兜底，时间轴口径与旧版一致）。
+   */
   async regenerateSubtitle(projectId: number): Promise<{ subtitlePath: string }> {
     const project = await this.projectRepo.findOne({ where: { id: projectId } });
     if (!project) {
@@ -851,7 +1038,22 @@ export class NovelPipelineService implements OnModuleDestroy {
     if (finalShots.length === 0) {
       throw new BadRequestException('没有已出片的分镜，无法生成字幕');
     }
-    const subtitlePath = await this.writeSubtitle(projectId, finalShots, project.config.videoSeconds);
+    const uploadsRoot = join(process.cwd(), 'uploads');
+    const segments: SubtitleSegment[] = [];
+    for (const shot of finalShots) {
+      let durationMs: number | null = null;
+      if (shot.muxedFile) {
+        durationMs = await this.probeMediaDurationMs(join(uploadsRoot, shot.muxedFile));
+      }
+      if (durationMs == null && shot.videoFile) {
+        durationMs = await this.probeMediaDurationMs(join(uploadsRoot, shot.videoFile));
+      }
+      segments.push({
+        text: shot.narration ?? '',
+        durationMs: durationMs ?? project.config.videoSeconds * 1000
+      });
+    }
+    const subtitlePath = await this.writeSubtitleSegments(projectId, segments);
     await this.projectRepo.update(projectId, { finalSubtitlePath: subtitlePath });
     return { subtitlePath };
   }

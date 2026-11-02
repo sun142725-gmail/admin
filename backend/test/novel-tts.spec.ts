@@ -1,7 +1,8 @@
 // 小说管线 TTS/字幕 e2e：
 // 1) 单镜 regenerate step=audio：video_done 镜头补配音，只写音频三列、status 不回退；
-// 2) POST :id/subtitle：SRT 落盘 + 时间轴按分段视频时长（videoSeconds）对齐（与 concat 成片一致，
-//    不受 audioDurationMs 影响；空文本段占时不出字幕）；
+// 2) POST :id/subtitle：SRT 落盘 + 时间轴口径（本 spec 镜头无 muxed_file/video_file 产物，
+//    走回落链末端 videoSeconds 兜底；composeProjectFinal 合成路径按 mux 后 ffprobe 实测段时长
+//    累加，见 novel-compose.spec.ts；空文本段占时不出字幕）；
 // 3) ffmpeg 存在性探测：jest.mock('child_process') 带 E2E_SIMULATE_NO_FFMPEG 开关模拟「未安装 ffmpeg」，
 //    恢复后的正向分支按本机是否装有 ffmpeg/ffprobe 条件断言（无 ffmpeg 主机断言继续拒绝，
 //    无 ffprobe 主机断言回落 estimateSpeechMs），满足 AGENTS「环境性失败可移植」要求。
@@ -191,8 +192,8 @@ describe('Novel TTS & subtitle (e2e)', () => {
 
   it('POST :id/subtitle：finalSubtitlePath 落库为 /uploads/ 路径、文件落盘、时间轴正确（空文本段占时不出字幕）', async () => {
     // 独立项目：三个 video_done 镜头（id 顺序 = concat 顺序），中间空旁白镜头占位。
-    // 时间轴口径 = 分段视频时长（videoSeconds=5 → 每段 5s），配音时长 500/800/700ms 刻意不等，
-    // 用于证明 SRT 不按 audioDurationMs 累加（那会与 concat 成片错位）。
+    // 镜头无 muxed_file/video_file 产物 → 回落链末端 videoSeconds 兜底（videoSeconds=5 → 每段 5s），
+    // 配音时长 500/800/700ms 刻意不等，用于证明 SRT 不按 audioDurationMs 累加。
     const project = await projectRepo.save(
       projectRepo.create({
         name: '字幕项目',
@@ -233,8 +234,7 @@ describe('Novel TTS & subtitle (e2e)', () => {
     const absolute = join(process.cwd(), 'uploads', subtitlePath.replace(/^\/uploads\//, ''));
     expect(existsSync(absolute)).toBe(true);
     const content = (await import('fs')).readFileSync(absolute, 'utf8');
-    // 时间轴按分段视频时长（videoSeconds=5）逐段累加，与 concat 成片对齐；
-    // 空旁白镜头只推进时间轴（5s→10s）不产出字幕条目。
+    // 兜底口径：时间轴按 videoSeconds=5 逐段累加；空旁白镜头只推进时间轴（5s→10s）不产出字幕条目。
     expect(content).toContain('1\n00:00:00,000 --> 00:00:05,000\n雪落无声。');
     expect(content).toContain('2\n00:00:10,000 --> 00:00:15,000\n灯火渐明。');
     expect(content).not.toContain('3\n');
@@ -287,8 +287,8 @@ describe('Novel TTS & subtitle (e2e)', () => {
       .expect(201);
     const absolute = join(process.cwd(), 'uploads', (result.body.data.subtitlePath as string).replace(/^\/uploads\//, ''));
     const content = (await import('fs')).readFileSync(absolute, 'utf8');
-    // 成片 = 3 段 × 2s = 6s：第 1 段 0-2s，空段 2-4s 推进不出条目，第 3 段 4-6s——
-    // 与 concat 成片逐段对齐（若按配音 300/700/900ms 累加则完全错位）。
+    // 兜底口径：成片合成时 = 3 段 × 2s（mux 实测前兜底 videoSeconds=2）；空段 2-4s 推进不出条目，
+    // 第 3 段 4-6s——若按配音 300/700/900ms 累加则完全错位。
     expect(content).toContain('1\n00:00:00,000 --> 00:00:02,000\n第一镜旁白。');
     expect(content).toContain('2\n00:00:04,000 --> 00:00:06,000\n第三镜旁白。');
     expect(content).not.toContain('00:00:02,000 --> 00:00:04,000'); // 空文本段不出条目

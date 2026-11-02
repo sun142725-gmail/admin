@@ -67,6 +67,13 @@ export class NovelShot extends BaseEntity {
   @Column({ name: 'audio_file', type: 'varchar', length: 255, nullable: true })
   audioFile?: string | null;
 
+  // 每镜混流产物（mux-{id}.mp4）相对 uploads 的路径。
+  // 失效语义：仅作 regenerateSubtitle 的 SRT 回落探针与调试——composeProjectFinal 每次合成
+  // 对全部 video_done 镜头重新 mux，绝不读该列作为合成输入（避免多写路径清理遗漏，mux 成本
+  // 本在每次合成预算内）。
+  @Column({ name: 'muxed_file', type: 'varchar', length: 255, nullable: true })
+  muxedFile?: string | null;
+
   // 配音实测时长毫秒（ffprobe 实测；无 ffprobe 时回落估算），字幕时间轴依据。
   @Column({ name: 'audio_duration_ms', type: 'int', nullable: true })
   audioDurationMs?: number | null;

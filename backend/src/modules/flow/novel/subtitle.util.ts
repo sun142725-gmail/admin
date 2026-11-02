@@ -19,8 +19,9 @@ export const formatSrtTime = (ms: number): string => {
 export interface SubtitleSegment {
   // 旁白文本（空/空白段仍占时长，但不产生字幕条目）。
   text: string;
-  // 该段时长毫秒。口径：分段视频时长（与 concat 成片逐段对齐），由调用方决定；
-  // 空文本段只推进时间轴不产出字幕。
+  // 该段时长毫秒。口径：调用方传入「成片逐段实际时长」——composeProjectFinal 按 mux 后
+  // ffprobe 实测段时长累加；regenerateSubtitle 走 muxed_file/video_file 实测回落，
+  // 无产物时兜底 videoSeconds。由调用方决定；空文本段只推进时间轴不产出字幕。
   durationMs: number;
 }
 
