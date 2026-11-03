@@ -770,11 +770,15 @@ export class SeedService implements OnModuleInit {
       { code: 'flow:prompt:view', name: '提示词库查看' },
       { code: 'flow:prompt:manage', name: '提示词库管理' },
       { code: 'publisher:manage', name: '发布矩阵管理' },
-      { code: 'publisher:view', name: '发布矩阵查看' }
+      { code: 'publisher:view', name: '发布矩阵查看' },
+      { code: 'compliance:view', name: '合规词库查看' },
+      { code: 'compliance:manage', name: '合规词库管理' }
     ];
     // 约定：给角色分配 publisher:manage 时必须同批分配 publisher:view——
     // 否则成片页发布入口可用，但账号列表/记录列表 403（前端已静默降级，完整体验依赖双码；
     // admin 角色经 ensureAdminRolePermission 自动获得双码）。
+    // compliance:manage 分配时建议同批 compliance:view——词库 Tab 条目级按 view 码渲染，
+    // 仅 manage 无 view 时 Tab 不展示（管理入口不可见），完整体验依赖双码。
     for (const item of codes) {
       const permission = await this.ensurePermissionByCode(item.code, item.name);
       if (permission) {
