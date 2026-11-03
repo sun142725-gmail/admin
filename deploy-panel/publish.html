@@ -51,6 +51,9 @@
   <div class="flex gap-4 items-center flex-wrap">
     <div>
       <label class="mr-2">脚本：</label>
+      <input id="onlineScriptFilter" type="text" placeholder="🔍 关键词过滤"
+             class="bg-gray-800 px-3 py-2 rounded border border-gray-600 mr-2 w-44"
+             autocomplete="off" />
       <select id="onlineScript" class="bg-gray-800 px-3 py-2 rounded border border-gray-600">
         <option value="">（加载中...）</option>
       </select>
@@ -86,6 +89,7 @@ const clearBtn = document.getElementById('clearBtn');
 const refreshLogBtn = document.getElementById('refreshLogBtn');
 const statusText = document.getElementById('status');
 const onlineScriptSel = document.getElementById('onlineScript');
+const onlineScriptFilterInput = document.getElementById('onlineScriptFilter');
 const onlineRunBtn = document.getElementById('onlineRunBtn');
 const refreshScriptsBtn = document.getElementById('refreshScriptsBtn');
 const refreshAuditBtn = document.getElementById('refreshAuditBtn');
@@ -223,8 +227,69 @@ publishBtn.onclick = async ()=>{
 
 // ---------- 线上脚本模块 ----------
 
-// 加载白名单目录内脚本列表；非 2xx 走 appendLog 提示（不把错误 JSON 当日志渲染）
+// 全量脚本缓存与过滤词：过滤输入/刷新共用同一渲染函数，刷新后保留当前过滤词与选中项
+let allScripts = [];
+let scriptFilterText = '';
+
+// 模糊匹配：大小写不敏感；子串命中，未命中时退化为子序列匹配
+// （如输入 rsu 可命中 rbac_studio_upgrade.sql）；query 为空恒命中（显示全量）
+function matchScript(name, query) {
+  if (!query) return true;
+  const lowerName = name.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  if (lowerName.includes(lowerQuery)) return true;
+  let cursor = 0;
+  for (const ch of lowerQuery) {
+    cursor = lowerName.indexOf(ch, cursor);
+    if (cursor === -1) return false;
+    cursor += 1;
+  }
+  return true;
+}
+
+// 长输出截断（git pull 失败原因可能多行，日志区只留可读摘要）
+function briefText(text, maxLen = 400) {
+  const s = String(text || '').trim();
+  return s.length > maxLen ? `${s.slice(0, maxLen)}…` : s;
+}
+
+function appendScriptOption(value, label) {
+  const opt = document.createElement('option');
+  opt.value = value;
+  opt.textContent = label;
+  onlineScriptSel.appendChild(opt);
+}
+
+// 依据 allScripts + scriptFilterText 重建下拉选项；保留仍可见的选中项
+function renderScriptOptions() {
+  const prev = onlineScriptSel.value;
+  onlineScriptSel.innerHTML = '';
+  if (!allScripts.length) {
+    appendScriptOption('', '（白名单目录暂无脚本）');
+    return;
+  }
+  const filtered = allScripts.filter(item => matchScript(item.name, scriptFilterText));
+  if (!filtered.length) {
+    appendScriptOption('', '（无匹配脚本）');
+    return;
+  }
+  // 子串命中排在子序列命中之前（sort 稳定，同组内保持文件名序）
+  const q = scriptFilterText.toLowerCase();
+  filtered.sort((a, b) =>
+    Number(b.name.toLowerCase().includes(q)) - Number(a.name.toLowerCase().includes(q))
+  );
+  for (const item of filtered) {
+    appendScriptOption(item.name, `${item.name}（${(item.size / 1024).toFixed(1)}KB）`);
+  }
+  if (filtered.some(item => item.name === prev)) {
+    onlineScriptSel.value = prev;
+  }
+}
+
+// 刷新脚本列表：服务端先 git pull --ff-only 再列目录（pull 尽力而为，失败不阻塞列表）
 async function fetchOnlineScripts() {
+  refreshScriptsBtn.disabled = true;
+  if (!running) statusText.textContent = "正在拉取最新代码...";
   try {
     const res = await fetch(`${API_BASE}/online-scripts`, {
       headers: { "X-Publish-Token": getPublishToken() }
@@ -238,25 +303,30 @@ async function fetchOnlineScripts() {
       return;
     }
     const result = await res.json();
-    const items = Array.isArray(result.data) ? result.data : [];
-    onlineScriptSel.innerHTML = '';
-    if (!items.length) {
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = '（白名单目录暂无脚本）';
-      onlineScriptSel.appendChild(opt);
-      return;
-    }
-    for (const item of items) {
-      const opt = document.createElement('option');
-      opt.value = item.name;
-      opt.textContent = `${item.name}（${(item.size / 1024).toFixed(1)}KB）`;
-      onlineScriptSel.appendChild(opt);
+    allScripts = Array.isArray(result.data) ? result.data : [];
+    renderScriptOptions();
+    const pull = result.pull || {};
+    if (pull.skipped) {
+      appendLog("任务执行中，本次刷新已跳过拉取最新代码", "info");
+    } else if (pull.ok === true) {
+      appendLog(`✅ 已拉取最新代码${pull.output ? `：${briefText(pull.output, 200)}` : ''}`, "success");
+    } else if (pull.ok === false) {
+      appendLog(`⚠️ git pull 失败，列表为本地已有脚本：${briefText(pull.output)}`, "warn");
     }
   } catch (err) {
     appendLog(`获取脚本列表异常：${err.message}`, "error");
+  } finally {
+    refreshScriptsBtn.disabled = false;
+    // 与 pollTask 的状态文案口径一致，避免覆盖任务运行中的提示
+    statusText.textContent = running ? (onlineActive ? "线上脚本执行中..." : "发布执行中...") : "空闲";
   }
 }
+
+// 过滤输入实时重建下拉
+onlineScriptFilterInput.addEventListener('input', () => {
+  scriptFilterText = onlineScriptFilterInput.value.trim();
+  renderScriptOptions();
+});
 
 onlineRunBtn.onclick = async () => {
   if (running) {
