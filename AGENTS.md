@@ -23,5 +23,6 @@
 
 ## 其他约定
 
+- **新增/修改数据库实体时，必须实时维护线上升级 SQL**（幂等、可重复执行）：在 `deploy-panel/scripts/online/` 下新建 `<日期>_<序号>_<名称>.sql`（新功能用新文件，不追改旧文件），模板与幂等规则参照 `20261030_0001_example_probe.sql`——建表用 `CREATE TABLE IF NOT EXISTS`，存量表加列/加索引先查 `information_schema` 再执行，INSERT 走 `ON DUPLICATE KEY` / `NOT EXISTS`，UPDATE 必须带条件 WHERE；新权限码/菜单资源随 SQL 一并 upsert，并在文件尾部附只读自检 SELECT；
 - 生产环境行为变化的配置一律走环境变量并在 `.env.example` 与 `deploy/env.production.example` 同步注释；
 - 涉及上游免费公开接口的功能需内置限流/容灾（参考 `backend/src/modules/stock/market/` 的多源容灾模式）。
