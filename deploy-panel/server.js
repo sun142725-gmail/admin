@@ -16,6 +16,7 @@ const {
   parseAllowedExts,
   validateScriptName,
   listOnlineScripts,
+  pullLatestCode,
   buildRunnerArgs,
   buildAuditRecord,
   appendAuditFile,
@@ -89,6 +90,9 @@ const ONLINE_SCRIPT_RUNNER = process.env.ONLINE_SCRIPT_RUNNER || path.join(__dir
 const ONLINE_SCRIPT_EXTS = parseAllowedExts(process.env.ONLINE_SCRIPT_EXTS || '');
 // 线上脚本执行超时：超时 SIGKILL 强杀并释放锁（旧 /deploy 路径保持无超时的既有行为不动）
 const ONLINE_SCRIPT_TIMEOUT_MS = Number(process.env.ONLINE_SCRIPT_TIMEOUT_MS || 600000);
+// 列表刷新即拉取：GET /online-scripts 先在 PROJECT_PATH（仓库根）执行 git pull --ff-only，
+// 开发机 push 的新 SQL 免 SSH 手动 pull 即出现在下拉框；超时防止远端不可达时请求悬挂
+const ONLINE_PULL_TIMEOUT_MS = Number(process.env.ONLINE_PULL_TIMEOUT_MS || 30000);
 // 新端点请求体上限；旧 /deploy 的 body 拼接保持既有行为不动（README 安全章节已注明）
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -177,9 +181,15 @@ const server = http.createServer(async (req, res) => {
 
   // ---- 线上脚本模块（脚本只来自服务端白名单目录，请求仅传文件名）----
 
-  // GET /online-scripts：列出白名单目录内可执行脚本（name/size/mtime）
+  // GET /online-scripts：刷新即拉取——先 git pull --ff-only 再列出白名单目录脚本。
+  // pull 是「尽力而为」：失败/超时不阻塞列表（fail-open），失败原因随响应 pull 字段
+  // 交前端警示；真正执行的基线安全仍由 run-online.sh 自身的 git pull（fail-closed）兜底。
+  // 任务执行中跳过 pull：避免与发布/run-online.sh 内的 git 操作并发争用仓库 index.lock。
   if (req.url === '/online-scripts' && req.method === 'GET') {
-    return sendJson(res, 200, { code: 200, data: listOnlineScripts(ONLINE_SCRIPT_DIR, ONLINE_SCRIPT_EXTS) });
+    const pull = isRunning()
+      ? { ok: null, skipped: true, output: '任务执行中，跳过拉取最新代码' }
+      : pullLatestCode({ cwd: PROJECT_PATH, timeoutMs: ONLINE_PULL_TIMEOUT_MS });
+    return sendJson(res, 200, { code: 200, data: listOnlineScripts(ONLINE_SCRIPT_DIR, ONLINE_SCRIPT_EXTS), pull });
   }
 
   // GET /online-scripts/logs：审计记录末 50 条

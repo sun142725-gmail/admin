@@ -5,10 +5,11 @@
 // - PANEL_LOG_FILE/PANEL_LOCK_FILE/ONLINE_AUDIT_FILE/PROJECT_PATH 指向临时目录，不触碰真实
 //   task.lock 与 logs/；
 // - ONLINE_SCRIPT_DIR 指向临时 fixture 目录、ONLINE_SCRIPT_RUNNER 指向 fake bash 执行器，
-//   不真调 docker/mysql；除本机回环外无任何网络访问。
+//   不真调 docker/mysql；除本机回环外无任何网络访问；
+// - 列表刷新即拉取用例的 git 远端是同机 bare 仓库（PROJECT_PATH 临时目录自身），无网络访问。
 const test = require('node:test');
 const assert = require('node:assert');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -153,6 +154,28 @@ async function readAudit(base, headers) {
   assert.equal(res.status, 200);
   const result = await res.json();
   return result.data;
+}
+
+// 本地 git 辅助：断言成功否则连 stderr 一起失败；commit 身份显式注入防本机全局配置干扰
+const GIT_IDENTITY = ['-c', 'user.name=test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false'];
+
+function runGit(args, cwd) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  assert.equal(result.status, 0, `git ${args.join(' ')} 失败：${result.stderr || result.stdout}`);
+}
+
+// 把临时 PROJECT_PATH 初始化为 git 仓库并推到同机 bare origin（origin 在 tmpRoot 之外，单独清理）；
+// 须在 startServer 之后调用，让 fixture 文件进入初始提交
+function setupLocalGitRepo(t, tmpRoot) {
+  const origin = fs.mkdtempSync(path.join(os.tmpdir(), 'rbac-online-origin-'));
+  t.after(() => fs.rmSync(origin, { recursive: true, force: true }));
+  runGit(['init', '--bare', '-b', 'main', origin]);
+  runGit(['init', '-b', 'main', tmpRoot]);
+  runGit(['add', '-A'], tmpRoot);
+  runGit([...GIT_IDENTITY, 'commit', '-m', 'init'], tmpRoot);
+  runGit(['remote', 'add', 'origin', origin], tmpRoot);
+  runGit(['push', '-u', 'origin', 'main'], tmpRoot);
+  return origin;
 }
 
 // ---------- fail-closed 与鉴权 ----------
@@ -511,4 +534,77 @@ test('runner 路径不存在：spawn error 后锁释放、审计记失败、面�
     return records.length ? records : null;
   });
   assert.notEqual(audit[audit.length - 1].exitCode, 0);
+});
+
+// ---------- 列表刷新即拉取（GET /online-scripts 内置 git pull，fail-open） ----------
+
+test('刷新即拉取：远端新提交的 SQL 无需手动 pull 直接出现在列表并落盘', async t => {
+  const tmpRoot = makeTmpRoot();
+  const ctx = startServer(t, tmpRoot);
+  await ctx.waitReady();
+  const origin = setupLocalGitRepo(t, tmpRoot);
+
+  // 模拟开发机 push：独立 seed 仓库向 origin 提交一个新 SQL
+  const seed = fs.mkdtempSync(path.join(os.tmpdir(), 'rbac-online-seed-'));
+  t.after(() => fs.rmSync(seed, { recursive: true, force: true }));
+  runGit(['clone', origin, seed]);
+  fs.mkdirSync(path.join(seed, 'scripts', 'online'), { recursive: true });
+  fs.writeFileSync(path.join(seed, 'scripts', 'online', 'pulled-fresh.sql'), 'SELECT 9;\n');
+  runGit(['add', '-A'], seed);
+  runGit([...GIT_IDENTITY, 'commit', '-m', 'add pulled-fresh.sql'], seed);
+  runGit(['push'], seed);
+
+  assert.ok(
+    !fs.existsSync(path.join(tmpRoot, 'scripts', 'online', 'pulled-fresh.sql')),
+    '刷新前列表目录不应已有该文件（否则断言无意义）'
+  );
+
+  const res = await fetch(`${ctx.base}/online-scripts`, { headers: ctx.authHeaders });
+  assert.equal(res.status, 200);
+  const result = await res.json();
+  assert.equal(result.pull.ok, true, `pull 应成功：${JSON.stringify(result.pull)}`);
+  const names = result.data.map(item => item.name);
+  assert.ok(names.includes('pulled-fresh.sql'), `新 SQL 应出现在列表：${names.join(',')}`);
+  assert.ok(fs.existsSync(path.join(tmpRoot, 'scripts', 'online', 'pulled-fresh.sql')), '新 SQL 应已落盘到列表目录');
+});
+
+test('git pull 失败不阻塞列表（fail-open）：仍 200 返回本地列表，pull.ok=false 带原因', async t => {
+  const tmpRoot = makeTmpRoot();
+  const ctx = startServer(t, tmpRoot); // tmpRoot 非 git 仓库 → pull 快速失败
+  await ctx.waitReady();
+
+  const res = await fetch(`${ctx.base}/online-scripts`, { headers: ctx.authHeaders });
+  assert.equal(res.status, 200);
+  const result = await res.json();
+  assert.equal(result.pull.ok, false);
+  assert.ok(result.pull.output, '应有失败原因输出');
+  const names = result.data.map(item => item.name);
+  assert.ok(names.includes('a.sql'), 'pull 失败后本地列表仍应返回');
+});
+
+test('任务执行中刷新列表跳过 pull：pull.skipped=true 且列表照常返回', async t => {
+  const tmpRoot = makeTmpRoot();
+  // 覆盖默认 300ms 超时，给 sleep.sql 拉出足够的运行窗口
+  const ctx = startServer(t, tmpRoot, { extraEnv: { ONLINE_SCRIPT_TIMEOUT_MS: '5000' } });
+  await ctx.waitReady();
+
+  const run = await fetch(`${ctx.base}/online-scripts/run`, {
+    method: 'POST',
+    headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'sleep.sql', confirm: 'sleep.sql' })
+  });
+  assert.equal(run.status, 200);
+
+  // 任务运行期间（POST 返回时锁已被同步持有）刷新列表：应标记 skipped
+  const res = await fetch(`${ctx.base}/online-scripts`, { headers: ctx.authHeaders });
+  assert.equal(res.status, 200);
+  const result = await res.json();
+  assert.equal(result.pull.skipped, true, `应跳过 pull：${JSON.stringify(result.pull)}`);
+  assert.ok(result.data.some(item => item.name === 'a.sql'), '跳过 pull 时本地列表仍应返回');
+
+  // 收尾：等待任务结束释放锁，不污染后续断言
+  await waitFor(async () => {
+    const status = await fetch(`${ctx.base}/status`);
+    return (await status.json()).data.running === false;
+  });
 });

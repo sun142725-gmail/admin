@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 
 // 脚本名规则：字母/数字开头，后续仅字母数字与 . _ -；. 与 .. 及隐藏文件天然不匹配
 const SCRIPT_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -73,6 +74,26 @@ function listOnlineScripts(dir, exts) {
   }
   items.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   return items;
+}
+
+// 在仓库目录执行 git pull --ff-only（列表刷新即拉取最新代码）。
+// 安全约束：命令与参数完全固定、无 shell:true，cwd 由服务端环境变量注入，不含用户输入。
+// 返回 { ok, output }：ok 仅看退出码；spawnError（如 git 不存在）与超时（status=null，
+// Node 已 SIGTERM 子进程）同样归一化为 ok:false，output 携带原因供前端展示。
+// 调用方须知：本函数是「尽力而为」——失败不应阻塞列表返回；执行期的基线安全
+// 仍由 run-online.sh 自身的 git pull --ff-only（fail-closed）兜底。
+function pullLatestCode({ cwd, timeoutMs }) {
+  let result;
+  try {
+    result = spawnSync('git', ['pull', '--ff-only'], { cwd, timeout: timeoutMs, encoding: 'utf8' });
+  } catch (error) {
+    return { ok: false, output: `git pull 启动失败：${error.message}` };
+  }
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+  if (result.error) {
+    return { ok: false, output: `git pull 异常：${result.error.message}${output ? `\n${output}` : ''}` };
+  }
+  return { ok: result.status === 0, output: output || (result.status === 0 ? '' : `退出码 ${result.status}`) };
 }
 
 // 拼装执行器 spawn 参数：固定 /bin/bash + 数组参数，无 shell:true。
@@ -146,6 +167,7 @@ module.exports = {
   parseAllowedExts,
   validateScriptName,
   listOnlineScripts,
+  pullLatestCode,
   buildRunnerArgs,
   secretFingerprint,
   buildAuditRecord,
