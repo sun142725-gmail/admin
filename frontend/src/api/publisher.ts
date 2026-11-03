@@ -1,6 +1,8 @@
 // 发布矩阵 API 封装（后端 /api/publisher，JWT + publisher:view/manage 权限）。
 // 凭据安全：明文只出不出——create/update 可传 credentials，任何响应只含 credentialMask 脱敏掩码。
+import axios from 'axios';
 import http from './http';
+import { store } from '../store';
 
 export const PUBLISHER_PLATFORMS = ['douyin', 'kuaishou', 'bilibili', 'channels', 'xhs', 'other'] as const;
 
@@ -90,3 +92,64 @@ export const createPublisherRecord = (payload: CreateVideoPublishRecordPayload) 
 
 export const deletePublisherRecord = (id: number) =>
   http.delete<never, { success: boolean }>(`/publisher/records/${id}`);
+
+// ---- 数据回流指标（平台按日数据 CSV 导入 / 模板 / 明细）----
+
+export interface PlatformMetricVo {
+  id: number;
+  novelProjectId: number;
+  projectName: string | null;
+  platform: PublisherPlatform;
+  // ISO 字符串（后端统一存 UTC 零点）
+  metricDate: string;
+  videoId: string;
+  views: number;
+  likes: number;
+  comments: number;
+  follows: number;
+  remark: string | null;
+  // isHot 不入 VO：由前端 utils/metrics.ts 同口径纯函数计算，避免双端口径漂移
+}
+
+export interface QueryPlatformMetricsParams {
+  projectId?: number;
+  platform?: PublisherPlatform;
+  from?: string;
+  to?: string;
+}
+
+export const listPlatformMetrics = (params: QueryPlatformMetricsParams) =>
+  http.get<never, PlatformMetricVo[]>('/publisher/metrics', { params });
+
+export interface MetricRejectedRow {
+  line: number;
+  reason: string;
+}
+
+export interface ImportPlatformMetricsResult {
+  received: number;
+  inserted: number;
+  updated: number;
+  rejected: MetricRejectedRow[];
+}
+
+// axios 自动 multipart（FormData），JSON envelope 正常解包
+export const importPlatformMetrics = (formData: FormData) =>
+  http.post<never, ImportPlatformMetricsResult>('/publisher/metrics/import', formData);
+
+// 模板下载不能走 http 封装：http.ts 响应拦截器对所有响应做 payload?.code!==0 检查，
+// blob 无 code 字段会被误判 reject——裸 axios 直取 Blob 后走 createObjectURL 落盘
+// （照 http.ts:229 裸 axios 先例与 utils/csv.ts downloadCsv 落盘模式）。
+export const downloadMetricsTemplate = async (): Promise<void> => {
+  const response = await axios.get('/api/publisher/metrics/template', {
+    responseType: 'blob',
+    headers: { Authorization: `Bearer ${store.getState().auth.accessToken}` }
+  });
+  const blob = new Blob([response.data as BlobPart], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'publisher-metrics-template.csv';
+  anchor.click();
+  URL.revokeObjectURL(url);
+};

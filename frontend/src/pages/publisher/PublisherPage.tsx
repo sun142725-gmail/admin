@@ -1,28 +1,42 @@
-// 发布矩阵页：双 Tab（平台账号管理 / 发布记录）。账号 CRUD + 手动登记发布结果。
+// 发布矩阵页：三 Tab（平台账号管理 / 发布记录 / 数据回流）。账号 CRUD + 手动登记发布结果 + 平台按日数据 CSV 导入。
 // 凭据安全：编辑时不传 credentials = 不修改；响应面只有 credentialMask 脱敏掩码。
+// 数据回流：明细全量拉取后前端聚合汇总卡；爆款标记用 utils/metrics.ts 与后端同口径纯函数。
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Button from 'antd/es/button';
+import DatePicker from 'antd/es/date-picker';
 import Form from 'antd/es/form';
 import Input from 'antd/es/input';
 import Select from 'antd/es/select';
 import Switch from 'antd/es/switch';
 import Tabs from 'antd/es/tabs';
-import { PlusOutlined } from '@ant-design/icons';
+import Tag from 'antd/es/tag';
+import Upload from 'antd/es/upload';
+import { DownloadOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import dayjs, { Dayjs } from 'dayjs';
 import {
   PUBLISHER_PLATFORMS,
   PUBLISHER_PLATFORM_LABELS,
   PublisherAccountVo,
   VideoPublishRecordVo,
+  MetricRejectedRow,
+  PlatformMetricVo,
   createPublisherAccount,
   deletePublisherAccount,
   deletePublisherRecord,
+  downloadMetricsTemplate,
+  importPlatformMetrics,
+  listPlatformMetrics,
   listPublisherAccounts,
   listPublisherRecords,
   updatePublisherAccount,
   type PublisherPlatform,
   type SavePublisherAccountPayload
 } from '../../api/publisher';
+import { NovelProjectSummary, listNovelProjects } from '../../api/novelVideo';
+import { aggregateMetrics, engagementRate, isHot } from '../../utils/metrics';
 import { PageHeader } from '../../components/business/PageHeader';
+import { FilterBar } from '../../components/business/FilterBar';
+import { StatCard } from '../../components/business/StatCard';
 import { SelfTable } from '../../components/base/SelfTable';
 import { SelfForm } from '../../components/base/SelfForm';
 import { SelfModal } from '../../components/base/SelfModal';
@@ -129,6 +143,190 @@ const AccountModal: React.FC<{
         </Form.Item>
       </SelfForm>
     </SelfModal>
+  );
+};
+
+interface MetricsFilterValues {
+  projectId?: number;
+  platform?: PublisherPlatform;
+  range?: [Dayjs, Dayjs];
+}
+
+// 数据回流 Tab：独立数据加载（懒挂载——antd Tabs 未激活 pane 不渲染 children，首切才拉取，不拖慢前两 Tab）。
+// 明细全量拉取后前端聚合四张汇总卡；爆款标记 isHot 与后端 hot-metrics.util 同口径（阈值常量见 utils/metrics.ts）。
+const MetricsTab: React.FC = () => {
+  const msg = useApiMessage();
+  const [form] = Form.useForm<MetricsFilterValues>();
+  const [metrics, setMetrics] = useState<PlatformMetricVo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [rejectedRows, setRejectedRows] = useState<MetricRejectedRow[]>([]);
+  const [projects, setProjects] = useState<NovelProjectSummary[]>([]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const values = form.getFieldsValue();
+      setMetrics(
+        await listPlatformMetrics({
+          projectId: values.projectId,
+          platform: values.platform,
+          from: values.range?.[0]?.format('YYYY-MM-DD'),
+          to: values.range?.[1]?.format('YYYY-MM-DD')
+        })
+      );
+    } catch (error) {
+      msg.errorFrom(error, '数据回流加载失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [form, msg]);
+
+  useEffect(() => {
+    void listNovelProjects()
+      .then(setProjects)
+      .catch(() => undefined);
+    void load();
+  }, [load]);
+
+  // Upload beforeUpload 返回 false 阻断 antd 自动上传，手动 FormData 走 JSON envelope 封装
+  const handleImport = useCallback(
+    async (file: File) => {
+      setImporting(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        const result = await importPlatformMetrics(formData);
+        msg.success(`导入完成：新增 ${result.inserted}，覆盖 ${result.updated}，拒绝 ${result.rejected.length}`);
+        if (result.rejected.length > 0) {
+          setRejectedRows(result.rejected);
+        }
+        await load();
+      } catch (error) {
+        msg.errorFrom(error, '导入失败');
+      } finally {
+        setImporting(false);
+      }
+    },
+    [load, msg]
+  );
+
+  // 模板下载失败兜底：downloadMetricsTemplate 内部裸 axios 无 try/catch，token 过期/网络错误时
+  // promise reject——不接住会成 unhandled rejection，用户点了没反应（与 handleImport 错误处理对齐）
+  const handleDownloadTemplate = useCallback(async () => {
+    try {
+      await downloadMetricsTemplate();
+    } catch (error) {
+      msg.errorFrom(error, '模板下载失败');
+    }
+  }, [msg]);
+
+  const summary = useMemo(() => aggregateMetrics(metrics), [metrics]);
+
+  const metricColumns = useMemo(
+    () => [
+      {
+        title: '日期',
+        dataIndex: 'metricDate',
+        key: 'metricDate',
+        width: 110,
+        render: (v: string) => dayjs(v).format('YYYY-MM-DD')
+      },
+      { title: '平台', dataIndex: 'platform', key: 'platform', width: 90, render: (v: string) => platformLabel(v) },
+      { title: '作品', dataIndex: 'projectName', key: 'projectName', ellipsis: true },
+      { title: '视频 ID', dataIndex: 'videoId', key: 'videoId', ellipsis: true, render: (v: string) => v || '-' },
+      { title: '播放', dataIndex: 'views', key: 'views', width: 100 },
+      { title: '点赞', dataIndex: 'likes', key: 'likes', width: 90 },
+      { title: '评论', dataIndex: 'comments', key: 'comments', width: 90 },
+      { title: '涨粉', dataIndex: 'follows', key: 'follows', width: 90 },
+      {
+        title: '互动率',
+        key: 'engagement',
+        width: 100,
+        render: (_: unknown, row: PlatformMetricVo) => `${(engagementRate(row.likes, row.views) * 100).toFixed(1)}%`
+      },
+      {
+        title: '爆款',
+        key: 'isHot',
+        width: 80,
+        render: (_: unknown, row: PlatformMetricVo) =>
+          isHot(row.views, row.likes) ? <Tag color="volcano">爆款</Tag> : '-'
+      }
+    ],
+    []
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      <FilterBar<MetricsFilterValues> form={form} onSearch={() => void load()} searchLoading={loading}>
+        <Form.Item name="projectId" label="作品">
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="全部作品"
+            options={projects.map((project) => ({ value: project.id, label: project.name }))}
+            className="w-full sm:w-[200px]"
+          />
+        </Form.Item>
+        <Form.Item name="platform" label="平台">
+          <Select allowClear placeholder="全部平台" options={PLATFORM_OPTIONS} className="w-full sm:w-[140px]" />
+        </Form.Item>
+        <Form.Item name="range" label="日期范围">
+          <DatePicker.RangePicker allowClear />
+        </Form.Item>
+      </FilterBar>
+      <div className="flex items-center gap-2">
+        <Button icon={<DownloadOutlined />} onClick={() => void handleDownloadTemplate()}>
+          下载模板
+        </Button>
+        <Permission code="publisher:manage">
+          <Upload
+            accept=".csv"
+            showUploadList={false}
+            beforeUpload={(file) => {
+              void handleImport(file);
+              return false;
+            }}
+          >
+            <Button type="primary" icon={<UploadOutlined />} loading={importing}>
+              导入 CSV
+            </Button>
+          </Upload>
+        </Permission>
+      </div>
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard title="总播放" value={summary.views} loading={loading} />
+        <StatCard title="总点赞" value={summary.likes} loading={loading} />
+        <StatCard title="总评论" value={summary.comments} loading={loading} />
+        <StatCard title="总涨粉" value={summary.follows} loading={loading} />
+      </div>
+      <SelfTable
+        rowKey="id"
+        loading={loading}
+        columns={metricColumns}
+        dataSource={metrics}
+        pagination={metrics.length > 20 ? { pageSize: 20 } : false}
+      />
+      <SelfModal
+        open={rejectedRows.length > 0}
+        title="导入拒绝明细"
+        width="md"
+        footer={null}
+        onCancel={() => setRejectedRows([])}
+      >
+        <SelfTable
+          rowKey={(row) => `${row.line}-${row.reason}`}
+          columns={[
+            { title: '行号', dataIndex: 'line', key: 'line', width: 80 },
+            { title: '拒绝原因', dataIndex: 'reason', key: 'reason' }
+          ]}
+          dataSource={rejectedRows.slice(0, 20)}
+          pagination={false}
+        />
+        {rejectedRows.length > 20 && <p className="mt-2 text-gray-500">仅展示前 20 条，共 {rejectedRows.length} 条</p>}
+      </SelfModal>
+    </div>
   );
 };
 
@@ -241,7 +439,7 @@ export const PublisherPage: React.FC = () => {
     <div className="flex flex-col gap-3">
       <PageHeader
         title="发布矩阵"
-        subtitle="平台账号管理与发布记录登记；后续平台 API 通道上线后可一键分发。"
+        subtitle="平台账号管理、发布记录登记与平台数据回流（CSV 导入）；后续平台 API 通道上线后可一键分发。"
         actions={
           <Permission code="publisher:manage">
             <Button
@@ -284,6 +482,11 @@ export const PublisherPage: React.FC = () => {
                 pagination={records.length > 20 ? { pageSize: 20 } : false}
               />
             )
+          },
+          {
+            key: 'metrics',
+            label: '数据回流',
+            children: <MetricsTab />
           }
         ]}
       />
