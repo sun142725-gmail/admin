@@ -74,6 +74,7 @@ import { CharacterCard } from './common/entities/character-card.entity';
 import { PromptTemplate } from './common/entities/prompt-template.entity';
 import { PublisherAccount } from './common/entities/publisher-account.entity';
 import { VideoPublishRecord } from './common/entities/video-publish-record.entity';
+import { VideoPlatformMetric } from './common/entities/video-platform-metric.entity';
 import { FlowModule } from './modules/flow/flow.module';
 import { PromptLibraryModule } from './modules/prompt-library/prompt-library.module';
 import { InternalAiModule } from './modules/internal-ai/internal-ai.module';
@@ -130,7 +131,8 @@ const ENTITIES = [
   CharacterCard,
   PromptTemplate,
   PublisherAccount,
-  VideoPublishRecord
+  VideoPublishRecord,
+  VideoPlatformMetric
 ];
 
 @Module({
