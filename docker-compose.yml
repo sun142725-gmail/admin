@@ -194,8 +194,7 @@ services:
       COMPOSE_PROJECT_NAME: admin
       COMPOSE_COMPATIBILITY: "1"
     ports:
-      # 仅回环绑定：部署面板拥有 docker.sock 与 SSH 私钥，绝不能暴露到外网网卡
-      - "127.0.0.1:9090:9090"
+      - "9090:9090"
     volumes:
       - ./:${HOST_PROJECT_PATH:-/home/sun142725/admin}
       - ./deploy-panel/logs:/app/logs
