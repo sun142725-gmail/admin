@@ -20,6 +20,8 @@ import { StockDailyBar } from '../../common/entities/stock-daily-bar.entity';
 import { DailyBarsService } from './daily-bars/daily-bars.service';
 import { DailyBarsScheduleService } from './daily-bars/daily-bars-schedule.service';
 import { DailyBarsController } from './daily-bars/daily-bars.controller';
+import { BacktestService } from './backtest/backtest.service';
+import { BacktestController } from './backtest/backtest.controller';
 import { StockController, RoundtableController } from './stock.controller';
 import { MarketDataController } from './market-data.controller';
 import { ScreenerController } from './screener.controller';
@@ -48,7 +50,8 @@ import { WatchlistController } from './watchlist.controller';
     ScreenerScheduleService,
     WatchlistService,
     DailyBarsService,
-    DailyBarsScheduleService
+    DailyBarsScheduleService,
+    BacktestService
   ],
   controllers: [
     StockController,
@@ -56,7 +59,8 @@ import { WatchlistController } from './watchlist.controller';
     MarketDataController,
     ScreenerController,
     WatchlistController,
-    DailyBarsController
+    DailyBarsController,
+    BacktestController
   ]
 })
 export class StockModule {}
