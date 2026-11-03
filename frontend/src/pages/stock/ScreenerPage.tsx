@@ -1,7 +1,8 @@
 // 选股器页面：按板块选池（市值 Top N）或手填代码，对候选池做 KDJ/MACD 金叉规则扫描。
 // 大池扫描由后端分批限流执行（50 任务/批，批间歇 1 秒），前端放宽超时等待结果。
 // 「每日扫描」Tab 展示收盘定时扫描的运行历史与命中清单；「数据质量」Tab 探针日线行情库
-// （覆盖概览/缺口异常明细/手动补抓），复用宿主页权限 stock:screener:use，零新路由。
+// （覆盖概览/缺口异常明细/手动补抓）；「回测」Tab 运行内置 MA 双均线演示信号的回测报告
+// （净值/回撤曲线/逐笔明细/口径声明区），复用宿主页权限 stock:screener:use，零新路由。
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -36,6 +37,7 @@ import { PageHeader } from '../../components/business/PageHeader';
 import { useApiMessage } from '../../hooks/useApiMessage';
 import { ScreenerRunsPanel } from './components/ScreenerRunsPanel';
 import { DailyBarsQualityPanel } from './components/DailyBarsQualityPanel';
+import { BacktestPanel } from './components/BacktestPanel';
 import { KlineDrawer, isStockRowClickIgnored } from './components/KlineDrawer';
 import { FREQ_LABEL, renderPct, renderSignal } from './components/screener-shared';
 
@@ -238,12 +240,19 @@ export const ScreenerPage: React.FC = () => {
 
       <Tabs
         defaultActiveKey={
-          searchParams.get('tab') === 'daily' ? 'daily' : searchParams.get('tab') === 'bars' ? 'bars' : 'manual'
+          searchParams.get('tab') === 'daily'
+            ? 'daily'
+            : searchParams.get('tab') === 'bars'
+              ? 'bars'
+              : searchParams.get('tab') === 'backtest'
+                ? 'backtest'
+                : 'manual'
         }
         items={[
           { key: 'manual', label: '手动扫描', children: <ManualScanPanel /> },
           { key: 'daily', label: '每日扫描', children: <ScreenerRunsPanel favoriteSymbols={favoriteSymbols} onToggleFavorite={toggleFavorite} /> },
-          { key: 'bars', label: '数据质量', children: <DailyBarsQualityPanel /> }
+          { key: 'bars', label: '数据质量', children: <DailyBarsQualityPanel /> },
+          { key: 'backtest', label: '回测', children: <BacktestPanel /> }
         ]}
       />
     </div>
