@@ -9,6 +9,8 @@ COPY . .
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/core ./cmd/server
 
 FROM docker.m.daocloud.io/library/alpine:3.20
+# 国内服务器下载 FFmpeg 及字体依赖走清华 Alpine 镜像；Docker 层缓存仍由 BuildKit 复用。
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories
 # ffmpeg + 字体：动漫流水线合成用（libass 烧字幕，中文字体取 Noto Sans CJK）
 RUN apk add --no-cache ca-certificates tzdata ffmpeg font-noto-cjk \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
