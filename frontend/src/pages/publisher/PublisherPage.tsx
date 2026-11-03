@@ -1,4 +1,4 @@
-// 发布矩阵页：三 Tab（平台账号管理 / 发布记录 / 数据回流）。账号 CRUD + 手动登记发布结果 + 平台按日数据 CSV 导入。
+// 发布矩阵页：四 Tab（平台账号管理 / 发布记录 / 数据回流 / 敏感词库）。账号 CRUD + 手动登记发布结果 + 平台按日数据 CSV 导入。
 // 凭据安全：编辑时不传 credentials = 不修改；响应面只有 credentialMask 脱敏掩码。
 // 数据回流：明细全量拉取后前端聚合汇总卡；爆款标记用 utils/metrics.ts 与后端同口径纯函数。
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -41,7 +41,9 @@ import { SelfTable } from '../../components/base/SelfTable';
 import { SelfForm } from '../../components/base/SelfForm';
 import { SelfModal } from '../../components/base/SelfModal';
 import { useApiMessage } from '../../hooks/useApiMessage';
+import { useAppSelector } from '../../store/hooks';
 import { Permission } from '../../components/permission/Permission';
+import { ComplianceWordsTab } from './ComplianceWordsTab';
 
 const PLATFORM_OPTIONS = PUBLISHER_PLATFORMS.map((value) => ({ value, label: PUBLISHER_PLATFORM_LABELS[value] }));
 
@@ -332,6 +334,9 @@ const MetricsTab: React.FC = () => {
 
 export const PublisherPage: React.FC = () => {
   const msg = useApiMessage();
+  // 敏感词库 Tab 条目级授权（UI 契约 §3）：本页此前无读 store 先例，此处为全新引入——
+  // 仅当含 compliance:view 时才把该 Tab 加入 items，无码用户整条 Tab 不渲染（非「点开空白」）
+  const permissions = useAppSelector((state) => state.auth.profile?.permissions ?? []);
   const [accounts, setAccounts] = useState<PublisherAccountVo[]>([]);
   const [records, setRecords] = useState<VideoPublishRecordVo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -487,7 +492,12 @@ export const PublisherPage: React.FC = () => {
             key: 'metrics',
             label: '数据回流',
             children: <MetricsTab />
-          }
+          },
+          // 词库是发布矩阵页内 Tab 不是新路由（页面资源 /publisher 已存在，无 resource seed 变更）；
+          // ComplianceWordsTab 懒挂载：antd Tabs 未激活 pane 不渲染 children，首切才拉数据
+          ...(permissions.includes('compliance:view')
+            ? [{ key: 'words', label: '敏感词库', children: <ComplianceWordsTab /> }]
+            : [])
         ]}
       />
       <AccountModal
