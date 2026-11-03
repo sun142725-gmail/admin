@@ -82,6 +82,11 @@ export interface MarketBreadth {
   approximate: boolean;
 }
 
+/** K 线来源标记：日线三级容灾链（东财→腾讯→新浪）命中哪一源。
+ *  仅 freq='day' 链路赋值（周/月/分钟重采样路径不标）；日线行情库源门禁据此放行/降级跳过，
+ *  复权口径：东财前复权且成交额真实（唯一可入库源）；腾讯前复权但 amount 恒 0；新浪不复权。 */
+export type KlineSource = 'eastmoney' | 'tencent' | 'sina';
+
 export interface MarketOverview {
   indexes: QuoteSnapshot[];
   breadth: MarketBreadth | null;
@@ -217,12 +222,15 @@ export class MarketDataService {
   /** K 线（前复权）：东财主源（含板块 BK，原生支持日/周/月/60分）→ 腾讯 → 新浪三级容灾，个股/指数 sh/sz。
    *  新浪体系板块（new_xxx）无公开 K 线源、腾讯板块（qqt_xxx）仅列表可用，均抛特定错误由上层降级提示。
    *  周/月线主源为东财原生聚合；若东财不可用，回退为拉日 K 后本地重采样（口径近似行情软件）。
-   *  60min 主源为东财原生分钟线，回退腾讯 mkline → 新浪 scale=60；120min 无上游原生，统一取 60min 后本地两两重采样。 */
+   *  60min 主源为东财原生分钟线，回退腾讯 mkline → 新浪 scale=60；120min 无上游原生，统一取 60min 后本地两两重采样。
+   *  返回值带可选 source（仅 freq='day' 三级链路赋值）：日线行情库写库门禁只放行东财主源——
+   *  腾讯/新浪降级命中时调用方跳过该标的（新浪不复权、双源 amount=0，错误口径写入是持久伤害）；
+   *  source 为可选新字段，现有消费方不受影响。 */
   async kline(
     symbol: string,
     limit = 250,
     freq: KlineFreq = 'day'
-  ): Promise<{ name: string; items: KlineItem[] }> {
+  ): Promise<{ name: string; items: KlineItem[]; source?: KlineSource }> {
     const key = `${symbol}:${limit}:${freq}`;
     const cached = this.getCache(this.klineCache, key, KLINE_TTL_MS);
     if (cached) {
@@ -236,13 +244,15 @@ export class MarketDataService {
     }
     // 主源请求：120min 先取 2×limit 根 60min（本地重采样后仍满足 limit 根）
     const eastLimit = freq === '120min' ? Math.min(800, limit * 2) : limit;
-    let parsed: { name: string; items: KlineItem[] } | null = null;
+    let parsed: { name: string; items: KlineItem[]; source?: KlineSource } | null = null;
 
     try {
       const payload = await fetchJson<EastmoneyKlineResponse>(
         buildEastmoneyKlineUrl(symbol, eastLimit, KLINE_FREQ_KLT[freq])
       );
-      parsed = parseEastmoneyKline(payload);
+      const eastParsed = parseEastmoneyKline(payload);
+      // 仅日线链路标记来源（周/月/分钟重采样路径口径混合，不标由门禁一视同仁拒绝）
+      parsed = freq === 'day' ? { ...eastParsed, source: 'eastmoney' as const } : eastParsed;
       if (freq === '120min' && parsed.items.length > 0) {
         parsed = { name: parsed.name, items: resampleMinuteKlines(parsed.items, 2) };
       }
@@ -284,22 +294,23 @@ export class MarketDataService {
     return parsed;
   }
 
-  private async fetchKlineFromTencent(symbol: string, limit: number) {
+  // 日 K 二/三级兜底：带 source 标记（日线行情库门禁据此拒绝写库——腾讯 amount 恒 0、新浪不复权）
+  private async fetchKlineFromTencent(symbol: string, limit: number): Promise<{ name: string; items: KlineItem[]; source: KlineSource }> {
     const payload = await fetchJson<TencentKlineResponse>(buildTencentKlineUrl(symbol, limit + 20));
     const parsed = parseTencentKline(payload, limit);
     if (parsed.items.length === 0) {
       throw new Error('腾讯 K 线为空');
     }
-    return parsed;
+    return { ...parsed, source: 'tencent' };
   }
 
-  private async fetchKlineFromSina(symbol: string, limit: number) {
+  private async fetchKlineFromSina(symbol: string, limit: number): Promise<{ name: string; items: KlineItem[]; source: KlineSource }> {
     const raw = await fetchText(buildSinaKlineUrl(symbol, limit + 20));
     const parsed = parseSinaKline(raw, limit);
     if (parsed.items.length === 0) {
       throw new Error('新浪 K 线为空');
     }
-    return parsed;
+    return { ...parsed, source: 'sina' };
   }
 
   /** 腾讯分钟 K（mkline m60）：60min 回退二级。 */

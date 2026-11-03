@@ -16,6 +16,10 @@ import { WatchlistService } from './watchlist.service';
 import { StockWatchlist } from '../../common/entities/stock-watchlist.entity';
 import { StockScreenerRun } from '../../common/entities/stock-screener-run.entity';
 import { StockScreenerHit } from '../../common/entities/stock-screener-hit.entity';
+import { StockDailyBar } from '../../common/entities/stock-daily-bar.entity';
+import { DailyBarsService } from './daily-bars/daily-bars.service';
+import { DailyBarsScheduleService } from './daily-bars/daily-bars-schedule.service';
+import { DailyBarsController } from './daily-bars/daily-bars.controller';
 import { StockController, RoundtableController } from './stock.controller';
 import { MarketDataController } from './market-data.controller';
 import { ScreenerController } from './screener.controller';
@@ -30,7 +34,8 @@ import { WatchlistController } from './watchlist.controller';
       AiModel,
       StockWatchlist,
       StockScreenerRun,
-      StockScreenerHit
+      StockScreenerHit,
+      StockDailyBar
     ]),
     AiModule
   ],
@@ -41,8 +46,17 @@ import { WatchlistController } from './watchlist.controller';
     RoundtableService,
     ScreenerService,
     ScreenerScheduleService,
-    WatchlistService
+    WatchlistService,
+    DailyBarsService,
+    DailyBarsScheduleService
   ],
-  controllers: [StockController, RoundtableController, MarketDataController, ScreenerController, WatchlistController]
+  controllers: [
+    StockController,
+    RoundtableController,
+    MarketDataController,
+    ScreenerController,
+    WatchlistController,
+    DailyBarsController
+  ]
 })
 export class StockModule {}
