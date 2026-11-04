@@ -16,6 +16,7 @@
 - `deploy-panel/scripts/deploy-has-web.sh`：移动端 has-web 发布脚本
 - `deploy-panel/scripts/deploy-all.sh`：全量发布脚本
 - `deploy-panel/scripts/common.sh`：Docker Compose 命令兼容封装
+- `deploy-panel/scripts/run-online.sh`：线上 SQL 脚本执行器；仅执行已刷新列表中的脚本，不在执行阶段再次拉取 Git
 - `deploy-panel/logs/deploy-logs.txt`：发布日志文件
 - `deploy-panel/task.lock`：发布任务锁文件
 
@@ -36,6 +37,8 @@
 4. 服务端按发布目标调用对应 shell 脚本。
 5. 服务端清空上一轮发布日志，脚本输出追加到 `logs/deploy-logs.txt`。
 6. 页面轮询 `/logs` 与 `/status` 展示实时日志和运行状态。
+
+线上 SQL 脚本通过「刷新脚本列表」拉取最新代码；执行时须输入固定确认词 `确认执行`，避免长文件名复制错误或误操作。
 
 ## Docker 部署
 

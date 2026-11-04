@@ -8,7 +8,7 @@
 --       不加列、不动页面资源——词库是发布矩阵页（/publisher，资源已存在）内 Tab，
 --       非新路由，无 resource seed 变更；检查报告不落库（每次实时计算）。
 -- 序号说明：原方案编号 0002 已被 20261103_0002_ai_bazi_agent.sql 占用，顺延取 0003。
--- 执行方式：发布面板「线上脚本」分区选择本文件 → 输入脚本名全文二次确认 → 执行。
+-- 执行方式：刷新发布面板「线上脚本」列表后选择本文件 → 输入“确认执行”二次确认 → 执行。
 -- 幂等规则（参照 20261103_0001_rbac_studio_upgrade.sql 模板）：
 --   建表 CREATE TABLE IF NOT EXISTS；加列/加索引先查 information_schema 再执行；
 --   INSERT 走 ON DUPLICATE KEY / NOT EXISTS；UPDATE 必须带条件 WHERE。

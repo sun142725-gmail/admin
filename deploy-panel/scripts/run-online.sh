@@ -6,7 +6,7 @@
 #    realpath 双重校验，防路径穿越（纵深防御）；
 # 2. SQL 凭据取 mysql 容器内环境变量（不落脚本不落盘），stdin 喂入 SQL（照抄 sync-stock-agents.sh 模式）；
 # 3. 不调 common.sh 的 preflight（其强制 nginx.conf 存在，会误伤纯 SQL 任务），自做精简检查；
-# 4. git pull --ff-only 失败即失败，避免在过期代码基线上执行变更。
+# 4. 脚本列表刷新负责 git pull；执行阶段不再拉取，确保执行用户已确认的脚本版本。
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
@@ -30,10 +30,6 @@ if [ ! -f "$COMPOSE_FILE_PATH" ]; then
   echo "Compose 文件不存在：$COMPOSE_FILE_PATH"
   exit 1
 fi
-
-CURRENT_STEP="拉取最新代码"
-echo "拉取最新代码"
-pull_latest_code
 
 CURRENT_STEP="校验脚本名与文件"
 sql_name="$1"

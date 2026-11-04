@@ -15,7 +15,7 @@
 --   复用宿主页权限码 stock:screener:use（seed.service.ts 已 seed，不新增权限码、不新增 resource），
 --   照 20261103_0003 头注范式——词库是发布矩阵页内 Tab 无 resource seed 变更，同理由本文件
 --   无 permissions / resources 段。
--- 执行方式：发布面板「线上脚本」分区选择本文件 → 输入脚本名全文二次确认 → 执行。
+-- 执行方式：刷新发布面板「线上脚本」列表后选择本文件 → 输入“确认执行”二次确认 → 执行。
 -- 幂等规则（参照 20261103_0001_rbac_studio_upgrade.sql 模板）：
 --   建表 CREATE TABLE IF NOT EXISTS；本文件无 ALTER 段（全新表，无存量表加列/加索引需求）；
 --   无 INSERT 段（质量结论不落库，表由后端行情抓取服务写入）。

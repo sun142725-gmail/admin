@@ -241,12 +241,12 @@ DEPLOY_CLEAN_CACHE=1 ./deploy-panel/scripts/deploy-frontend.sh
 1. 开发机编写 SQL，**必须幂等**：`INSERT ... ON DUPLICATE KEY UPDATE` 或先判断再变更（结构变更用 information_schema + PREPARE 模板），参照 `deploy-panel/scripts/online/20261030_0001_example_probe.sql` 中的模板与 `deploy/scripts/stock-agents.sql` 的写法；
 2. 命名为字母数字开头的纯文件名、`.sql` 结尾（如 `20261030_0001_fix_xxx.sql`）；
 3. git 提交到 `deploy-panel/scripts/online/`；
-4. 服务器发布面板执行时自动 `git pull --ff-only` 拉取最新脚本，无需登录服务器同步。
+4. 在发布面板点击「刷新脚本列表」时自动 `git pull --ff-only` 拉取最新脚本，无需登录服务器同步；执行阶段不会再次拉取。
 
 ### 如何执行
 
 1. 打开发布面板「线上脚本」分区，选择脚本（列表来自服务端白名单目录扫描）；
-2. 点击「执行脚本」，二次确认时**输入脚本名全文**（前端 prompt 与服务端 `confirm` 双重校验）；
+2. 点击「执行脚本」，二次确认时准确输入 **`确认执行`**（前端 prompt 与服务端 `confirm` 双重校验）；
 3. 执行日志复用下方日志区；每次执行写入审计（时间、脚本名、来源 IP、密钥指纹、退出码、耗时、是否超时、输出末 2KB 摘要），点「查看审计记录」即可查看。
 
 ### 安全约束

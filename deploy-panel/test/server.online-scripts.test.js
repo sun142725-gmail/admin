@@ -232,7 +232,7 @@ test('GET /online-scripts 返回 fixture SQL 列表（过滤子目录与隐藏�
   }
 });
 
-test('POST run 拒绝穿越名/不存在名/confirm 不一致，均 400', async t => {
+test('POST run 拒绝穿越名/不存在名/非固定确认词，均 400', async t => {
   const tmpRoot = makeTmpRoot();
   const ctx = startServer(t, tmpRoot);
   await ctx.waitReady();
@@ -242,7 +242,7 @@ test('POST run 拒绝穿越名/不存在名/confirm 不一致，均 400', async 
     { name: '/etc/passwd.sql', confirm: '/etc/passwd.sql' }, // 绝对路径
     { name: 'sub/nested.sql', confirm: 'sub/nested.sql' },   // 子目录名
     { name: 'nope.sql', confirm: 'nope.sql' },      // 白名单内不存在
-    { name: 'a.sql', confirm: 'b.sql' },            // 二次确认不一致
+    { name: 'a.sql', confirm: 'a.sql' },            // 旧的脚本名确认方式已失效
     { name: '', confirm: '' }                       // 空名
   ];
   for (const body of cases) {
@@ -269,7 +269,7 @@ test('fake runner 执行成功：日志含开始/结束标记，审计 exitCode=
   const res = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'a.sql', confirm: 'a.sql' })
+    body: JSON.stringify({ name: 'a.sql', confirm: '确认执行' })
   });
   assert.equal(res.status, 200);
 
@@ -305,7 +305,7 @@ test('FAKE_EXIT=3 失败执行：审计 exitCode=3', async t => {
   const res = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'a.sql', confirm: 'a.sql' })
+    body: JSON.stringify({ name: 'a.sql', confirm: '确认执行' })
   });
   assert.equal(res.status, 200);
 
@@ -334,7 +334,7 @@ test('sleep 期间并发执行返回 409；超时 SIGKILL 记 timedOut 并释放
   const first = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'sleep.sql', confirm: 'sleep.sql' })
+    body: JSON.stringify({ name: 'sleep.sql', confirm: '确认执行' })
   });
   assert.equal(first.status, 200);
 
@@ -342,7 +342,7 @@ test('sleep 期间并发执行返回 409；超时 SIGKILL 记 timedOut 并释放
   const second = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'a.sql', confirm: 'a.sql' })
+    body: JSON.stringify({ name: 'a.sql', confirm: '确认执行' })
   });
   assert.equal(second.status, 409);
 
@@ -363,7 +363,7 @@ test('sleep 期间并发执行返回 409；超时 SIGKILL 记 timedOut 并释放
   const again = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'a.sql', confirm: 'a.sql' })
+    body: JSON.stringify({ name: 'a.sql', confirm: '确认执行' })
   });
   assert.equal(again.status, 200);
   await waitFor(async () => {
@@ -383,7 +383,7 @@ test('GET /online-scripts/logs 返回审计记录末 50 条', async t => {
   const res = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'a.sql', confirm: 'a.sql' })
+    body: JSON.stringify({ name: 'a.sql', confirm: '确认执行' })
   });
   assert.equal(res.status, 200);
   const audit = await waitFor(async () => {
@@ -402,7 +402,7 @@ test('body 超 64KB 返回 413 且进程存活（无 ERR_HTTP_HEADERS_SENT 二�
   const ctx = startServer(t, tmpRoot);
   await ctx.waitReady();
 
-  const bigBody = JSON.stringify({ name: 'a.sql', confirm: 'a.sql', padding: 'x'.repeat(70 * 1024) });
+  const bigBody = JSON.stringify({ name: 'a.sql', confirm: '确认执行', padding: 'x'.repeat(70 * 1024) });
   const res = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
@@ -451,7 +451,7 @@ test('超时强杀终止整个进程组：runner 的孙进程一并被杀，不�
   const res = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'grandchild.sql', confirm: 'grandchild.sql' })
+    body: JSON.stringify({ name: 'grandchild.sql', confirm: '确认执行' })
   });
   assert.equal(res.status, 200);
 
@@ -499,7 +499,7 @@ test('ONLINE_SCRIPT_RUNNER 误配含 shell 元字符：返回 500、不残留锁
   const res = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'a.sql', confirm: 'a.sql' })
+    body: JSON.stringify({ name: 'a.sql', confirm: '确认执行' })
   });
   assert.equal(res.status, 500);
 
@@ -517,7 +517,7 @@ test('runner 路径不存在：spawn error 后锁释放、审计记失败、面�
   const res = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'a.sql', confirm: 'a.sql' })
+    body: JSON.stringify({ name: 'a.sql', confirm: '确认执行' })
   });
   assert.equal(res.status, 200);
 
@@ -591,7 +591,7 @@ test('任务执行中刷新列表跳过 pull：pull.skipped=true 且列表照常
   const run = await fetch(`${ctx.base}/online-scripts/run`, {
     method: 'POST',
     headers: { ...ctx.authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'sleep.sql', confirm: 'sleep.sql' })
+    body: JSON.stringify({ name: 'sleep.sql', confirm: '确认执行' })
   });
   assert.equal(run.status, 200);
 

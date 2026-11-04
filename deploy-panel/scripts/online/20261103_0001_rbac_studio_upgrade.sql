@@ -11,7 +11,7 @@
 --   31892c7  发布矩阵数据回流        → 新表 video_platform_metrics
 --   9e92233  角色一致性角色库        → 新表 character_cards + novel_projects.cover_url
 --   e4e58c4  音画合成（每镜mux）     → novel_shots.muxed_file
--- 执行方式：发布面板「线上脚本」分区选择本文件 → 输入脚本名全文二次确认 → 执行。
+-- 执行方式：刷新发布面板「线上脚本」列表后选择本文件 → 输入“确认执行”二次确认 → 执行。
 -- 幂等规则（参照 20261030_0001_example_probe.sql 模板）：
 --   建表 CREATE TABLE IF NOT EXISTS；加列/加索引先查 information_schema 再执行；
 --   INSERT 走 ON DUPLICATE KEY / NOT EXISTS；UPDATE 必须带条件 WHERE。

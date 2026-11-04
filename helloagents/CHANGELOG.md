@@ -3,6 +3,9 @@
 本文件记录项目的重要变更，格式参考 Keep a Changelog 与语义化版本。
 
 ## [未发布]
+### 变更（发布面板）
+- 线上 SQL 脚本仅在刷新列表时拉取 Git，执行阶段固定使用用户确认过的本地脚本版本。
+- 线上 SQL 脚本二次确认改为固定输入“确认执行”。
 ### 安全加固（全局 review P0/P1，2026-09-21）
 - 文件上传 bizType 白名单枚举（common/avatar/divination/chat/notification），multer 落盘阶段格式校验防路径穿越
 - 登录/验证码端点加严限流（login/code 10 次/分、发码 5 次/分）；AI 对话/解卦/生图端点 20 次/分兜底，防 LLM 余额被刷

@@ -80,8 +80,8 @@ function listOnlineScripts(dir, exts) {
 // 安全约束：命令与参数完全固定、无 shell:true，cwd 由服务端环境变量注入，不含用户输入。
 // 返回 { ok, output }：ok 仅看退出码；spawnError（如 git 不存在）与超时（status=null，
 // Node 已 SIGTERM 子进程）同样归一化为 ok:false，output 携带原因供前端展示。
-// 调用方须知：本函数是「尽力而为」——失败不应阻塞列表返回；执行期的基线安全
-// 仍由 run-online.sh 自身的 git pull --ff-only（fail-closed）兜底。
+// 调用方须知：本函数是「尽力而为」——失败不应阻塞列表返回；SQL 执行期不再拉取，
+// 仅执行用户刷新列表后所选的本地脚本版本。
 function pullLatestCode({ cwd, timeoutMs }) {
   let result;
   try {

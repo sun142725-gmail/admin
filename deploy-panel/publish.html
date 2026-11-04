@@ -338,9 +338,9 @@ onlineRunBtn.onclick = async () => {
     appendLog("请先选择要执行的脚本", "warn");
     return;
   }
-  // 二次确认：必须输入脚本名全文（服务端 confirm 校验与前端双重把关）
-  const confirmed = window.prompt(`二次确认：请输入脚本名全文（${name}）以确认执行`);
-  if (confirmed !== name) {
+  // 二次确认：固定确认词与服务端双重校验，避免长脚本名复制错误。
+  const confirmed = window.prompt(`二次确认：将执行 ${name}。请输入“确认执行”继续`);
+  if (confirmed !== '确认执行') {
     appendLog("二次确认未通过，已取消执行", "warn");
     return;
   }
