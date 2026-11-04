@@ -227,6 +227,110 @@ func (h *GraphicHandler) StreamStory(c *gin.Context) {
 	}
 }
 
+// DeleteStory DELETE /api/v1/graphic/stories/:id —— 删除故事与全部分幕。
+// 产物文件保留在 uploads/graphic/ 下不随删（与 novel-pipeline 一致，避免误删被其它记录引用的静态资源，
+// 由运维按目录定期清理）；执行中的故事拒绝删除，避免后台 goroutine 写回已删记录。
+func (h *GraphicHandler) DeleteStory(c *gin.Context) {
+	if h.db == nil {
+		response.Fail(c, 503, "数据库未连接（未配置 DB_HOST）", http.StatusServiceUnavailable)
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Fail(c, 400, "id 必须是数字", http.StatusBadRequest)
+		return
+	}
+	if h.svc != nil && h.svc.IsActive(uint(id)) {
+		response.Fail(c, 409, graphic.ErrStoryBusy.Error(), http.StatusConflict)
+		return
+	}
+	var story entity.GraphicStory
+	if err := h.db.First(&story, id).Error; err != nil {
+		response.Fail(c, 404, "故事不存在", http.StatusNotFound)
+		return
+	}
+	tx := h.db.Begin()
+	if tx.Error != nil {
+		response.Fail(c, 500, "开启事务失败: "+tx.Error.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Where("story_id = ?", id).Delete(&entity.GraphicScene{}).Error; err != nil {
+		tx.Rollback()
+		response.Fail(c, 500, "删除分幕失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Delete(&entity.GraphicStory{}, id).Error; err != nil {
+		tx.Rollback()
+		response.Fail(c, 500, "删除故事失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit().Error; err != nil {
+		response.Fail(c, 500, "提交事务失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	response.Ok(c, gin.H{"storyId": id, "deleted": true})
+}
+
+// RegenerateScene POST /api/v1/graphic/stories/:id/scenes/:sceneId/regenerate
+// 把指定分幕退回 pending 后触发整条流水线；runInternal 会复用其它 succeeded 幕，只重跑这一幕
+// （anime 模式会顺带重做该幕 TTS 与最终成片）。同一事务内完成状态回退，避免前端看到半更新态。
+func (h *GraphicHandler) RegenerateScene(c *gin.Context) {
+	if h.db == nil || h.svc == nil {
+		response.Fail(c, 503, "流水线未就绪", http.StatusServiceUnavailable)
+		return
+	}
+	storyID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Fail(c, 400, "id 必须是数字", http.StatusBadRequest)
+		return
+	}
+	sceneID, err := strconv.ParseUint(c.Param("sceneId"), 10, 64)
+	if err != nil {
+		response.Fail(c, 400, "sceneId 必须是数字", http.StatusBadRequest)
+		return
+	}
+	if err := graphic.CanMutateStory(h.svc.IsActive(uint(storyID))); err != nil {
+		response.Fail(c, 409, err.Error(), http.StatusConflict)
+		return
+	}
+	var story entity.GraphicStory
+	if err := h.db.First(&story, storyID).Error; err != nil {
+		response.Fail(c, 404, "故事不存在", http.StatusNotFound)
+		return
+	}
+	var scene entity.GraphicScene
+	if err := h.db.Where("id = ? AND story_id = ?", sceneID, storyID).First(&scene).Error; err != nil {
+		response.Fail(c, 404, "分幕不存在或不属于该故事", http.StatusNotFound)
+		return
+	}
+	updates, err := graphic.SceneRegenUpdates(scene.Status)
+	if err != nil {
+		response.Fail(c, 409, err.Error(), http.StatusConflict)
+		return
+	}
+	tx := h.db.Begin()
+	if tx.Error != nil {
+		response.Fail(c, 500, "开启事务失败: "+tx.Error.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Model(&entity.GraphicScene{}).Where("id = ?", sceneID).Updates(updates).Error; err != nil {
+		tx.Rollback()
+		response.Fail(c, 500, "重置分幕失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Model(&entity.GraphicStory{}).Where("id = ?", storyID).Updates(graphic.StoryRegenUpdates()).Error; err != nil {
+		tx.Rollback()
+		response.Fail(c, 500, "重置故事失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit().Error; err != nil {
+		response.Fail(c, 500, "提交事务失败: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	go h.svc.Run(uint(storyID), userIDFrom(c))
+	response.Ok(c, gin.H{"storyId": storyID, "sceneId": sceneID, "accepted": true})
+}
+
 // ---------- 小工具 ----------
 
 func userIDFrom(c *gin.Context) int {

@@ -65,7 +65,7 @@ const realMenuTree = (): MenuTreeNode[] => [
     leaf('流程管理', '/flow'),
     leaf('运行历史', '/flow/runs'),
     leaf('小说转视频', '/flow/novel'),
-    leaf('小说生图', '/graphic'),
+    leaf('AI 生成漫画', '/graphic'),
     leaf('图片提示词库', '/prompts'),
     leaf('发布矩阵', '/publisher')
   ])

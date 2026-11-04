@@ -65,3 +65,12 @@ export const runGraphicStory = (id: number) =>
 
 export const cancelGraphicStory = (id: number) =>
   http.post<never, { storyId: number; cancelRequested: boolean }>(`${BASE}/${id}/cancel`);
+
+// 漫画编辑闭环：删除整篇故事 / 只重生成指定一幕（Go 侧复用断点重跑，succeeded 幕不重画）。
+export const deleteGraphicStory = (id: number) =>
+  http.delete<never, { storyId: number; deleted: boolean }>(`${BASE}/${id}`);
+
+export const regenerateGraphicScene = (storyId: number, sceneId: number) =>
+  http.post<never, { storyId: number; sceneId: number; accepted: boolean }>(
+    `${BASE}/${storyId}/scenes/${sceneId}/regenerate`
+  );

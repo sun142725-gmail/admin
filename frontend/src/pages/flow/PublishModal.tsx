@@ -89,7 +89,7 @@ export const PublishModal: React.FC<PublishModalProps> = ({ open, projectId, onC
     try {
       const [start, end] = values.range ?? [dayjs(), dayjs()];
       await createPublisherRecord({
-        novelProjectId: projectId,
+        projectId,
         platform: values.platform,
         ...(values.accountId ? { accountId: values.accountId } : {}),
         ...(values.title?.trim() ? { title: values.title.trim() } : {}),

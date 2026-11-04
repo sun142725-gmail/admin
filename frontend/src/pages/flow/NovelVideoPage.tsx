@@ -1174,6 +1174,15 @@ export const NovelVideoPage: React.FC = () => {
         onSaved={characterSaved}
         onError={(error) => antMessage.error(error instanceof Error ? error.message : '保存失败')}
       />
+
+      {/* 发布登记（manual 通道）：标题/简介过合规检查链 + AIGC 声明开关，blocked 阻断提交 */}
+      <PublishModal
+        open={publishOpen}
+        projectId={detail?.project.id ?? 0}
+        onClose={() => setPublishOpen(false)}
+        onRegistered={() => detail && reloadPublishRecords(detail.project.id)}
+        onError={(error) => antMessage.error(error instanceof Error ? error.message : '发布登记失败')}
+      />
     </div>
   );
 };

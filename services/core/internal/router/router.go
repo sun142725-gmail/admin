@@ -50,8 +50,10 @@ func registerGraphic(v1 *gin.RouterGroup, h *handler.GraphicHandler) {
 		graphicGroup.GET("", h.ListStories)
 		graphicGroup.POST("", h.CreateStory)
 		graphicGroup.GET("/:id", h.GetStory)
+		graphicGroup.DELETE("/:id", h.DeleteStory)
 		graphicGroup.POST("/:id/run", h.RunStory)
 		graphicGroup.POST("/:id/cancel", h.CancelStory)
+		graphicGroup.POST("/:id/scenes/:sceneId/regenerate", h.RegenerateScene)
 		graphicGroup.GET("/:id/stream", h.StreamStory)
 	}
 }

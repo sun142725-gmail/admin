@@ -11,6 +11,7 @@ import { NotificationTemplate } from '../../common/entities/notification-templat
 import { Dict } from '../../common/entities/dict.entity';
 import { DictItem } from '../../common/entities/dict-item.entity';
 import { AiAgent } from '../../common/entities/ai-agent.entity';
+import { shouldRenameResourcePage } from './resource-naming';
 
 @Injectable()
 export class SeedService implements OnModuleInit {
@@ -808,14 +809,20 @@ export class SeedService implements OnModuleInit {
       { path: '/flow', name: '流程管理', code: 'flow:define:manage' },
       { path: '/flow/runs', name: '运行历史', code: 'flow:run:view' },
       { path: '/flow/novel', name: '小说转视频', code: 'flow:run:view' },
-      { path: '/graphic', name: '小说生图', code: 'flow:run:view' },
+      { path: '/graphic', name: 'AI 生成漫画', code: 'flow:run:view' },
       { path: '/prompts', name: '图片提示词库', code: 'flow:prompt:view' },
       // 页面可见挂 publisher:view，写操作由页面内 Permission(publisher:manage) 控制（/prompts 先例同构）
       { path: '/publisher', name: '发布矩阵', code: 'publisher:view' }
     ];
+    // 2026-11-04：/graphic 升级为「AI 生成漫画」，老库存的「小说生图」启动顺带更名。
+    // 判定抽到 resource-naming.ts 纯函数（有单测）：只在旧名时改，管理员自定义名称不覆盖；
+    // 与线上 SQL 20261104_0003_comic_module.sql 口径一致。
     for (const page of pages) {
       const exists = await this.resourceRepo.findOne({ where: { path: page.path } });
       if (exists) {
+        if (shouldRenameResourcePage(page.path, exists.name, page.name)) {
+          await this.resourceRepo.update({ id: exists.id }, { name: page.name });
+        }
         if (exists.parentId !== flowMenu.id || exists.permissionCode !== page.code) {
           await this.resourceRepo.update(
             { id: exists.id },
