@@ -65,6 +65,10 @@ import { StockWatchlist } from './common/entities/stock-watchlist.entity';
 import { StockScreenerRun } from './common/entities/stock-screener-run.entity';
 import { StockScreenerHit } from './common/entities/stock-screener-hit.entity';
 import { StockDailyBar } from './common/entities/stock-daily-bar.entity';
+import { StockStrategyConfig } from './common/entities/stock-strategy-config.entity';
+import { StockStrategySignal } from './common/entities/stock-strategy-signal.entity';
+import { StockStrategyPosition } from './common/entities/stock-strategy-position.entity';
+import { StockStrategyAccount } from './common/entities/stock-strategy-account.entity';
 import { FlowDefinition } from './common/entities/flow-definition.entity';
 import { FlowRun } from './common/entities/flow-run.entity';
 import { FlowRunNode } from './common/entities/flow-run-node.entity';
@@ -126,6 +130,10 @@ const ENTITIES = [
   StockScreenerRun,
   StockScreenerHit,
   StockDailyBar,
+  StockStrategyConfig,
+  StockStrategySignal,
+  StockStrategyPosition,
+  StockStrategyAccount,
   FlowDefinition,
   FlowRun,
   FlowRunNode,

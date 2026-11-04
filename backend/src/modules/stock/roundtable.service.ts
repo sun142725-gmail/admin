@@ -16,6 +16,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { StockRoundtable } from '../../common/entities/stock-roundtable.entity';
 import { StockRoundtableTurn } from '../../common/entities/stock-roundtable-turn.entity';
+import { StockStrategyConfig } from '../../common/entities/stock-strategy-config.entity';
+import { StrategyService } from './strategy/strategy.service';
 import { IndicatorSummary, summarizeIndicators } from './indicators.util';
 import { MarketDataService, MarketOverview } from './market/market-data.service';
 import { ThsFinancials } from './market/ths-f10.api';
@@ -84,8 +86,11 @@ export class RoundtableService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectRepository(StockRoundtable) private readonly rtRepo: Repository<StockRoundtable>,
     @InjectRepository(StockRoundtableTurn) private readonly turnRepo: Repository<StockRoundtableTurn>,
+    @InjectRepository(StockStrategyConfig)
+    private readonly strategyConfigRepo: Repository<StockStrategyConfig>,
     private readonly market: MarketDataService,
-    private readonly experts: ExpertsService
+    private readonly experts: ExpertsService,
+    private readonly strategy: StrategyService
   ) {}
 
   async onModuleInit() {
@@ -147,6 +152,28 @@ export class RoundtableService implements OnModuleInit, OnModuleDestroy {
           throw new BadRequestException('未找到该板块或板块数据源暂不可用，请稍后重试');
         }
         subjectName = info.name;
+      } else if (subjectType === 'strategy') {
+        // 策略点评分支（方案 §5）：create 即校验并落库，不等 buildBrief；
+        // 不校验 enabled（点评停用策略的回测绩效合法）。
+        // 契约：stock_roundtables 不加列，subjectCode=String(strategyId)
+        // （'strategy' 主题下 subject_code 语义=策略行 id，varchar(32) 容纳），buildBrief 据此反解。
+        const strategyId = dto.strategyId;
+        if (strategyId == null || !Number.isInteger(strategyId) || strategyId <= 0) {
+          throw new BadRequestException('请提供合法的 strategyId（正整数）');
+        }
+        let configRow: StockStrategyConfig | null;
+        try {
+          // 查库异常自行转 BadRequestException：外层 catch 会把非 BadRequest 异常改写为
+          // 「行情数据暂不可用」，策略查库失败不应伪装成行情文案。
+          configRow = await this.strategyConfigRepo.findOne({ where: { id: strategyId } });
+        } catch {
+          throw new BadRequestException('策略数据暂不可用，无法创建会议，请稍后重试');
+        }
+        if (!configRow) {
+          throw new BadRequestException('策略不存在');
+        }
+        subjectCode = String(strategyId);
+        subjectName = configRow.name;
       } else {
         throw new BadRequestException('不支持的分析对象类型');
       }
@@ -586,6 +613,16 @@ export class RoundtableService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async buildBrief(row: StockRoundtable): Promise<{ briefText: string; briefJson: Record<string, unknown> }> {
+    // 策略点评分支（方案 §5）：从 subjectCode 反解 strategyId（create 契约=String(strategyId)），
+    // 调 StrategyService.buildRoundtableBrief 现场重算重放绩效（纯本地毫秒级不触网）——
+    // 专家管线、SSE、turn 落库、replayFromDb 回放原样复用，零 AI 基建新增。
+    if (row.subjectType === 'strategy') {
+      const strategyId = Number(row.subjectCode);
+      if (!Number.isInteger(strategyId) || strategyId <= 0) {
+        throw new Error('策略会议的 subject_code 缺失或非法');
+      }
+      return this.strategy.buildRoundtableBrief(strategyId);
+    }
     const overview: MarketOverview | null = await this.market.overview().catch(() => null);
     let snapshot: QuoteSnapshot | null = null;
     let summary: IndicatorSummary | null = null;

@@ -8,9 +8,9 @@ import { StockDailyBar } from '../../../common/entities/stock-daily-bar.entity';
 import { isoDay } from '../daily-bars/daily-bars-calib.util';
 import { maCrossDemoSignals } from './backtest-demo-signal.util';
 import { DEFAULT_CONFIG, runBacktest } from './backtest-match.util';
-import { atrModel, allInModel, fixedRatioModel, PositionModel } from './backtest-sizing.util';
+import { resolvePositionModel } from './backtest-sizing.util';
 import { BacktestConfig, EquityPoint, TradeRecord, BacktestMetrics } from './backtest.types';
-import { BacktestPositionModelDto, RunBacktestDto } from './dto/run-backtest.dto';
+import { RunBacktestDto } from './dto/run-backtest.dto';
 
 /** 内核最小可回测 bar 数（<2 无法构成任何 T→T+1 成交路径）。 */
 const MIN_BARS = 2;
@@ -90,16 +90,5 @@ export class BacktestService {
 const DEFAULT_LIMIT = 500;
 const DEFAULT_ATR_PERIOD = 14;
 
-/** 请求仓位参数 → 内置仓位插件（缺省 all-in）。 */
-const resolvePositionModel = (pm: BacktestPositionModelDto | undefined): PositionModel => {
-  if (pm?.type === 'fixed-ratio') {
-    return fixedRatioModel(pm.ratio as number); // ratio 必填性由 DTO @ValidateIf 校验保证
-  }
-  if (pm?.type === 'atr') {
-    return atrModel({
-      riskPct: pm.riskPct ?? 0.01,
-      maxPositionPct: pm.maxPositionPct ?? 1
-    });
-  }
-  return allInModel();
-};
+// resolvePositionModel 已抽至 backtest-sizing.util.ts 导出共用（方案 §1.1，不复制）：
+// 策略服务（配置 position_model JSON / 模板默认仓位）与回测服务走同一解析入口。

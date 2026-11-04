@@ -725,7 +725,10 @@ export class SeedService implements OnModuleInit {
     const pages: Array<{ name: string; path: string; permissionCode: string }> = [
       { name: '股市圆桌', path: '/stock', permissionCode: 'stock:roundtable:use' },
       { name: '选股器', path: '/stock/screener', permissionCode: 'stock:screener:use' },
-      { name: '自选股', path: '/stock/watchlist', permissionCode: 'stock:watchlist:use' }
+      { name: '自选股', path: '/stock/watchlist', permissionCode: 'stock:watchlist:use' },
+      // 策略管理页（策略插件化+模拟盘 MVP）：管理端组接口走 stock:strategy:manage，
+      // watchlist-tags 仅 JwtAuthGuard（照 stock.controller.ts「权限码仅用于菜单可见性」论证）
+      { name: '策略管理', path: '/stock/strategy', permissionCode: 'stock:strategy:manage' }
     ];
     for (const page of pages) {
       const exists = await this.resourceRepo.findOne({ where: { path: page.path } });
@@ -752,7 +755,8 @@ export class SeedService implements OnModuleInit {
     for (const [code, name] of [
       ['stock:roundtable:use', '股市圆桌'],
       ['stock:screener:use', '选股器'],
-      ['stock:watchlist:use', '自选股']
+      ['stock:watchlist:use', '自选股'],
+      ['stock:strategy:manage', '策略管理']
     ] as const) {
       const ensured = await this.ensurePermissionByCode(code, name);
       if (ensured) {

@@ -2,8 +2,8 @@
 import { IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateRoundtableDto {
-  /** 分析对象类型：market 大盘 / index 指数 / sector 板块 / stock 个股。 */
-  @IsIn(['market', 'index', 'sector', 'stock'])
+  /** 分析对象类型：market 大盘 / index 指数 / sector 板块 / stock 个股 / strategy 策略点评。 */
+  @IsIn(['market', 'index', 'sector', 'stock', 'strategy'])
   subjectType!: string;
 
   /** 对象代码：sh600519 / sh000001 / BK0475（东财板块）/ new_xxx（新浪板块）；大盘可空。 */
@@ -27,4 +27,9 @@ export class CreateRoundtableDto {
   @IsOptional()
   @IsInt()
   modelId?: number;
+
+  /** 策略 id：strategy 主题下必填（缺失/非正整数由 create 分支 422；subject_code=String(strategyId)）。 */
+  @IsOptional()
+  @IsInt()
+  strategyId?: number;
 }

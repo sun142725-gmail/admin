@@ -17,11 +17,18 @@ import { StockWatchlist } from '../../common/entities/stock-watchlist.entity';
 import { StockScreenerRun } from '../../common/entities/stock-screener-run.entity';
 import { StockScreenerHit } from '../../common/entities/stock-screener-hit.entity';
 import { StockDailyBar } from '../../common/entities/stock-daily-bar.entity';
+import { StockStrategyConfig } from '../../common/entities/stock-strategy-config.entity';
+import { StockStrategySignal } from '../../common/entities/stock-strategy-signal.entity';
+import { StockStrategyPosition } from '../../common/entities/stock-strategy-position.entity';
+import { StockStrategyAccount } from '../../common/entities/stock-strategy-account.entity';
 import { DailyBarsService } from './daily-bars/daily-bars.service';
 import { DailyBarsScheduleService } from './daily-bars/daily-bars-schedule.service';
 import { DailyBarsController } from './daily-bars/daily-bars.controller';
 import { BacktestService } from './backtest/backtest.service';
 import { BacktestController } from './backtest/backtest.controller';
+import { StrategyService } from './strategy/strategy.service';
+import { StrategyScheduleService } from './strategy/strategy-schedule.service';
+import { StrategyController } from './strategy/strategy.controller';
 import { StockController, RoundtableController } from './stock.controller';
 import { MarketDataController } from './market-data.controller';
 import { ScreenerController } from './screener.controller';
@@ -37,7 +44,11 @@ import { WatchlistController } from './watchlist.controller';
       StockWatchlist,
       StockScreenerRun,
       StockScreenerHit,
-      StockDailyBar
+      StockDailyBar,
+      StockStrategyConfig,
+      StockStrategySignal,
+      StockStrategyPosition,
+      StockStrategyAccount
     ]),
     AiModule
   ],
@@ -51,7 +62,9 @@ import { WatchlistController } from './watchlist.controller';
     WatchlistService,
     DailyBarsService,
     DailyBarsScheduleService,
-    BacktestService
+    BacktestService,
+    StrategyService,
+    StrategyScheduleService
   ],
   controllers: [
     StockController,
@@ -60,7 +73,8 @@ import { WatchlistController } from './watchlist.controller';
     ScreenerController,
     WatchlistController,
     DailyBarsController,
-    BacktestController
+    BacktestController,
+    StrategyController
   ]
 })
 export class StockModule {}

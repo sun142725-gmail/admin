@@ -51,3 +51,31 @@ export const atrModel = (params: { riskPct: number; maxPositionPct: number }): P
     );
   }
 });
+
+/** 请求仓位参数的最小结构（BacktestPositionModelDto 与策略配置 position_model JSON 均满足该形状；
+ *  用结构接口而非 import DTO 类，保持本文件零 DTO/@nestjs 依赖）。 */
+export interface PositionModelParams {
+  type?: 'all-in' | 'fixed-ratio' | 'atr';
+  ratio?: number;
+  riskPct?: number;
+  maxPositionPct?: number;
+  atrPeriod?: number;
+}
+
+/**
+ * 请求仓位参数 → 内置仓位插件（缺省 all-in）。
+ * 自 backtest.service.ts:94-105 抽出导出共用（方案 §1.1：不复制）——回测服务与策略服务
+ * （配置 position_model JSON / 模板默认仓位）走同一解析入口；ratio 必填性由 DTO @ValidateIf 保证。
+ */
+export const resolvePositionModel = (pm?: PositionModelParams): PositionModel => {
+  if (pm?.type === 'fixed-ratio') {
+    return fixedRatioModel(pm.ratio as number); // ratio 必填性由 DTO @ValidateIf 校验保证
+  }
+  if (pm?.type === 'atr') {
+    return atrModel({
+      riskPct: pm.riskPct ?? 0.01,
+      maxPositionPct: pm.maxPositionPct ?? 1
+    });
+  }
+  return allInModel();
+};

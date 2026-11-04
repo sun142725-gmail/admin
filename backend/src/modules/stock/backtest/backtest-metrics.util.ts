@@ -21,12 +21,18 @@ const zeroedMetrics = (tradeCount: number, roundTripCount: number): BacktestMetr
 });
 
 /** 回合（round trip）：一次 filled 买入与其后最近一次 filled 卖出配对（清仓语义下天然一一配对）。 */
-interface RoundTrip {
+export interface RoundTrip {
   /** 回合收益率 = 卖出净所得/买入净成本 − 1（净=含费含滑点）。 */
   return: number;
 }
 
-const collectRoundTrips = (trades: TradeRecord[]): RoundTrip[] => {
+/**
+ * 按 trades 全序配对回合（单 openBuyCost 标量：买入净成本被其后最近一次 filled 卖出消费）。
+ * 导出供组合层 computePortfolioMetrics 按 symbol 分组复用（strategy-portfolio-match.util.ts）——
+ * 单标量配对在 holdTop≥2 交错成交下会错配（买A→买B→卖B→卖A 把 B 的卖出毛额与 A 的成本配对），
+ * 组合层必须逐 symbol 过滤后再喂本函数；单标的（内核）语义不变。
+ */
+export const collectRoundTrips = (trades: TradeRecord[]): RoundTrip[] => {
   const rounds: RoundTrip[] = [];
   let openBuyCost: number | null = null; // 买入净成本（gross+fee）
   for (const trade of trades) {

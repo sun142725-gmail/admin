@@ -11,9 +11,12 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as request from 'supertest';
 import { User } from '../src/common/entities/user.entity';
+import { StockStrategyConfig } from '../src/common/entities/stock-strategy-config.entity';
+import { StockDailyBar } from '../src/common/entities/stock-daily-bar.entity';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { MarketDataService } from '../src/modules/stock/market/market-data.service';
 import { RoundtableService } from '../src/modules/stock/roundtable.service';
+import { toUtcMidnight } from '../src/modules/stock/daily-bars/daily-bars-calib.util';
 import { KlineItem } from '../src/modules/stock/indicators.util';
 
 // 确定性 K 线：前 40 日下跌、其后上行，让规则信号产生可断言的多头结构。
@@ -105,6 +108,8 @@ describe('Stock Roundtable (e2e)', () => {
   jest.setTimeout(30000);
   let app: INestApplication;
   let userRepo: Repository<User>;
+  let strategyConfigRepo: Repository<StockStrategyConfig>;
+  let barRepo: Repository<StockDailyBar>;
   let accessToken: string;
   let createdId: number;
   let streamRaw = '';
@@ -139,6 +144,10 @@ describe('Stock Roundtable (e2e)', () => {
     await app.init();
 
     userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
+    strategyConfigRepo = moduleFixture.get<Repository<StockStrategyConfig>>(
+      getRepositoryToken(StockStrategyConfig)
+    );
+    barRepo = moduleFixture.get<Repository<StockDailyBar>>(getRepositoryToken(StockDailyBar));
     const passwordHash = await bcrypt.hash('password', 10);
     await userRepo.save(userRepo.create({ username: 'stock-tester', passwordHash, status: 1 }));
 
@@ -414,5 +423,103 @@ describe('Stock Roundtable (e2e)', () => {
 
     await request(app.getHttpServer()).delete(`/api/stock/roundtable/${id}`).set(auth()).expect(200);
     await request(app.getHttpServer()).get(`/api/stock/roundtable/${id}`).set(auth()).expect(404);
+  });
+
+  // ---------- strategy 主题（策略点评，方案 §5）：create 即校验 + subjectCode 契约 + 简报 ----------
+
+  it('strategy subject: missing/non-positive strategyId and unknown strategy are rejected with 422 at create', async () => {
+    await request(app.getHttpServer())
+      .post('/api/stock/roundtable')
+      .set(auth())
+      .send({ subjectType: 'strategy', mode: 'quick' }) // strategyId 缺失
+      .expect(422);
+    await request(app.getHttpServer())
+      .post('/api/stock/roundtable')
+      .set(auth())
+      .send({ subjectType: 'strategy', strategyId: 0, mode: 'quick' }) // 非正整数
+      .expect(422);
+    await request(app.getHttpServer())
+      .post('/api/stock/roundtable')
+      .set(auth())
+      .send({ subjectType: 'strategy', strategyId: 999999, mode: 'quick' }) // 策略不存在
+      .expect(422);
+  });
+
+  it('strategy subject success: create validates and persists (subjectCode=String(id), subjectName=策略名) without waiting for brief', async () => {
+    // 静态 fixture：主阶梯 27 根（与 stock-backtest.spec.ts 同款）+ ma-cross 策略配置
+    const LADDER = [...Array(20).fill(10), 11, 11, 12, 13, 9, 4, 4];
+    const dates: string[] = [];
+    const cursor = new Date('2026-08-24T00:00:00Z');
+    while (dates.length < 27) {
+      const day = cursor.getUTCDay();
+      if (day !== 0 && day !== 6) {
+        dates.push(cursor.toISOString().slice(0, 10));
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    for (let i = 0; i < dates.length; i += 1) {
+      await barRepo.insert({
+        symbol: 'sh600519',
+        tradeDate: toUtcMidnight(dates[i])!,
+        open: LADDER[i],
+        high: LADDER[i],
+        low: LADDER[i],
+        close: LADDER[i],
+        volume: 1000,
+        amount: LADDER[i] * 1000
+      } as StockDailyBar);
+    }
+    const config = await strategyConfigRepo.save(
+      strategyConfigRepo.create({
+        name: '圆桌点评策略',
+        template: 'ma-cross',
+        params: { fastN: 5, slowN: 20 },
+        symbols: ['sh600519'],
+        initialCash: 100000,
+        positionModel: null,
+        enabled: true,
+        simStartDate: '2026-08-01',
+        remark: null,
+        createdBy: null
+      })
+    );
+
+    const created = await request(app.getHttpServer())
+      .post('/api/stock/roundtable')
+      .set(auth())
+      .send({ subjectType: 'strategy', strategyId: config.id, mode: 'quick', question: '这个策略靠谱吗' })
+      .expect(201);
+    const id = created.body.data.id;
+    expect(id).toBeDefined();
+
+    // 建会话即落库（不等 buildBrief）：subjectCode=String(strategyId) 契约 + subjectName=策略名
+    const early = await request(app.getHttpServer()).get(`/api/stock/roundtable/${id}`).set(auth()).expect(200);
+    expect(early.body.data.subjectType).toBe('strategy');
+    expect(early.body.data.subjectCode).toBe(String(config.id));
+    expect(early.body.data.subjectName).toBe('圆桌点评策略');
+
+    // 简报异步落库：轮询至 briefJson 写入（纯本地重算，毫秒级）
+    let brief: Record<string, unknown> | null = null;
+    for (let attempt = 0; attempt < 50 && !brief; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const detail = await request(app.getHttpServer()).get(`/api/stock/roundtable/${id}`).set(auth()).expect(200);
+      if (detail.body.data.brief) {
+        brief = detail.body.data.brief;
+      }
+    }
+    expect(brief).not.toBeNull();
+    expect(brief!.strategyId).toBe(config.id);
+    // briefJson 落回测指标+信号摘要（重启回放 replayFromDb 天然兼容）
+    const backtestMetrics = brief!.backtestMetrics as { tradeCount: number; roundTripCount: number } | null;
+    expect(backtestMetrics).not.toBeNull();
+    expect(backtestMetrics!.tradeCount).toBe(2); // 金叉 09-21 / 死叉 09-28（主阶梯手推）
+    expect(backtestMetrics!.roundTripCount).toBe(1);
+    const recentSignals = brief!.recentSignals as Array<{ action: string; status: string }>;
+    expect(recentSignals).toHaveLength(2);
+    expect(recentSignals.every((signal) => signal.status === 'filled')).toBe(true);
+    // 口径声明段落进入简报文本（喂 buildRound1Prompt 的 briefText）
+    expect(brief!.configSnapshot).toMatchObject({ template: 'ma-cross', symbols: ['sh600519'] });
+
+    await request(app.getHttpServer()).delete(`/api/stock/roundtable/${id}`).set(auth()).expect(200);
   });
 });
