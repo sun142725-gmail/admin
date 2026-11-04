@@ -42,6 +42,7 @@ const UsageReportPage = lazyPage(() => import('../pages/ai/UsageReportPage'), 'U
 const StockPage = lazyPage(() => import('../pages/stock/StockPage'), 'StockPage');
 const ScreenerPage = lazyPage(() => import('../pages/stock/ScreenerPage'), 'ScreenerPage');
 const WatchlistPage = lazyPage(() => import('../pages/stock/WatchlistPage'), 'WatchlistPage');
+const StrategyPage = lazyPage(() => import('../pages/stock/StrategyPage'), 'StrategyPage');
 const FlowsPage = lazyPage(() => import('../pages/flow/FlowsPage'), 'FlowsPage');
 const FlowRunsPage = lazyPage(() => import('../pages/flow/FlowRunsPage'), 'FlowRunsPage');
 const NovelVideoPage = lazyPage(() => import('../pages/flow/NovelVideoPage'), 'NovelVideoPage');
@@ -107,6 +108,7 @@ export const router = createBrowserRouter([
       { path: '/stock', element: <StockPage /> },
       { path: '/stock/screener', element: <ScreenerPage /> },
       { path: '/stock/watchlist', element: <WatchlistPage /> },
+      { path: '/stock/strategy', element: <StrategyPage /> },
       { path: '/flow', element: <FlowsPage /> },
       { path: '/flow/runs', element: <FlowRunsPage /> },
       { path: '/flow/novel', element: <NovelVideoPage /> },

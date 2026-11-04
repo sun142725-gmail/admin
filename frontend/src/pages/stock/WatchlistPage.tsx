@@ -24,6 +24,7 @@ import {
   updateWatchlist
 } from '../../api/watchlist';
 import { fetchQuotes } from '../../api/stock';
+import { getWatchlistTags, type StrategyWatchlistTagItem } from '../../api/strategy';
 import { KlineDrawer, isStockRowClickIgnored } from './components/KlineDrawer';
 
 interface QuoteRow {
@@ -111,6 +112,44 @@ export const WatchlistPage: React.FC = () => {
     const exchange = suffixed ? suffixed[2] : code.startsWith('6') ? 'sh' : 'sz';
     return { symbol: `${exchange}${code}`, name: code };
   };
+
+  // 策略信号标签（只读联动，不做信号自动写入自选——策略是管理端全局对象、自选是用户私有，
+  // 系统级信号自动写进用户私有清单属污染；后端仅返回 emitted/filled，skipped 含 no_bar 不返回）
+  const [strategyTags, setStrategyTags] = useState<Map<string, StrategyWatchlistTagItem>>(new Map());
+
+  useEffect(() => {
+    if (!items.length) {
+      setStrategyTags(new Map());
+      return;
+    }
+    let stopped = false;
+    // ≤100 个代码（超出后端 422），超出部分静默截断
+    const symbols = items.map((item) => item.symbol).slice(0, 100);
+    getWatchlistTags(symbols)
+      .then((res) => {
+        if (stopped) {
+          return;
+        }
+        // Map<symbol, latestSignal>：同标的多策略信号取日期最新（并列保持后到覆盖）
+        const merged = new Map<string, StrategyWatchlistTagItem>();
+        (res?.items ?? []).forEach((tag) => {
+          const existing = merged.get(tag.symbol);
+          if (!existing || tag.date > existing.date) {
+            merged.set(tag.symbol, tag);
+          }
+        });
+        setStrategyTags(merged);
+      })
+      .catch(() => {
+        // 策略信号加载失败不阻断页面，标签列显示 '-'
+        if (!stopped) {
+          setStrategyTags(new Map());
+        }
+      });
+    return () => {
+      stopped = true;
+    };
+  }, [items]);
 
   const onAdd = async () => {
     const parsed = parseSymbol(addSymbol);
@@ -255,6 +294,24 @@ export const WatchlistPage: React.FC = () => {
           return '-';
         }
         return <span className={v > 0 ? 'text-stock-up' : v < 0 ? 'text-stock-down' : undefined}>{v.toFixed(2)}%</span>;
+      }
+    },
+    {
+      // 策略信号 Tag：BUY 红 / SELL 绿（照 stock 涨跌色惯例），Tooltip 显策略名与信号日；
+      // 后端已过滤 skipped（含 no_bar）与停用策略，前端无需二次过滤，无信号显 '-'
+      title: '策略信号',
+      key: 'strategyTag',
+      width: 100,
+      render: (_: unknown, record) => {
+        const tag = strategyTags.get(record.symbol);
+        if (!tag) {
+          return '-';
+        }
+        return (
+          <Tooltip title={`${tag.strategyName} · ${tag.date}`}>
+            <Tag color={tag.action === 'buy' ? 'red' : 'green'}>{tag.action === 'buy' ? '买入' : '卖出'}</Tag>
+          </Tooltip>
+        );
       }
     },
     { title: '备注', dataIndex: 'note', ellipsis: true, render: (v: string | null) => v || '-' },

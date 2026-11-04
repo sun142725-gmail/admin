@@ -93,7 +93,9 @@ export interface SearchResult {
 
 // ---------- 会议类型 ----------
 
-export type SubjectType = 'market' | 'index' | 'sector' | 'stock';
+// 主题类型：'strategy' 为策略模拟盘联动主题（CreateRoundtableDto @IsIn 同步扩展；strategy 主题下
+// strategyId 必填，subjectCode=String(strategyId)，策略页一键发起，不进圆桌页选单）。
+export type SubjectType = 'market' | 'index' | 'sector' | 'stock' | 'strategy';
 export type RoundtableMode = 'quick' | 'standard' | 'deep';
 export type SessionStatus = 'preparing' | 'round1' | 'debating' | 'summarizing' | 'completed' | 'failed';
 export type StanceDirection = 'bull' | 'bear' | 'neutral';
@@ -224,6 +226,8 @@ export interface CreateRoundtablePayload {
   mode?: RoundtableMode;
   /** 指定模型行 id（空 = 自动：智能体绑定模型 > 任意 chat 渠道）。 */
   modelId?: number;
+  /** subjectType='strategy' 时必填：策略行 id（缺失/非正整数 422，策略不存在 422——create 即校验）。 */
+  strategyId?: number;
 }
 
 export const fetchStockModels = async (): Promise<StockModelOption[]> =>
