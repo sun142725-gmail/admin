@@ -28,11 +28,17 @@ import {
   FileImageOutlined,
   FundOutlined,
   ApartmentOutlined,
-  GatewayOutlined
+  GatewayOutlined,
+  LineChartOutlined,
+  HistoryOutlined,
+  VideoCameraOutlined,
+  SnippetsOutlined
 } from '@ant-design/icons';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { fetchMenuTree } from '../api/resources';
 import type { MenuTreeNode } from '../api/resources';
+import { buildMenuTree, MENU_ICON_KEY } from './menuConfig';
+import type { BuiltMenuItem, MenuIconKey } from './menuConfig';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { clearTokens } from '../store/authSlice';
 import { logout as apiLogout } from '../api/auth';
@@ -42,72 +48,49 @@ const { Header, Sider, Content } = Layout;
 
 type MenuItem = MenuTreeNode;
 
-const getMenuIcon = (item: MenuItem) => {
-  if (item.path) {
-    const pathIconMap: Record<string, React.ReactNode> = {
-      '/': <HomeOutlined />,
-      '/users': <UserOutlined />,
-      '/roles': <TeamOutlined />,
-      '/permissions': <SafetyOutlined />,
-      '/logs/overview': <FundOutlined />,
-      '/logs/audit': <FileTextOutlined />,
-      '/logs/session': <ApartmentOutlined />,
-      '/logs/track': <FileSearchOutlined />,
-      '/logs/frontend': <FileSearchOutlined />,
-      '/logs/error': <FileSearchOutlined />,
-      '/divination': <ExperimentOutlined />,
-      '/ai/models': <DatabaseOutlined />,
-      '/ai/agents': <RobotOutlined />,
-      '/ai/chat': <MessageOutlined />,
-      '/ai/images': <PictureOutlined />,
-      '/ai/canvas': <GatewayOutlined />,
-      '/ai/usage': <FundOutlined />,
-      '/stock': <StockOutlined />,
-      '/stock/screener': <FilterOutlined />,
-      '/stock/watchlist': <StarOutlined />,
-      '/dicts': <BookOutlined />,
-      '/notifications/templates': <BookOutlined />,
-      '/notifications/publish': <FileTextOutlined />,
-      '/notifications/inbox': <IdcardOutlined />,
-      '/publisher': <SendOutlined />,
-      '/profile': <IdcardOutlined />
-    };
-    return pathIconMap[item.path];
-  }
-  const nameIconMap: Record<string, React.ReactNode> = {
-    系统首页: <HomeOutlined />,
-    系统管理: <SettingOutlined />,
-    系统配置: <SettingOutlined />,
-    日志管理: <FileSearchOutlined />,
-    'AI 中心': <ThunderboltOutlined />,
-    股市: <StockOutlined />,
-    工具: <AppstoreOutlined />
-  };
-  return nameIconMap[item.name];
+// 图标 key → 实际组件。用 Record<MenuIconKey, ...> 约束：menuConfig.ts 里新增 key 时
+// 这里漏配会直接编译失败，不会出现「有 key 但渲染成空」的同级图标缺失。
+const ICON_COMPONENTS: Record<MenuIconKey, React.ReactNode> = {
+  [MENU_ICON_KEY.home]: <HomeOutlined />,
+  [MENU_ICON_KEY.user]: <UserOutlined />,
+  [MENU_ICON_KEY.team]: <TeamOutlined />,
+  [MENU_ICON_KEY.safety]: <SafetyOutlined />,
+  [MENU_ICON_KEY.fund]: <FundOutlined />,
+  [MENU_ICON_KEY.fileText]: <FileTextOutlined />,
+  [MENU_ICON_KEY.apartment]: <ApartmentOutlined />,
+  [MENU_ICON_KEY.fileSearch]: <FileSearchOutlined />,
+  [MENU_ICON_KEY.experiment]: <ExperimentOutlined />,
+  [MENU_ICON_KEY.database]: <DatabaseOutlined />,
+  [MENU_ICON_KEY.robot]: <RobotOutlined />,
+  [MENU_ICON_KEY.message]: <MessageOutlined />,
+  [MENU_ICON_KEY.picture]: <PictureOutlined />,
+  [MENU_ICON_KEY.gateway]: <GatewayOutlined />,
+  [MENU_ICON_KEY.stock]: <StockOutlined />,
+  [MENU_ICON_KEY.filter]: <FilterOutlined />,
+  [MENU_ICON_KEY.star]: <StarOutlined />,
+  [MENU_ICON_KEY.lineChart]: <LineChartOutlined />,
+  [MENU_ICON_KEY.history]: <HistoryOutlined />,
+  [MENU_ICON_KEY.videoCamera]: <VideoCameraOutlined />,
+  [MENU_ICON_KEY.fileImage]: <FileImageOutlined />,
+  [MENU_ICON_KEY.snippets]: <SnippetsOutlined />,
+  [MENU_ICON_KEY.book]: <BookOutlined />,
+  [MENU_ICON_KEY.idcard]: <IdcardOutlined />,
+  [MENU_ICON_KEY.send]: <SendOutlined />,
+  [MENU_ICON_KEY.setting]: <SettingOutlined />,
+  [MENU_ICON_KEY.thunderbolt]: <ThunderboltOutlined />,
+  [MENU_ICON_KEY.appstore]: <AppstoreOutlined />
 };
 
-const buildMenuItems = (
-  items: MenuItem[],
-  permissions: string[],
-  includeChildren = true
-): MenuProps['items'] => {
-  return items
-    .filter((item) => !item.permissionCode || permissions.includes(item.permissionCode))
-    .map((item) => {
-      // 折叠态不渲染子菜单，父级退化为普通项：hover 不弹浮层，点击由 onClick 展开侧边栏。
-      const childrenItems =
-        includeChildren && item.children?.length
-          ? buildMenuItems(item.children, permissions)
-          : undefined;
-      return {
-        key: item.path ?? String(item.id),
-        label: item.path ? <Link to={item.path}>{item.name}</Link> : item.name,
-        title: item.name,
-        icon: getMenuIcon(item),
-        children: childrenItems?.length ? childrenItems : undefined
-      };
-    });
-};
+// 纯数据的菜单树 → antd items。折叠态下 buildMenuTree 不产出 children，
+// 父级退化为普通项：hover 不弹浮层，点击由 Menu.onClick 展开侧边栏。
+const toAntdItems = (nodes: BuiltMenuItem[]): MenuProps['items'] =>
+  nodes.map((node) => ({
+    key: node.key,
+    label: node.path ? <Link to={node.path}>{node.name}</Link> : node.name,
+    title: node.name,
+    icon: node.iconKey ? ICON_COMPONENTS[node.iconKey] : undefined,
+    children: node.children ? toAntdItems(node.children) : undefined
+  }));
 
 const PAGE_CODE_MAP: Record<string, string> = {
   '/': 'home',
@@ -192,7 +175,7 @@ export const MainLayout: React.FC = () => {
   }, [location.pathname]);
 
   const items = useMemo(
-    () => buildMenuItems(menuTree, permissions, !collapsed),
+    () => toAntdItems(buildMenuTree(menuTree, permissions, !collapsed)),
     [menuTree, permissions, collapsed]
   );
 
